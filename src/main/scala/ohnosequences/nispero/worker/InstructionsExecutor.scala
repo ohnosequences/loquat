@@ -8,6 +8,7 @@ import org.clapper.avsl.Logger
 import java.io.File
 import ohnosequences.nispero.utils.{JSON, Utils}
 import scala.concurrent.Future
+import net.liftweb.json.JsonParser.ParseException
 
 
 class InstructionsExecutor(config: Config, instructions: Instructions, val awsClients: AWSClients) {

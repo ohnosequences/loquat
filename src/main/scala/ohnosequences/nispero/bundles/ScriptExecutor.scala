@@ -60,9 +60,10 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.InstructionsAux {
         outputObjects.mkdir()
         outputObjects.listFiles().foreach(_.delete())
 
-        for ((name, objectAddress) <- task.inputObjects) {
-          logger.info("trying to retrieve input object " + objectAddress)
-          loadManager.download(objectAddress, new File(inputObjects, name))
+        /* if it's a tiny task, we just create the files with input messages */
+        for ((name, content) <- task.inputObjects) {
+          logger.info("trying to create input object: " + name)
+          Utils.writeStringToFile(content, new File(inputObjects, name))
           logger.info("success")
         }
 
