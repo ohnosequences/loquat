@@ -15,7 +15,7 @@ libraryDependencies ++= Seq(
   "org.scala-sbt" % "launcher-interface" % "0.13.0" % "provided",
   "net.databinder" %% "unfiltered-filter" % "0.6.8",
   "net.databinder" %% "unfiltered-jetty" % "0.6.8",
-  "org.clapper" %% "avsl" % "1.0.2",
+  "org.clapper" %% "avsl" % "1.0.1",
   "ohnosequences" %% "aws-scala-tools" % "0.4.2",
   "ohnosequences" %% "statika" % "1.0.0",
   "ohnosequences" %% "aws-statika" % "1.0.1",
