@@ -39,7 +39,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
   def waitForResult(futureResult: Future[TaskResult], message: Message): (TaskResult, Int) = {
     val startTime = System.currentTimeMillis()
-    val step = 500
+    val step = 1000 // 1s
 
     def timeSpent(): Int = {
       val currentTime = System.currentTimeMillis()
@@ -48,13 +48,9 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
     var stopWaiting = false
 
-    var it = 1
-
     var taskResult: TaskResult = Failure("internal error during waiting for task result")
 
     while(!stopWaiting) {
-      it += 1;
-
       if(timeSpent() > config.taskProcessTimeout) {
         stopWaiting = true
         taskResult = Failure("timeout: " + timeSpent + " > visibilityTimeoutLimit")
@@ -62,9 +58,11 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
       } else {
         futureResult.value match {
           case None => {
-            logger.info("solving task: " + Utils.printInterval(timeSpent()))
-            if(it % 60==0) {
+            logger.info("Solving task: " + Utils.printInterval(timeSpent()))
+            try {
               message.changeVisibilityTimeout((step / 1000) * 2)
+            } catch {
+              case e: Throwable => logger.warn("An error while changing the visibility timeout")
             }
             
             Thread.sleep(step)
@@ -108,7 +106,6 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
         logger.info("InstructionsExecutor processing message")
 
-        instructions.execute(s3, task, new File(config.workersDir))  
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = scala.concurrent.future {
           instructions.execute(s3, task, new File(config.workersDir))  

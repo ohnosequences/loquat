@@ -46,18 +46,19 @@ trait ManagerAux extends AnyAWSDistribution {
       logger.info("generating tasks")
       val tasks = taskProvider.tasks(aws.s3)
 
-      logger.info("uploading initial tasks to S3")
-      aws.s3.putWholeObject(initialTasks, JSON.toJson(tasks))
+      // NOTE: It's not used anywhere, but serializing can take too long
+      // logger.info("uploading initial tasks to S3")
+      // aws.s3.putWholeObject(initialTasks, JSON.toJson(tasks))
 
-
-      logger.info("add initial tasks to SQS")
+      logger.info("adding initial tasks to SQS")
       val inputQueue = aws.sqs.createQueue(resourcesBundle.resources.inputQueue)
 
-      tasks.foreach {
-        task =>
-          inputQueue.sendMessage(JSON.toJson(task))
+      // NOTE: we can send messages in parallel
+      tasks.par.foreach { task =>
+        inputQueue.sendMessage(JSON.toJson(task))
       }
       aws.s3.putWholeObject(resourcesBundle.config.tasksUploaded, "")
+      logger.info("initial tasks are ready")
 
     } catch {
       case t: Throwable => logger.error("error during uploading initial tasks"); t.printStackTrace()
