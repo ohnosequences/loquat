@@ -8,6 +8,7 @@ import org.clapper.avsl.Logger
 import java.io.File
 import ohnosequences.nispero.utils.{JSON, Utils}
 import scala.concurrent.Future
+import net.liftweb.json.JsonParser.ParseException
 
 
 class InstructionsExecutor(config: Config, instructions: Instructions, val awsClients: AWSClients) {
@@ -38,7 +39,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
   def waitForResult(futureResult: Future[TaskResult], message: Message): (TaskResult, Int) = {
     val startTime = System.currentTimeMillis()
-    val step = 500
+    val step = 1000 // 1s
 
     def timeSpent(): Int = {
       val currentTime = System.currentTimeMillis()
@@ -47,26 +48,27 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
     var stopWaiting = false
 
-    var it = 1
-
     var taskResult: TaskResult = Failure("internal error during waiting for task result")
 
-    while(!stopWaiting) {
-      it += 1;
 
+    var it = 0
+    while(!stopWaiting) {
       if(timeSpent() > config.taskProcessTimeout) {
         stopWaiting = true
-        taskResult = Failure("timeout: " + timeSpent + " > visibilityTimeoutLimit")
-        terminate()
+        taskResult = Failure("Timeout: " + timeSpent + " > taskProcessTimeout")
+        // terminate()
       } else {
         futureResult.value match {
           case None => {
-            logger.info("solving task: " + Utils.printInterval(timeSpent()))
-            if(it % 60==0) {
-              message.changeVisibilityTimeout((step / 1000) * 2)
+            try {
+              // every 5min we extend it for 6min
+              if (it % (5*60) == 0) message.changeVisibilityTimeout(6*60)
+            } catch {
+              case e: Throwable => logger.info("Couldn't change the visibility timeout")
             }
-            
             Thread.sleep(step)
+            logger.info("Solving task: " + Utils.printInterval(timeSpent()))
+            it += 1
           }
           case Some(scala.util.Success(r)) => stopWaiting = true; taskResult = r
           case Some(scala.util.Failure(t)) => stopWaiting = true; taskResult = Failure("future error: " + t.getMessage)
@@ -107,7 +109,6 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
         logger.info("InstructionsExecutor processing message")
 
-        instructions.execute(s3, task, new File(config.workersDir))  
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = scala.concurrent.future {
           instructions.execute(s3, task, new File(config.workersDir))  

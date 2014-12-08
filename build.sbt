@@ -15,13 +15,14 @@ libraryDependencies ++= Seq(
   "org.scala-sbt" % "launcher-interface" % "0.13.0" % "provided",
   "net.databinder" %% "unfiltered-filter" % "0.6.8",
   "net.databinder" %% "unfiltered-jetty" % "0.6.8",
-  "org.clapper" %% "avsl" % "1.0.2",
+  "org.clapper" %% "avsl" % "1.0.1",
   "ohnosequences" %% "aws-scala-tools" % "0.4.2",
   "ohnosequences" %% "statika" % "1.0.0",
-  "ohnosequences" %% "aws-statika" % "1.0.0",
+  "ohnosequences" %% "aws-statika" % "1.0.1",
   "ohnosequences" %% "amazon-linux-ami" % "0.14.0"
 )
 
 dependencyOverrides ++= Set(
-  "commons-codec" % "commons-codec" % "1.6"
+  "commons-codec" % "commons-codec" % "1.6",
+  "ohnosequences" %% "aws-statika" % "1.0.1"
 )

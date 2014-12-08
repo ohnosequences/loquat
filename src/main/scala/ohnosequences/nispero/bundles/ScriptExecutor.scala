@@ -24,17 +24,10 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.InstructionsAux {
 
   val instructions = new ohnosequences.nispero.Instructions {
 
-    var loadManager: LoadingManager = null
-
     val scriptname = "script.sh"
 
     def execute(s3: S3, task: Task, workingDir: File): TaskResult = {
       try {
-
-        if (loadManager == null) {
-          logger.info("creating download manager")
-          loadManager = s3.createLoadingManager()
-        }
 
         workingDir.mkdir()
 
@@ -60,9 +53,10 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.InstructionsAux {
         outputObjects.mkdir()
         outputObjects.listFiles().foreach(_.delete())
 
-        for ((name, objectAddress) <- task.inputObjects) {
-          logger.info("trying to retrieve input object " + objectAddress)
-          loadManager.download(objectAddress, new File(inputObjects, name))
+        /* if it's a tiny task, we just create the files with input messages */
+        for ((name, content) <- task.inputObjects) {
+          logger.info("trying to create input object: " + name)
+          Utils.writeStringToFile(content, new File(inputObjects, name))
           logger.info("success")
         }
 
@@ -93,7 +87,8 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.InstructionsAux {
             val outputFile = new File(outputObjects, name)
             if (outputFile.exists()) {
               logger.info("trying to publish output object " + objectAddress)
-              loadManager.upload(objectAddress, outputFile)
+              // TODO: publicity should be a configurable option
+              s3.putObject(objectAddress, outputFile, public = true)
               logger.info("success")
             } else {
               logger.warn("warning: file " + outputFile.getAbsolutePath + " doesn't exists!")
