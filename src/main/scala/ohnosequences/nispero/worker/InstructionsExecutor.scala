@@ -50,22 +50,25 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
     var taskResult: TaskResult = Failure("internal error during waiting for task result")
 
+
+    var it = 0
     while(!stopWaiting) {
       if(timeSpent() > config.taskProcessTimeout) {
         stopWaiting = true
-        taskResult = Failure("timeout: " + timeSpent + " > visibilityTimeoutLimit")
-        terminate()
+        taskResult = Failure("Timeout: " + timeSpent + " > taskProcessTimeout")
+        // terminate()
       } else {
         futureResult.value match {
           case None => {
-            logger.info("Solving task: " + Utils.printInterval(timeSpent()))
             try {
-              message.changeVisibilityTimeout((step / 1000) * 2)
+              // every 5min we extend it for 6min
+              if (it % (5*60) == 0) message.changeVisibilityTimeout(6*60)
             } catch {
-              case e: Throwable => logger.warn("An error while changing the visibility timeout")
+              case e: Throwable => logger.info("Couldn't change the visibility timeout")
             }
-            
             Thread.sleep(step)
+            logger.info("Solving task: " + Utils.printInterval(timeSpent()))
+            it += 1
           }
           case Some(scala.util.Success(r)) => stopWaiting = true; taskResult = r
           case Some(scala.util.Failure(t)) => stopWaiting = true; taskResult = Failure("future error: " + t.getMessage)

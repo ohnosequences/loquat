@@ -16,7 +16,7 @@ abstract class TasksProvider {  p =>
 
 object TasksProvider {
   def flatten(qs: List[TasksProvider]): TasksProvider = new TasksProvider {
-    def tasks(s3: S3): Stream[Task] =  qs.flatMap(_.tasks(s3))
+    def tasks(s3: S3): Stream[Task] =  qs.foldLeft(Stream[Task]()){ (acc, p) => acc ++ p.tasks(s3) }
   }
 }
 
