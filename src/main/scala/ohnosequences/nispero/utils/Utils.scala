@@ -5,7 +5,7 @@ import java.util.zip.{ZipEntry, ZipFile}
 import org.apache.commons.io.{IOUtils, FileUtils}
 import scala.collection.JavaConversions._
 import ohnosequences.awstools.s3.ObjectAddress
-import net.liftweb.json.JsonParser.ParseException
+// import net.liftweb.json.JsonParser.ParseException
 import ohnosequences.awstools.ec2.Tag
 import ohnosequences.awstools.autoscaling.AutoScaling
 import ohnosequences.nispero.InstanceTags

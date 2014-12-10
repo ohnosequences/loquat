@@ -1,14 +1,15 @@
 package ohnosequences.nispero.worker
 
 import ohnosequences.nispero._
+import ohnosequences.nispero.utils.Utils
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sns.Topic
 import ohnosequences.awstools.sqs.Queue
 import org.clapper.avsl.Logger
 import java.io.File
-import ohnosequences.nispero.utils.{JSON, Utils}
 import scala.concurrent.Future
-import net.liftweb.json.JsonParser.ParseException
+import ohnosequences.nispero.utils.pickles._
+import upickle._
 
 
 class InstructionsExecutor(config: Config, instructions: Instructions, val awsClients: AWSClients) {
@@ -104,7 +105,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
         instance.foreach(_.createTag(InstanceTags.PROCESSING))
         logger.info("InstructionsExecutor: received message " + message)
-        val task = JSON.parse[Task](message.body)
+        val task = upickle.read[Task](message.body)
         taskId = task.id
 
         logger.info("InstructionsExecutor processing message")
@@ -130,12 +131,12 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
         taskResult match {
           case Success(msg) => {
-            outputTopic.publish(JSON.toJson(taskResultDescription.copy(message = msg)))
+            outputTopic.publish(upickle.write(taskResultDescription.copy(message = msg)))
             logger.info("InstructionsExecutor deleting message with from input queue")
             inputQueue.deleteMessage(message)
           }
           case Failure(msg) => {
-            errorTopic.publish(JSON.toJson(taskResultDescription.copy(message = msg)))
+            errorTopic.publish(upickle.write(taskResultDescription.copy(message = msg)))
           }
         }
       } catch {
@@ -148,7 +149,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
             instanceId = instance.map(_.getInstanceId()),
             time = lastTimeSpent
           )
-          errorTopic.publish(JSON.toJson(taskResultDescription))
+          errorTopic.publish(upickle.write(taskResultDescription))
           terminate()
         }
       }

@@ -8,8 +8,9 @@ import unfiltered.Cycle
 
 import org.clapper.avsl.Logger
 
-
-import ohnosequences.nispero.utils.{JSON, Utils}
+import ohnosequences.nispero.utils.Utils
+import ohnosequences.nispero.utils.pickles._
+import upickle._
 
 
 trait Users {
@@ -30,8 +31,8 @@ class App(backend: BackEnd, mainPage: String, users: Users) extends unfiltered.f
 
   val logger = Logger(classOf[App])
 
-  def responseJSON(any: Any): ResponseWriter = {
-    ResponseString(JSON.toJson(any))
+  def responseJSON[X : upickle.Writer](x: X): ResponseWriter = {
+    ResponseString(upickle.write(x))
   }
 
   def intent = Auth(users) {
@@ -135,12 +136,26 @@ class FrontEnd(backend: BackEnd, password: String, port: Int, resourcesBucket: S
 
     val dns = backend.currentAddress
 
+    // implicitly[upickle.Writer[ohnosequences.awstools.ec2.InstanceSpecs]]
+    // implicitly[upickle.Writer[ohnosequences.awstools.autoscaling.OnDemand.type]]
+    // implicitly[upickle.Writer[ohnosequences.awstools.autoscaling.SpotAuto.type]]
+    // implicitly[upickle.Writer[ohnosequences.awstools.autoscaling.Spot]]
+    // implicitly[upickle.Writer[ohnosequences.awstools.autoscaling.PurchaseModel]]
+    // implicitly[upickle.Writer[ohnosequences.awstools.autoscaling.LaunchConfiguration]]
+    // implicitly[upickle.Writer[ohnosequences.awstools.autoscaling.AutoScalingGroup]]
+    // implicitly[upickle.Writer[ohnosequences.awstools.s3.ObjectAddress]]
+    // implicitly[upickle.Writer[ohnosequences.nispero.ManagerConfig]]
+    // implicitly[upickle.Writer[ohnosequences.nispero.TasksProvider]]
+    // implicitly[upickle.Writer[ohnosequences.nispero.TerminationConditions]]
+    // implicitly[upickle.Writer[ohnosequences.nispero.Resources]]
+    val c = implicitly[upickle.Writer[ohnosequences.nispero.Config]]
+
     val managerLocation = printURL(dns, port)
     val message = "Nispero started \n" +
       "console location: "+  managerLocation + "\n" +
       "login: nispero\n" +
       "password: " + password + "\n" +
-      "config:\n" + JSON.toJson(backend.configForConsole)
+      "config:\n" + upickle.write[ohnosequences.nispero.Config](backend.configForConsole)
     val subject = "Nispero " + backend.configForConsole.resources.id + " started"
 
 

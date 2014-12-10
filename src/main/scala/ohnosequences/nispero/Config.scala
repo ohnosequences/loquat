@@ -2,6 +2,8 @@ package ohnosequences.nispero
 
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
+import ohnosequences.nispero.utils.pickles._
+import upickle._
 
 /**
  * configuration for nispero
@@ -14,15 +16,15 @@ import ohnosequences.awstools.autoscaling.AutoScalingGroup
  * @param taskProcessTimeout maximum time for processing task
  */
 case class Config(
-                   managerConfig: ManagerConfig,
-                   email: String,
-                   terminationConditions: TerminationConditions,
-                   resources: Resources,
-                   workersDir: String,
-                   tasksProvider: TasksProvider = EmptyTasks,
-                   jarAddress: ObjectAddress,
-                   taskProcessTimeout: Int = 60 * 60 * 10 // 10 hours
-                   ) {
+    managerConfig: ManagerConfig,
+    email: String,
+    terminationConditions: TerminationConditions,
+    resources: Resources,
+    workersDir: String,
+    tasksProvider: TasksProvider = EmptyTasks,
+    jarAddress: ObjectAddress,
+    taskProcessTimeout: Int = 60 * 60 * 10 // 10 hours
+  ) {
 
   def initialTasks = ObjectAddress(resources.bucket, "initialTasks")
 
@@ -49,24 +51,18 @@ case class Config(
  * @param workersGroup configuration of worker group
  */
 case class Resources(
-                      id: String
-                      )(
-
-                      val inputQueue: String = "nisperoInputQueue" + id,
-
-                      val controlQueue: String = "nisperoControlQueue" + id,
-
-                      val outputQueue: String = "nisperoOutputQueue" + id,
-                      val outputTopic: String = "nisperoOutputTopic" + id,
-
-                      val errorTopic: String = "nisperoErrorQueue" + id,
-                      val errorQueue: String = "nisperoErrorTopic" + id,
-
-                      val bucket: String = "nisperobucket" + id.replace("_", "-"),
-
-                      val workersStateTable: String = "nisperoworkersStateTable" + id,
-                      val workersGroup: AutoScalingGroup
-                      )
+  id: String,
+  workersGroup: AutoScalingGroup
+) {
+  val inputQueue: String = "nisperoInputQueue" + id
+  val controlQueue: String = "nisperoControlQueue" + id
+  val outputQueue: String = "nisperoOutputQueue" + id
+  val outputTopic: String = "nisperoOutputTopic" + id
+  val errorTopic: String = "nisperoErrorQueue" + id
+  val errorQueue: String = "nisperoErrorTopic" + id
+  val bucket: String = "nisperobucket" + id.replace("_", "-")
+  val workersStateTable: String = "nisperoworkersStateTable" + id
+}
 
 /**
  * configuration for Manager and Console
