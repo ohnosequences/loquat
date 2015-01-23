@@ -2,6 +2,8 @@ package ohnosequences.nispero
 
 import ohnosequences.awstools.s3.{ObjectAddress, S3}
 import java.io.File
+import ohnosequences.nispero.utils.pickles._
+import upickle._
 
 /* The difference here is that we put input objects content in the message itself */
 case class Task(

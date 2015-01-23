@@ -7,8 +7,9 @@ import scala.collection.mutable.ListBuffer
 import scala.Some
 import ohnosequences.nispero.TaskResultDescription
 import ohnosequences.nispero.Task
-import ohnosequences.nispero.utils.JSON
 import ohnosequences.typesets._
+import ohnosequences.nispero.utils.pickles._
+import upickle._
 
 case class SNSMessage(Message: String)
 
@@ -67,8 +68,8 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
 
     rawMessages.map {
       case (handle, rawMessageBody) =>  {
-        val snsMessage: SNSMessage = JSON.parse[SNSMessage](rawMessageBody)
-        val r: TaskResultDescription = JSON.parse[TaskResultDescription](snsMessage.Message)
+        val snsMessage: SNSMessage = upickle.read[SNSMessage](rawMessageBody)
+        val r: TaskResultDescription = upickle.read[TaskResultDescription](snsMessage.Message)
         (handle, r)
       }
     }
@@ -118,7 +119,7 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
   def calcInitialTasksCount(): Option[Int] = {
     try {
       val tasksString = s3.readWholeObject(config.initialTasks)
-      val tasks: List[Task] = JSON.parse[List[Task]](tasksString)
+      val tasks: List[Task] = upickle.read[List[Task]](tasksString)
       val ids = scala.collection.mutable.HashSet() ++ tasks
       Some(ids.size)
     } catch {

@@ -8,9 +8,11 @@ import org.clapper.avsl.Logger
 
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.nispero.utils.{JSON, Utils}
+import ohnosequences.nispero.utils.Utils
 import ohnosequences.typesets._
 import shapeless._
+import ohnosequences.nispero.utils.pickles._
+import upickle._
 
 trait ManagerAux extends AnyAWSDistribution {
   type WA <: WorkerAux
@@ -48,14 +50,14 @@ trait ManagerAux extends AnyAWSDistribution {
 
       // NOTE: It's not used anywhere, but serializing can take too long
       // logger.info("uploading initial tasks to S3")
-      // aws.s3.putWholeObject(initialTasks, JSON.toJson(tasks))
+      // aws.s3.putWholeObject(initialTasks, upickle.write(tasks))
 
       logger.info("adding initial tasks to SQS")
       val inputQueue = aws.sqs.createQueue(resourcesBundle.resources.inputQueue)
 
       // NOTE: we can send messages in parallel
       tasks.par.foreach { task =>
-        inputQueue.sendMessage(JSON.toJson(task))
+        inputQueue.sendMessage(upickle.write(task))
       }
       aws.s3.putWholeObject(resourcesBundle.config.tasksUploaded, "")
       logger.info("initial tasks are ready")

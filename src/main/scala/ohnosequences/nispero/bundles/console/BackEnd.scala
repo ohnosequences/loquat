@@ -15,7 +15,8 @@ import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.nispero.bundles.console.pojo.FarmState
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 import ohnosequences.nispero.manager.{RawCommand}
-import ohnosequences.nispero.utils.JSON
+import ohnosequences.nispero.utils.pickles._
+import upickle._
 
 
 class BackEnd(awsClients: AWSClients, config: Config, farmStateLogger: FarmStateLogger) {
@@ -89,10 +90,8 @@ class BackEnd(awsClients: AWSClients, config: Config, farmStateLogger: FarmState
   }
 
   def addTasks(tasksString: String): Int = {
-    val tasks = JSON.parse[List[Task]](tasksString)
-    tasks.foreach { task: Task =>
-      addTask(JSON.toJson(task))
-    }
+    val tasks = upickle.read[List[Task]](tasksString)
+    tasks.foreach { t: Task => addTask(upickle.write(t)) }
     tasks.size
   }
 
@@ -175,7 +174,7 @@ class BackEnd(awsClients: AWSClients, config: Config, farmStateLogger: FarmState
 
   def sendManagerCommand(command: RawCommand) {
     val c = RawCommand(command.command, command.arg)
-    sqs.createQueue(resources.controlQueue).sendMessage(JSON.toJson(c))
+    sqs.createQueue(resources.controlQueue).sendMessage(upickle.write(c))
   }
 
 }

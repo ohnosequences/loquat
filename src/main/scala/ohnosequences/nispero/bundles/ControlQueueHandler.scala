@@ -5,11 +5,11 @@ import ohnosequences.awstools.sqs.{Message, Queue}
 import ohnosequences.nispero.{Task, Undeployer}
 import ohnosequences.nispero.manager._
 import org.clapper.avsl.Logger
-import net.liftweb.json.MappingException
+import ohnosequences.nispero.utils.pickles._
+import upickle._
 
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
-import ohnosequences.nispero.utils.JSON
 import ohnosequences.typesets._
 
 
@@ -43,16 +43,16 @@ abstract class ControlQueueHandler(resourcesBundle: Resources, aws: AWS) extends
       try {
         val message = waitForTask(controlQueue)
 
-        val command: RawCommand = JSON.parse[RawCommand](message.body)
+        val command: RawCommand = upickle.read[RawCommand](message.body)
         logger.info("received command: " + command)
         command match {
           case RawCommand("UnDeploy", reason: String) => {
             Undeployer.undeploy(aws.awsClients, config, reason)
           }
           case RawCommand("AddTasks", tasks: String) => {
-            val parsedTasks = JSON.parse[List[Task]](tasks)
+            val parsedTasks = upickle.read[List[Task]](tasks)
             parsedTasks.foreach { task =>
-              inputQueue.sendMessage(JSON.toJson(task))
+              inputQueue.sendMessage(upickle.write(task))
             }
           }
           case RawCommand("ChangeCapacity", n: String) => {
