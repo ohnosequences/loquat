@@ -7,8 +7,8 @@
 Goals of this fork:
 
 - [x] tasks content is transferred to workers in the SQS messages (no S3 involved) (See [#1](https://github.com/laughedelic/nisperito/pull/1))
-- [x] nispero-cli is removed, as it's not used
-- [ ] migrate from lift-json to [upickle](https://github.com/lihaoyi/upickle) (See [#2](https://github.com/laughedelic/nisperito/pull/2))
+- [x] removed nispero-cli, because it's not used
+- [x] migrated from lift-json to [upickle](https://github.com/lihaoyi/upickle) (See [#2](https://github.com/laughedelic/nisperito/pull/2))
 - [ ] support both kinds of tasks: tiny (in SQS message) and big (in S3 objects)
 - [ ] better console dashboard: informative charts, etc.
 - [ ] upgrade to Scala-2.11 and clean-up in general
