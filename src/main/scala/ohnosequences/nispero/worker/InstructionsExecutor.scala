@@ -56,7 +56,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
       if(timeSpent() > config.taskProcessTimeout) {
         stopWaiting = true
         taskResult = Failure("Timeout: " + timeSpent + " > taskProcessTimeout")
-        // terminate()
+        terminate()
       } else {
         futureResult.value match {
           case None => {

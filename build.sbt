@@ -6,7 +6,7 @@ organization := "ohnosequences"
 bucketSuffix := "era7.com"
 
 scalaVersion        := "2.10.4"
-// crossScalaVersions  := Seq("2.10.4", "2.11.2")
+// crossScalaVersions  := Seq("2.10.4", "2.11.5")
 
 libraryDependencies ++= Seq(
   "commons-io" % "commons-io" % "2.4",
@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
   "net.databinder" %% "unfiltered-filter" % "0.6.8",
   "net.databinder" %% "unfiltered-jetty" % "0.6.8",
   "org.clapper" %% "avsl" % "1.0.1",
-  "ohnosequences" %% "aws-scala-tools" % "0.4.2",
+  "ohnosequences" %% "aws-scala-tools" % "0.10.0",
   "ohnosequences" %% "statika" % "1.0.0",
   "ohnosequences" %% "aws-statika" % "1.0.1",
   "ohnosequences" %% "amazon-linux-ami" % "0.14.0"
