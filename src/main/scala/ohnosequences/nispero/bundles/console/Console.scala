@@ -1,21 +1,21 @@
 package ohnosequences.nispero.bundles.console
 
-import ohnosequences.statika._
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.instructions._
 import ohnosequences.nispero.bundles.{AWS, LogUploader, Resources}
 import java.io.File
 import org.apache.commons.io.FileUtils
 import org.clapper.avsl.Logger
 import ohnosequences.nispero.utils.Utils
-import ohnosequences.typesets._
 
 abstract class Console(resourcesBundle: Resources, logUploader: LogUploader, farmStateLogger: FarmStateLogger, aws: AWS)
-  extends Bundle(resourcesBundle :~: logUploader :~: farmStateLogger :~: aws :~: ∅) {
+  extends Bundle(resourcesBundle, logUploader, farmStateLogger, aws) {
 
   val logger = Logger(this.getClass)
 
-  override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+  def install: Results = {
 
-    val awsClients = aws.awsClients
+    // val awsClients = aws
 
     val config = resourcesBundle.config
 
@@ -52,11 +52,11 @@ abstract class Console(resourcesBundle: Resources, logUploader: LogUploader, far
     System.setProperty("jetty.ssl.keyStore", "keystore")
     System.setProperty("jetty.ssl.keyStorePassword", "password")
 
-    val bucket = aws.s3.createBucket(config.resources.bucket)
+    val bucket = aws.clients.s3.createBucket(config.resources.bucket)
     tmpDir.listFiles().foreach(bucket.putObject(_, public = true))
 
     val backEnd = new BackEnd(
-      awsClients = awsClients,
+      awsClients = aws.clients,
       config = config,
       farmStateLogger
     )

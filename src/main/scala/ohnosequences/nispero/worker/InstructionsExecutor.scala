@@ -5,6 +5,7 @@ import ohnosequences.nispero.utils.Utils
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sns.Topic
 import ohnosequences.awstools.sqs.Queue
+import ohnosequences.awstools.AWSClients
 import org.clapper.avsl.Logger
 import java.io.File
 import scala.concurrent.Future
@@ -105,14 +106,14 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
         instance.foreach(_.createTag(InstanceTags.PROCESSING))
         logger.info("InstructionsExecutor: received message " + message)
-        val task = upickle.read[Task](message.body)
+        val task = upickle.default.read[Task](message.body)
         taskId = task.id
 
         logger.info("InstructionsExecutor processing message")
 
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = scala.concurrent.future {
-          instructions.execute(s3, task, new File(config.workersDir))  
+          instructions.execute(s3, task, new File(config.workersDir))
         }
 
         val (taskResult, timeSpent) = waitForResult(futureResult, message)
@@ -131,12 +132,12 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
         taskResult match {
           case Success(msg) => {
-            outputTopic.publish(upickle.write(taskResultDescription.copy(message = msg)))
+            outputTopic.publish(upickle.default.write(taskResultDescription.copy(message = msg)))
             logger.info("InstructionsExecutor deleting message with from input queue")
             inputQueue.deleteMessage(message)
           }
           case Failure(msg) => {
-            errorTopic.publish(upickle.write(taskResultDescription.copy(message = msg)))
+            errorTopic.publish(upickle.default.write(taskResultDescription.copy(message = msg)))
           }
         }
       } catch {
@@ -149,7 +150,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
             instanceId = instance.map(_.getInstanceId()),
             time = lastTimeSpent
           )
-          errorTopic.publish(upickle.write(taskResultDescription))
+          errorTopic.publish(upickle.default.write(taskResultDescription))
           terminate()
         }
       }

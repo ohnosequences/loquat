@@ -1,6 +1,7 @@
 package ohnosequences.nispero
 
 import org.clapper.avsl.Logger
+import ohnosequences.awstools.AWSClients
 
 
 object Undeployer {
@@ -15,7 +16,7 @@ object Undeployer {
     try {
       val message = "termination due to " + reason
       val subject = "Nispero " + config.resources.id + " terminated"
-      val notificationTopic = sns.createTopic(config.notificationTopic)
+      val notificationTopic = awsClients.sns.createTopic(config.notificationTopic)
       notificationTopic.publish(message, subject)
     } catch {
       case t: Throwable => logger.error("error during sending notification" + t.getMessage)
@@ -23,7 +24,7 @@ object Undeployer {
 
 
     logger.info("deleting workers group")
-    awsClients.autoScaling.deleteAutoScalingGroup(config.resources.workersGroup)
+    awsClients.as.deleteAutoScalingGroup(config.resources.workersGroup)
 
 
     try {
@@ -34,37 +35,37 @@ object Undeployer {
     }
 
     try {
-      sqs.getQueueByName(config.resources.errorQueue).foreach(_.delete())
+      awsClients.sqs.getQueueByName(config.resources.errorQueue).foreach(_.delete())
     } catch {
       case t: Throwable => logger.error("error during deleting error queue " + t.getMessage)
     }
 
     try {
-      sns.createTopic(config.resources.errorTopic).delete()
+      awsClients.sns.createTopic(config.resources.errorTopic).delete()
     } catch {
       case t: Throwable => logger.error("error during deleting error topic " + t.getMessage)
     }
 
     try {
-      sqs.getQueueByName(config.resources.outputQueue).foreach(_.delete())
+      awsClients.sqs.getQueueByName(config.resources.outputQueue).foreach(_.delete())
     } catch {
       case t: Throwable => logger.error("error during deleting output queue " + t.getMessage)
     }
 
     try {
-      sns.createTopic(config.resources.outputTopic).delete()
+      awsClients.sns.createTopic(config.resources.outputTopic).delete()
     } catch {
       case t: Throwable => logger.error("error during deleting output topic " + t.getMessage)
     }
 
     try {
-      sqs.getQueueByName(config.resources.inputQueue).foreach(_.delete())
+      awsClients.sqs.getQueueByName(config.resources.inputQueue).foreach(_.delete())
     } catch {
       case t: Throwable => logger.error("error during deleting input queue " + t.getMessage)
     }
 
     try {
-      sqs.getQueueByName(config.resources.controlQueue).foreach(_.delete())
+      awsClients.sqs.getQueueByName(config.resources.controlQueue).foreach(_.delete())
     } catch {
       case t: Throwable => logger.error("error during deleting control queue " + t.getMessage)
     }
@@ -72,21 +73,21 @@ object Undeployer {
 
 
     try {
-      dynamoDB.deleteTable(config.resources.workersStateTable)
+      awsClients.ddb.deleteTable(config.resources.workersStateTable)
     } catch {
       case t: Throwable => logger.error("error during deleting workers state table: " + t.getMessage)
     }
 
     try {
       logger.info("delete console group")
-      awsClients.autoScaling.deleteAutoScalingGroup(config.managerConfig.groups._2)
+      awsClients.as.deleteAutoScalingGroup(config.managerConfig.groups._2)
     } catch {
       case t: Throwable => logger.info("error during deleting console group: " + t.getMessage)
     }
 
     try {
       logger.info("delete manager group")
-      awsClients.autoScaling.deleteAutoScalingGroup(config.managerConfig.groups._1)
+      awsClients.as.deleteAutoScalingGroup(config.managerConfig.groups._1)
     } catch {
       case t: Throwable => logger.info("error during deleting console group: " + t.getMessage)
     }

@@ -9,38 +9,38 @@ import ohnosequences.nispero._
 import ohnosequences.awstools.ec2.InstanceType
 import ohnosequences.awstools.autoscaling._
 import java.io.File
-import ohnosequences.nispero.utils.pickles._
-import upickle._
+// import ohnosequences.nispero.utils.pickles._
+import upickle.Js
 
 object pickles {
 
 
-  implicit val instanceTypeWriter = upickle.Writer[InstanceType]{
+  implicit val instanceTypeWriter = upickle.default.Writer[InstanceType]{
     case it => Js.Str(it.toString)
   }
 
-  implicit val instanceTypeReader = upickle.Reader[InstanceType]{
+  implicit val instanceTypeReader = upickle.default.Reader[InstanceType]{
     case Js.Str(str) => InstanceType.fromName(str)
   }
 
-  implicit val purchaseModelWriter = upickle.Writer[PurchaseModel] {
+  implicit val purchaseModelWriter = upickle.default.Writer[PurchaseModel] {
     case OnDemand => Js.Arr(Js.Str("OnDemand"), Js.Obj())
     case SpotAuto => Js.Arr(Js.Str("SpotAuto"), Js.Obj())
     case Spot(price) => Js.Arr(Js.Str("Spot"), Js.Obj(("price", Js.Num(price))))
   }
 
-  implicit val tasksProviderWriter = upickle.Writer[TasksProvider] {
+  implicit val tasksProviderWriter = upickle.default.Writer[TasksProvider] {
     case _ => Js.Str("SomeTaskProvider")
   }
-  // implicit val taskWriter = upickle.Writer[Task]{
+  // implicit val taskWriter = json.Writer[Task]{
   //   case it => Js.Str(it.toString)
   // }
 
-  // implicit val taskReader = upickle.Reader[Task]{
+  // implicit val taskReader = json.Reader[Task]{
   //   case Js.Str(str) => InstanceType.fromName(str)
   // }
 
-  // def toJson[X](x: X): String = upickle.write(x)
+  // def toJson[X](x: X): String = json.write(x)
 
   // def parse[T](s: String): T = {
   //   val json = JsonParser.parse(s)

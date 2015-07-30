@@ -1,40 +1,34 @@
 package ohnosequences.nispero.bundles
 
-import ohnosequences.statika._
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.instructions._
 import ohnosequences.statika.aws._
 import ohnosequences.nispero.bundles.console.Console
-import ohnosequences.typesets._
 
 
-abstract class NisperoDistribution
-[M <: ManagerAux, C <: Console](val manager: M, val console: C)
-  extends Bundle() with NisperoDistributionAux {
-  type MA = M
-  type CA = C
+trait NisperoDistributionAux extends AnyBundle {
+  type Manager <: AnyManager
+  val  manager: Manager
 
-}
+  val  console: Console
 
-trait NisperoDistributionAux extends AnyAWSDistribution {
-  type MA <: ManagerAux
-  val manager: MA
-
-  type CA <: Console
-  val console: CA
-
-  override type Members = MA :~: CA :~: ∅
-  override val members = manager :~: console :~: ∅
-
-  type Metadata = manager.resourcesBundle.configuration.Metadata
-  val metadata = manager.resourcesBundle.configuration.metadata
-  //val m: Metadata = resourcesBundle.configuration.metadata.asInstanceOf[Metadata]
+  val  metadata: AnyArtifactMetadata = manager.metadata
 
   type AMI = manager.resourcesBundle.configuration.AMI
-  val ami = manager.resourcesBundle.configuration.ami
+  val  ami = manager.resourcesBundle.configuration.ami
 
-  override type Deps = ∅
-  override val deps = ∅
+  val bundleDependencies: List[AnyBundle] = List(manager, console)
 
-  override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+  case object managerCompat extends Compatible(ami, manager, metadata)
+  case object consoleCompat extends Compatible(ami, console, metadata)     
+
+  def install: Results = {
     success("nispero distribution installed")
   }
+}
+
+abstract class NisperoDistribution[M <: AnyManager]
+  (val manager: M, val console: Console) extends NisperoDistributionAux {
+
+  type Manager = M
 }

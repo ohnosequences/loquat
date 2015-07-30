@@ -1,22 +1,21 @@
 package ohnosequences.nispero.bundles
 
-import ohnosequences.statika._
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.instructions._
+import ohnosequences.statika.aws._, amazonLinuxAMIs._
 import ohnosequences.nispero.Config
-import ohnosequences.statika.aws.{SbtMetadata, AnyAMI, AnyMetadata}
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.typesets._
 
 abstract class Configuration extends Bundle() {
 
-  type Metadata <: AnyMetadata
-  val metadata: Metadata
+  val metadata: AnyArtifactMetadata
 
-  type AMI <: AnyAMI.of[Metadata]
-  val ami: AMI
+  type AMI <: AmazonLinuxAMI
+  val  ami: AMI
 
   val config: Config
 
-  def generateId(metadata: SbtMetadata): String = {
+  def generateId(metadata: AnyArtifactMetadata): String = {
     val name = metadata.artifact.replace(".", "")
     val version = metadata.version.replace(".", "")
     (name + version).toLowerCase
@@ -30,7 +29,7 @@ abstract class Configuration extends Bundle() {
     }
   }
 
-  override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+  def install: Results = {
     success("configuration installed")
   }
 }

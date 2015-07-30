@@ -10,11 +10,12 @@ import ohnosequences.nispero.Failure
 import ohnosequences.nispero.Task
 import org.apache.commons.io.{FileUtils}
 import ohnosequences.nispero.utils.Utils
-import ohnosequences.typesets._
-import shapeless._
+
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.instructions._
 
 
-trait ScriptExecutorAux extends ohnosequences.nispero.bundles.InstructionsAux {
+trait ScriptExecutorAux extends ohnosequences.nispero.bundles.AnyInstructions {
 
   val configureScript: String
 
@@ -108,9 +109,7 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.InstructionsAux {
 
   def fixLineEndings(s: String): String = s.replaceAll("\\r\\n", "\n").replaceAll("\\r", "\n")
 
-  import ohnosequences.statika._
-
-  override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+  def install: Results = {
     val configureScriptName = "configure.sh"
 
     Utils.writeStringToFile(fixLineEndings(configureScript), new File(configureScriptName))
@@ -125,8 +124,5 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.InstructionsAux {
 }
 
 
-import ohnosequences.statika._
-
-abstract class ScriptExecutor[D <: TypeSet : ofBundles, T <: HList : towerFor[D]#is](deps: D = ∅)
-  extends Bundle[D, T](deps) with ScriptExecutorAux
-
+abstract class ScriptExecutor(deps: AnyBundle*)
+  extends Bundle(deps: _*) with ScriptExecutorAux

@@ -1,19 +1,16 @@
 package ohnosequences.nispero.bundles
 
-import ohnosequences.statika._
-import ohnosequences.typesets._
-import shapeless._
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.instructions._
 
 
-
-trait InstructionsAux extends AnyBundle {
+trait AnyInstructions extends AnyBundle {
 
   val instructions: ohnosequences.nispero.Instructions
 
-  override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+  def install: Results = {
     success("instructions installed")
   }
 }
 
-abstract class Instructions[D <: TypeSet : ofBundles, T <: HList : towerFor[D]#is](deps: D)
-  extends Bundle[D, T](deps) with InstructionsAux
+abstract class Instructions(deps: AnyBundle*) extends Bundle(deps: _*) with AnyInstructions
