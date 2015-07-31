@@ -10,38 +10,36 @@ import org.clapper.avsl.Logger
 abstract class LogUploader(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle, aws) {
 
   def install: Results = {
-    try {
-      val logFile = new File("/root/log.txt")
+    val logFile = new File("/root/log.txt")
 
-      val logger = Logger(this.getClass)
+    val logger = Logger(this.getClass)
 
-      val bucket = resourcesBundle.resources.bucket
+    val bucket = resourcesBundle.resources.bucket
 
-      aws.clients.ec2.getCurrentInstanceId match {
-        case Some(id) => {
-          val logUploader = new Thread(new Runnable {
-            def run() {
-              while(true) {
-                try {
-                  if(aws.clients.s3.getBucket(bucket).isEmpty) {
-                      logger.warn("bucket " + bucket + " doesn't exist")
-                    } else {
-                      aws.clients.s3.putObject(ObjectAddress(bucket, id), logFile)
-                    }
+    aws.clients.ec2.getCurrentInstanceId match {
+      case Some(id) => {
+        val logUploader = new Thread(new Runnable {
+          def run() {
+            while(true) {
+              try {
+                if(aws.clients.s3.getBucket(bucket).isEmpty) {
+                    logger.warn("bucket " + bucket + " doesn't exist")
+                  } else {
+                    aws.clients.s3.putObject(ObjectAddress(bucket, id), logFile)
+                  }
 
-                  Thread.sleep(1000 * 30)
-                } catch {
-                  case t: Throwable => logger.error("log upload fails() " + t.toString);
-                }
+                Thread.sleep(1000 * 30)
+              } catch {
+                case t: Throwable => logger.error("log upload fails() " + t.toString);
               }
             }
-          }, "logUploader")
-          logUploader.setDaemon(true)
-          logUploader.start()
-          success("logUploader started")
-        }
-        case None => failure("can't obtain instanceId")
+          }
+        }, "logUploader")
+        logUploader.setDaemon(true)
+        logUploader.start()
+        success("logUploader started")
       }
+      case None => failure("can't obtain instanceId")
     }
   }
 }

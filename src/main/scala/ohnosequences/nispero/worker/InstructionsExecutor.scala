@@ -112,7 +112,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
         logger.info("InstructionsExecutor processing message")
 
         import scala.concurrent.ExecutionContext.Implicits._
-        val futureResult = scala.concurrent.future {
+        val futureResult = Future {
           instructions.execute(s3, task, new File(config.workersDir))
         }
 
