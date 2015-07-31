@@ -3,7 +3,8 @@ package ohnosequences.nispero.bundles
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 import ohnosequences.nispero.{Names}
-
+import ohnosequences.awstools.dynamodb._
+import ohnosequences.logging._
 import org.clapper.avsl.Logger
 
 abstract class Resources(val configuration: Configuration, aws: AWS) extends Bundle(configuration, aws) {
@@ -55,8 +56,8 @@ abstract class Resources(val configuration: Configuration, aws: AWS) extends Bun
       ddb = aws.clients.ddb,
       tableName = config.resources.workersStateTable,
       hash = Names.Tables.WORKERS_STATE_HASH_KEY,
-      range = Some(Names.Tables.WORKERS_STATE_RANGE_KEY)
-      logger = logger
+      range = Some(Names.Tables.WORKERS_STATE_RANGE_KEY),
+      logger = new ConsoleLogger(config.resources.workersStateTable)
     )
 
     success("resources bundle finished")

@@ -8,9 +8,9 @@ trait AnyInstructions extends AnyBundle {
 
   val instructions: ohnosequences.nispero.Instructions
 
-  def install: Results = {
-    success("instructions installed")
-  }
+  // def install: Results = {
+  //   success("instructions installed")
+  // }
 }
 
 abstract class Instructions(deps: AnyBundle*) extends Bundle(deps: _*) with AnyInstructions

@@ -19,8 +19,12 @@ trait Instructions {
 sealed abstract class TaskResult {
   val message: String
 }
-case class Success(message: String) extends TaskResult
-case class Failure(message: String) extends TaskResult
+
+object TaskResult {
+
+  case class Success(message: String) extends TaskResult
+  case class Failure(message: String) extends TaskResult
+}
 
 case class TaskResultDescription(
   id: String,

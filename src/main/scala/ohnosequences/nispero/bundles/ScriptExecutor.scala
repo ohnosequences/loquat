@@ -6,8 +6,6 @@ import ohnosequences.awstools.s3.{S3}
 import java.io.File
 import org.clapper.avsl.Logger
 import ohnosequences.awstools.s3.LoadingManager
-import ohnosequences.nispero.Failure
-import ohnosequences.nispero.Task
 import org.apache.commons.io.{FileUtils}
 import ohnosequences.nispero.utils.Utils
 
@@ -15,7 +13,7 @@ import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
 
-trait ScriptExecutorAux extends ohnosequences.nispero.bundles.AnyInstructions {
+trait AnyScriptExecutor extends ohnosequences.nispero.bundles.AnyInstructions {
 
   val configureScript: String
 
@@ -78,9 +76,9 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.AnyInstructions {
         if (result != 0) {
           logger.error("script finished with non zero code: " + result)
           if (message.isEmpty) {
-            Failure("script finished with non zero code: " + result)
+            TaskResult.Failure("script finished with non zero code: " + result)
           } else {
-            Failure(message)
+            TaskResult.Failure(message)
           }
         } else {
           logger.info("start.sh script finished, uploading results")
@@ -95,12 +93,12 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.AnyInstructions {
               logger.warn("warning: file " + outputFile.getAbsolutePath + " doesn't exists!")
             }
           }
-          Success(message)
+          TaskResult.Success(message)
         }
       } catch {
         case e: Throwable => {
           e.printStackTrace()
-          Failure(e.getMessage)
+          TaskResult.Failure(e.getMessage)
         }
       }
     }
@@ -125,4 +123,4 @@ trait ScriptExecutorAux extends ohnosequences.nispero.bundles.AnyInstructions {
 
 
 abstract class ScriptExecutor(deps: AnyBundle*)
-  extends Bundle(deps: _*) with ScriptExecutorAux
+  extends Bundle(deps: _*) with AnyScriptExecutor

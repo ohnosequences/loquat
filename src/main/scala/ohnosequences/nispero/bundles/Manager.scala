@@ -29,6 +29,8 @@ trait AnyManager extends AnyBundle {
   type AMI = resourcesBundle.configuration.AMI
   val  ami = resourcesBundle.configuration.ami
 
+  case object workerCompat extends Compatible(ami, worker, metadata)
+
   //val m: ami.Metadata = resourcesBundle.configuration.metadata.asInstanceOf[ami.Metadata]
   //val metadata = m
 
@@ -77,10 +79,10 @@ trait AnyManager extends AnyBundle {
 
       logger.info("generating workers userScript")
 
-      val workerUserScript = userScript(worker)
+      // val workerUserScript = userScript(worker)
       // val workerUserScript = ami.userScript(metadata, this.fullName, worker.fullName)
 
-      val workersGroup = aws.clients.as.fixAutoScalingGroupUserData(config.resources.workersGroup, workerUserScript)
+      val workersGroup = aws.clients.as.fixAutoScalingGroupUserData(config.resources.workersGroup, workerCompat.userScript)
 
       logger.info("running workers auto scaling group")
       aws.clients.as.createAutoScalingGroup(workersGroup)

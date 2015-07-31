@@ -50,14 +50,14 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
     var stopWaiting = false
 
-    var taskResult: TaskResult = Failure("internal error during waiting for task result")
+    var taskResult: TaskResult = TaskResult.Failure("internal error during waiting for task result")
 
 
     var it = 0
     while(!stopWaiting) {
       if(timeSpent() > config.taskProcessTimeout) {
         stopWaiting = true
-        taskResult = Failure("Timeout: " + timeSpent + " > taskProcessTimeout")
+        taskResult = TaskResult.Failure("Timeout: " + timeSpent + " > taskProcessTimeout")
         terminate()
       } else {
         futureResult.value match {
@@ -73,7 +73,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
             it += 1
           }
           case Some(scala.util.Success(r)) => stopWaiting = true; taskResult = r
-          case Some(scala.util.Failure(t)) => stopWaiting = true; taskResult = Failure("future error: " + t.getMessage)
+          case Some(scala.util.Failure(t)) => stopWaiting = true; taskResult = TaskResult.Failure("future error: " + t.getMessage)
         }
       }
     }
@@ -131,12 +131,12 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
         logger.info("publishing result to topic")
 
         taskResult match {
-          case Success(msg) => {
+          case TaskResult.Success(msg) => {
             outputTopic.publish(upickle.default.write(taskResultDescription.copy(message = msg)))
             logger.info("InstructionsExecutor deleting message with from input queue")
             inputQueue.deleteMessage(message)
           }
-          case Failure(msg) => {
+          case TaskResult.Failure(msg) => {
             errorTopic.publish(upickle.default.write(taskResultDescription.copy(message = msg)))
           }
         }

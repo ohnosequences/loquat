@@ -31,7 +31,7 @@ class App(backend: BackEnd, mainPage: String, users: Users) extends unfiltered.f
 
   val logger = Logger(classOf[App])
 
-  def responseJSON[X : upickle.default.writer](x: X): ResponseWriter = {
+  def responseJSON[X : upickle.default.Writer](x: X): ResponseWriter = {
     ResponseString(upickle.default.write(x))
   }
 

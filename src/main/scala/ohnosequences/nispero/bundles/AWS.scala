@@ -12,6 +12,7 @@ import ohnosequences.statika.aws._
 // import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient
 import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
+import com.amazonaws.services.dynamodbv2.datamodeling._ //DynamoDBMapper
 
 
 abstract class AWS(val configuration: Configuration) extends Bundle(configuration) {
@@ -28,6 +29,7 @@ abstract class AWS(val configuration: Configuration) extends Bundle(configuratio
 
   // TODO: region should be configurable
   val clients: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
+  val dynamoMapper: DynamoDBMapper = new DynamoDBMapper(clients.ddb) 
   //   val ec2 = ec2
   //   val as = as
   //   val sqs = sqs
