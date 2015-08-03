@@ -97,7 +97,7 @@ abstract class TerminationDaemon(val resourcesBundle: ResourcesBundle) extends B
   }
 
   def checkConditions(terminationConditions: TerminationConditions, successResultsCount: Int, failedResultsCount: Int, initialTasksCount: Option[Int]): Option[String] = {
-    val startTime = aws.clients.as.getCreatedTime(config.managerConfig.groups._1.name).map(_.getTime)
+    val startTime = aws.clients.as.getCreatedTime(config.managerConfig.group.name).map(_.getTime)
 
     if (terminationConditions.terminateAfterInitialTasks && initialTasksCount.isDefined && (successResultsCount >= initialTasksCount.get)) {
       Some("terminated due to terminateAfterInitialTasks: initialTasks count: " + initialTasksCount.get + " current: " + successResultsCount)

@@ -73,7 +73,7 @@ case class ResourcesBundle(
  */
 case class ManagerConfig(
   port: Int = 443,
-  groups: (AutoScalingGroup, AutoScalingGroup),
+  group: AutoScalingGroup,
   password: String
 )
 

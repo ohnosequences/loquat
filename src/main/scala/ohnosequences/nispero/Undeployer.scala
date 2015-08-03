@@ -79,17 +79,10 @@ object Undeployer {
     }
 
     try {
-      logger.info("delete console group")
-      awsClients.as.deleteAutoScalingGroup(config.managerConfig.groups._2)
-    } catch {
-      case t: Throwable => logger.info("error during deleting console group: " + t.getMessage)
-    }
-
-    try {
       logger.info("delete manager group")
-      awsClients.as.deleteAutoScalingGroup(config.managerConfig.groups._1)
+      awsClients.as.deleteAutoScalingGroup(config.managerConfig.group)
     } catch {
-      case t: Throwable => logger.info("error during deleting console group: " + t.getMessage)
+      case t: Throwable => logger.info("error during deleting manager group: " + t.getMessage)
     }
 
     logger.info("undeployed")

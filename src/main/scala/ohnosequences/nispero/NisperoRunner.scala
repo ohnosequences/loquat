@@ -1,7 +1,8 @@
 package ohnosequences.nispero
 
 import ohnosequences.statika.aws._
-import ohnosequences.nispero.bundles.{NisperoDistributionAux}
+import ohnosequences.nispero.bundles.AnyNisperoDistribution
+import ohnosequences.nispero.utils.Utils
 
 import com.amazonaws.AmazonServiceException
 import org.clapper.avsl.Logger
@@ -14,26 +15,18 @@ import com.amazonaws.auth.{InstanceProfileCredentialsProvider, PropertiesCredent
 import com.amazonaws.internal.StaticCredentialsProvider
 import com.amazonaws.AmazonClientException
 import ohnosequences.awstools.s3.S3
-import ohnosequences.nispero.utils.Utils
 
 
-abstract class NisperoRunner(nisperoDistribution: NisperoDistributionAux) {
+abstract class NisperoRunner(nisperoDistribution: AnyNisperoDistribution) {
 
   val config = nisperoDistribution.manager.resourcesBundle.aws.config
 
   def compilerChecks(): Unit
 
-  def main(args: Array[String]) {
-    args.toList match {
-      case "undeploy" :: "-m" :: msg :: tail => undeploy(msg, tail)
-
-      case "undeploy" :: tail => undeploy("manual undeploy", tail)
-
-      case list => runNispero(args.toList, nisperoDistribution)
-    }
+  def main(args: Array[String]): Unit = args.toList match {
+    case "undeploy" :: tail => undeploy("manual undeploy", tail)
+    case list => deploy(args.toList, nisperoDistribution)
   }
-
-
 
   def retrieveCredentialsProviderFromFile(file: File): (AWSCredentialsProvider, Option[String]) = {
     logger.info("retrieving credentials from: " + file.getPath)
@@ -64,17 +57,42 @@ abstract class NisperoRunner(nisperoDistribution: NisperoDistributionAux) {
   val logger = Logger(this.getClass)
 
 
+  def checkConfig(c: Config, ec2: EC2, s3: S3): Boolean = {
 
-  //deploy nispero
-  def runNispero(args: List[String], nisperoDistribution: NisperoDistributionAux) {
+    val workers = c.resources.workersGroup
+
+    if (workers.desiredCapacity < workers.minSize || workers.desiredCapacity > workers.maxSize) {
+      logger.error("desired capacity should be in interval [minSize, maxSize]")
+      return false
+    }
+
+    val keyPair = workers.launchingConfiguration.instanceSpecs.keyName
+    if(!ec2.isKeyPairExists(keyPair)) {
+      logger.error("key pair: " + keyPair + " doesn't exists")
+      return false
+    }
+
+    try {
+      s3.getObjectStream(config.jarAddress) match {
+        case null => logger.error("artifact isn't uploaded"); false
+        case _ => true
+      }
+    } catch {
+      case s3e: AmazonServiceException if s3e.getStatusCode==301 => true
+      case t: Throwable  => {
+        logger.error("artifact isn't uploaded: " + config.jarAddress + " " + t)
+        false
+      }
+    }
+  }
+
+  def deploy(args: List[String], nisperoDistribution: AnyNisperoDistribution) {
 
     val credentialsProvider = retrieveCredentialsProvider(args)._1
     val ec2 = EC2.create(credentialsProvider)
     val as = AutoScaling.create(credentialsProvider, ec2)
     val sns = SNS.create(credentialsProvider)
     val s3 = S3.create(credentialsProvider)
-
-
 
     if(!checkConfig(config, ec2, s3)) {
       return
@@ -93,58 +111,14 @@ abstract class NisperoRunner(nisperoDistribution: NisperoDistributionAux) {
     }
 
     logger.info("generating userScript for manager")
-
-    //val managerUserData = nisperoDistribution.ami.userScript(nisperoDistribution.metadata, nisperoDistribution.fullName, nisperoDistribution.manager.fullName)
     val managerUserData = nisperoDistribution.managerCompat.userScript
 
     logger.info("running manager auto scaling group")
-    val managerGroup = as.fixAutoScalingGroupUserData(config.managerConfig.groups._1, managerUserData)
+    val managerGroup = as.fixAutoScalingGroupUserData(config.managerConfig.group, managerUserData)
     as.createAutoScalingGroup(managerGroup)
+
     logger.info("creating tags")
     Utils.tagAutoScalingGroup(as, managerGroup.name, "manager")
-
-    logger.info("generating userScript for console")
-
-    val consoleUserData = nisperoDistribution.consoleCompat.userScript
-
-    logger.info("running manager auto scaling group")
-    val consoleGroup = as.fixAutoScalingGroupUserData(config.managerConfig.groups._2, consoleUserData)
-    as.createAutoScalingGroup(consoleGroup)
-    logger.info("creating tags")
-    Utils.tagAutoScalingGroup(as, consoleGroup.name, "console")
-  }
-
-  def checkConfig(c: Config, ec2: EC2, s3: S3): Boolean = {
-
-      val (min, d, max) = (
-        c.resources.workersGroup.minSize,
-        c.resources.workersGroup.desiredCapacity,
-        c.resources.workersGroup.maxSize
-      )
-
-      if (d < min || d > max) {
-        logger.error("desired capacity should be in interval [minSize, maxSize]")
-        return false
-      }
-
-      val keyPair = c.resources.workersGroup.launchingConfiguration.instanceSpecs.keyName
-      if(!ec2.isKeyPairExists(keyPair)) {
-        logger.error("key pair: " + keyPair + " doesn't exists")
-        return false
-      }
-
-    try {
-      s3.getObjectStream(config.jarAddress) match {
-        case null => logger.error("artifact isn't uploaded"); false
-        case _ => true
-      }
-    } catch {
-      case s3e: AmazonServiceException if s3e.getStatusCode==301 => true
-      case t: Throwable  => {
-        logger.error("artifact isn't uploaded: " + config.jarAddress + " " + t)
-        false
-      }
-    }
   }
 
   def undeploy(message: String, args: List[String]) {

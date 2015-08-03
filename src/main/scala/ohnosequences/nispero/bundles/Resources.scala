@@ -58,8 +58,7 @@ abstract class ResourcesBundle(val aws: AWSBundle) extends Bundle(aws) {
       logger = new ConsoleLogger(aws.config.resources.workersStateTable)
     )
 
-    success("resources bundle finished")
-
+    success("resources bundle installed")
   }
 
 }
