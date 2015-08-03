@@ -106,7 +106,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
         instance.foreach(_.createTag(InstanceTags.PROCESSING))
         logger.info("InstructionsExecutor: received message " + message)
-        val task = upickle.default.read[Task](message.body)
+        val task = upickle.default.read[AnyTask](message.body)
         taskId = task.id
 
         logger.info("InstructionsExecutor processing message")

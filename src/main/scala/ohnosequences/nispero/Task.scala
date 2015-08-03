@@ -5,15 +5,32 @@ import java.io.File
 import ohnosequences.nispero.utils.pickles._
 import upickle._
 
+sealed trait AnyTask {
+
+  val id: String
+
+  type InputObj
+  val inputObjects: Map[String, InputObj]
+
+  val outputObjects: Map[String, ObjectAddress]
+}
+
+case class BigTask(
+  val id: String,
+  val inputObjects: Map[String, ObjectAddress],
+  val outputObjects: Map[String, ObjectAddress]
+) extends AnyTask { type InputObj = ObjectAddress }
+
 /* The difference here is that we put input objects content in the message itself */
-case class Task(
+case class TinyTask(
   val id: String,
   val inputObjects: Map[String, String],
   val outputObjects: Map[String, ObjectAddress]
-)
+) extends AnyTask { type InputObj = String }
+
 
 trait Instructions {
-  def execute(s3: S3, task: Task, workingDir: File = new File(".")): TaskResult
+  def execute(s3: S3, task: AnyTask, workingDir: File = new File(".")): TaskResult
 }
 
 sealed abstract class TaskResult {

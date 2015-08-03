@@ -3,7 +3,7 @@ package ohnosequences.nispero.bundles
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 import ohnosequences.awstools.sqs.{Message, Queue}
-import ohnosequences.nispero.{Task, Undeployer}
+import ohnosequences.nispero._
 import ohnosequences.nispero.manager._
 import org.clapper.avsl.Logger
 import ohnosequences.nispero.utils.pickles._
@@ -48,7 +48,7 @@ abstract class ControlQueueHandler(resourcesBundle: Resources, aws: AWS) extends
             Undeployer.undeploy(aws.clients, config, reason)
           }
           case RawCommand("AddTasks", tasks: String) => {
-            val parsedTasks = upickle.default.read[List[Task]](tasks)
+            val parsedTasks = upickle.default.read[List[AnyTask]](tasks)
             parsedTasks.foreach { task =>
               inputQueue.sendMessage(upickle.default.write(task))
             }

@@ -25,7 +25,9 @@ trait AnyScriptExecutor extends ohnosequences.nispero.bundles.AnyInstructions {
 
     val scriptname = "script.sh"
 
-    def execute(s3: S3, task: Task, workingDir: File): TaskResult = {
+    var loadManager: LoadingManager = null
+
+    def execute(s3: S3, task: AnyTask, workingDir: File): TaskResult = {
       try {
 
         workingDir.mkdir()
@@ -52,11 +54,25 @@ trait AnyScriptExecutor extends ohnosequences.nispero.bundles.AnyInstructions {
         outputObjects.mkdir()
         outputObjects.listFiles().foreach(_.delete())
 
-        /* if it's a tiny task, we just create the files with input messages */
-        for ((name, content) <- task.inputObjects) {
-          logger.info("trying to create input object: " + name)
-          Utils.writeStringToFile(content, new File(inputObjects, name))
-          logger.info("success")
+        task match {
+          case TinyTask(_, inputObjs, _) =>
+            for ((name, content) <- inputObjs) {
+              logger.info("trying to create input object: " + name)
+              /* if it's a tiny task, we just create the files with input messages */
+              Utils.writeStringToFile(content, new File(inputObjects, name))
+              logger.info("success")
+            }
+          case BigTask(_, inputObjs, _) =>
+            for ((name, objAddress) <- inputObjs) {
+              logger.info("trying to create input object: " + name)
+              if (loadManager == null) {
+                logger.info("creating download manager")
+                loadManager = s3.createLoadingManager()
+              }
+              /* if it's a big task, we download objects from S3 */
+              loadManager.download(objAddress, new File(inputObjects, name))
+              logger.info("success")
+            }
         }
 
         logger.info("running instructions script in " + APP_DIR.getAbsolutePath)
