@@ -8,7 +8,7 @@ import scala.collection.mutable.ListBuffer
 abstract class TasksProvider {  p =>
   def tasks(s3: S3): Stream[Task]
 
-  def ~(q: TasksProvider) = new TasksProvider {
+  def ~(q: TasksProvider): TasksProvider = new TasksProvider {
     def tasks(s3: S3): Stream[Task] = p.tasks(s3) ++ q.tasks(s3)
   }
 }

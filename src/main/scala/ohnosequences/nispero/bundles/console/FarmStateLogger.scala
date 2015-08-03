@@ -71,7 +71,7 @@ abstract class FarmStateLogger(resourcesBundle: Resources, aws: AWS) extends Bun
 
     // FIXME: this is weird:
     val query = new DynamoDBQueryExpression[FarmStatePojo]()
-      // .withHashKeyValues(new AttributeValue().withN(1.toString)) // Names.Tables.WORKERS_STATE_HASH_KEY_VALUE,
+      .withHashKeyValues(new FarmStatePojo) //new AttributeValue().withN(1.toString)) // Names.Tables.WORKERS_STATE_HASH_KEY_VALUE,
       .withRangeKeyCondition(
         Names.Tables.WORKERS_STATE_RANGE_KEY.getAttributeName,
         new Condition()
