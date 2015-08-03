@@ -6,8 +6,7 @@ import org.clapper.avsl.Logger
 import ohnosequences.nispero._
 import scala.collection.mutable.ListBuffer
 import scala.Some
-import ohnosequences.nispero.TaskResultDescription
-import ohnosequences.nispero.Task
+import ohnosequences.nispero._
 import ohnosequences.nispero.utils.pickles._
 import upickle._
 
@@ -117,7 +116,7 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
   def calcInitialTasksCount(): Option[Int] = {
     try {
       val tasksString = aws.clients.s3.readWholeObject(config.initialTasks)
-      val tasks: List[Task] = upickle.default.read[List[Task]](tasksString)
+      val tasks: List[AnyTask] = upickle.default.read[List[AnyTask]](tasksString)
       val ids = scala.collection.mutable.HashSet() ++ tasks
       Some(ids.size)
     } catch {

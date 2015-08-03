@@ -4,18 +4,17 @@ import ohnosequences.nispero._
 import scala.collection.mutable.ListBuffer
 import org.clapper.avsl.Logger
 
-import ohnosequences.nispero.Config
 import ohnosequences.awstools.sqs.Message
 
-import ohnosequences.nispero.Task
+import ohnosequences.nispero._
+import ohnosequences.nispero.manager.{RawCommand}
+import ohnosequences.nispero.utils.pickles._
+import ohnosequences.nispero.bundles.console.pojo.FarmState
 
 import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.ec2._
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.nispero.bundles.console.pojo.FarmState
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
-import ohnosequences.nispero.manager.{RawCommand}
-import ohnosequences.nispero.utils.pickles._
 import upickle._
 
 
@@ -90,8 +89,8 @@ class BackEnd(awsClients: AWSClients, config: Config, farmStateLogger: FarmState
   }
 
   def addTasks(tasksString: String): Int = {
-    val tasks = upickle.default.read[List[Task]](tasksString)
-    tasks.foreach { t: Task => addTask(upickle.default.write(t)) }
+    val tasks = upickle.default.read[List[AnyTask]](tasksString)
+    tasks.foreach { t => addTask(upickle.default.write(t)) }
     tasks.size
   }
 
