@@ -14,13 +14,13 @@ trait NisperoDistributionAux extends AnyBundle {
 
   val  metadata: AnyArtifactMetadata = manager.metadata
 
-  type AMI = manager.resourcesBundle.configuration.AMI
-  val  ami = manager.resourcesBundle.configuration.ami
+  type AMI = manager.resourcesBundle.aws.AMI
+  val  ami = manager.resourcesBundle.aws.ami
 
   val bundleDependencies: List[AnyBundle] = List(manager, console)
 
   case object managerCompat extends Compatible(ami, manager, metadata)
-  case object consoleCompat extends Compatible(ami, console, metadata)     
+  case object consoleCompat extends Compatible(ami, console, metadata)
 
   def install: Results = {
     success("nispero distribution installed")

@@ -136,20 +136,6 @@ class FrontEnd(backend: BackEnd, password: String, port: Int, resourcesBucket: S
 
     val dns = backend.currentAddress
 
-    // implicitly[upickle.default.writer[ohnosequences.awstools.ec2.InstanceSpecs]]
-    // implicitly[upickle.default.writer[ohnosequences.awstools.autoscaling.OnDemand.type]]
-    // implicitly[upickle.default.writer[ohnosequences.awstools.autoscaling.SpotAuto.type]]
-    // implicitly[upickle.default.writer[ohnosequences.awstools.autoscaling.Spot]]
-    // implicitly[upickle.default.writer[ohnosequences.awstools.autoscaling.PurchaseModel]]
-    // implicitly[upickle.default.writer[ohnosequences.awstools.autoscaling.LaunchConfiguration]]
-    // implicitly[upickle.default.writer[ohnosequences.awstools.autoscaling.AutoScalingGroup]]
-    // implicitly[upickle.default.writer[ohnosequences.awstools.s3.ObjectAddress]]
-    // implicitly[upickle.default.writer[ohnosequences.nispero.ManagerConfig]]
-    // implicitly[upickle.default.writer[ohnosequences.nispero.TasksProvider]]
-    // implicitly[upickle.default.writer[ohnosequences.nispero.TerminationConditions]]
-    // implicitly[upickle.default.writer[ohnosequences.nispero.Resources]]
-    // val c = implicitly[upickle.default.writer[ohnosequences.nispero.Config]]
-
     val managerLocation = printURL(dns, port)
     val message = "Nispero started \n" +
       "console location: "+  managerLocation + "\n" +

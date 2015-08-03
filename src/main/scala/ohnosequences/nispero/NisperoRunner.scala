@@ -19,7 +19,7 @@ import ohnosequences.nispero.utils.Utils
 
 abstract class NisperoRunner(nisperoDistribution: NisperoDistributionAux) {
 
-  val config = nisperoDistribution.manager.resourcesBundle.config
+  val config = nisperoDistribution.manager.resourcesBundle.aws.config
 
   def compilerChecks(): Unit
 

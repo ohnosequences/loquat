@@ -15,16 +15,17 @@ import upickle._
  * @param tasksProvider task provider (@see https://github.com/ohnosequences/nispero/blob/master/doc/tasks-providers.md)
  * @param taskProcessTimeout maximum time for processing task
  */
+
 case class Config(
-    managerConfig: ManagerConfig,
-    email: String,
-    terminationConditions: TerminationConditions,
-    resources: Resources,
-    workersDir: String,
-    tasksProvider: TasksProvider = EmptyTasks,
-    jarAddress: ObjectAddress,
-    taskProcessTimeout: Int = 60 * 60 * 10 // 10 hours
-  ) {
+  managerConfig: ManagerConfig,
+  email: String,
+  terminationConditions: TerminationConditions,
+  resources: ResourcesBundle,
+  workersDir: String,
+  tasksProvider: TasksProvider = EmptyTasks,
+  jarAddress: ObjectAddress,
+  taskProcessTimeout: Int = 60 * 60 * 10 // 10 hours
+) {
 
   def initialTasks = ObjectAddress(resources.bucket, "initialTasks")
 
@@ -50,7 +51,7 @@ case class Config(
  * @param workersStateTable name of DynamoDB table with workers statistics
  * @param workersGroup configuration of worker group
  */
-case class Resources(
+case class ResourcesBundle(
   id: String,
   workersGroup: AutoScalingGroup
 ) {
@@ -71,10 +72,10 @@ case class Resources(
  * @param password password for Console
  */
 case class ManagerConfig(
-                          port: Int = 443,
-                          groups: (AutoScalingGroup, AutoScalingGroup),
-                          password: String
-                          )
+  port: Int = 443,
+  groups: (AutoScalingGroup, AutoScalingGroup),
+  password: String
+)
 
 /**
  * configuration of termination conditions
@@ -83,7 +84,7 @@ case class ManagerConfig(
  * @param timeout if true nispero will terminate after this timeout reached. Time units are sceonds.
  */
 case class TerminationConditions(
-                                  terminateAfterInitialTasks: Boolean,
-                                  errorsThreshold: Option[Int] = None,
-                                  timeout: Option[Int] = None
-                                  )
+  terminateAfterInitialTasks: Boolean,
+  errorsThreshold: Option[Int] = None,
+  timeout: Option[Int] = None
+)

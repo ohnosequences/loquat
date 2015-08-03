@@ -18,16 +18,16 @@ trait AnyManager extends AnyBundle {
   type Worker <: AnyWorker
   val  worker: Worker
 
-  val resourcesBundle: Resources
+  val resourcesBundle: ResourcesBundle
   val logUploader: LogUploader
   val controlQueueHandler: ControlQueueHandler
   val terminationDaemon: TerminationDaemon
-  val aws: AWS
+  val aws: AWSBundle
 
-  val metadata: AnyArtifactMetadata = resourcesBundle.configuration.metadata
+  val metadata: AnyArtifactMetadata = resourcesBundle.aws.metadata
 
-  type AMI = resourcesBundle.configuration.AMI
-  val  ami = resourcesBundle.configuration.ami
+  type AMI = resourcesBundle.aws.AMI
+  val  ami = resourcesBundle.aws.ami
 
   case object workerCompat extends Compatible(ami, worker, metadata)
 
@@ -54,7 +54,7 @@ trait AnyManager extends AnyBundle {
       tasks.par.foreach { task =>
         inputQueue.sendMessage(upickle.default.write(task))
       }
-      aws.clients.s3.putWholeObject(resourcesBundle.config.tasksUploaded, "")
+      aws.clients.s3.putWholeObject(resourcesBundle.aws.config.tasksUploaded, "")
       logger.info("initial tasks are ready")
 
     } catch {
@@ -65,7 +65,7 @@ trait AnyManager extends AnyBundle {
 
   def install: Results = {
 
-    val config = resourcesBundle.config
+    val config = resourcesBundle.aws.config
 
     logger.info("manager is started")
 
@@ -118,8 +118,8 @@ trait AnyManager extends AnyBundle {
 abstract class Manager[W <: AnyWorker](
   val controlQueueHandler: ControlQueueHandler,
   val terminationDaemon: TerminationDaemon,
-  val resourcesBundle: Resources,
+  val resourcesBundle: ResourcesBundle,
   val logUploader: LogUploader,
-  val aws: AWS,
+  val aws: AWSBundle,
   val worker: W
 ) extends AnyManager { type Worker = W }

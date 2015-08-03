@@ -13,7 +13,7 @@ import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 
 
-abstract class ControlQueueHandler(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle, aws) {
+abstract class ControlQueueHandler(resourcesBundle: ResourcesBundle) extends Bundle(resourcesBundle) {
 
   val logger = Logger(this.getClass)
 
@@ -33,7 +33,8 @@ abstract class ControlQueueHandler(resourcesBundle: Resources, aws: AWS) extends
   }
 
   def run() {
-    val config = resourcesBundle.config
+    val config = resourcesBundle.aws.config
+    val aws = resourcesBundle.aws
     val controlQueue = aws.clients.sqs.getQueueByName(resourcesBundle.resources.controlQueue).get
     val inputQueue =  aws.clients.sqs.getQueueByName(resourcesBundle.resources.inputQueue).get
 

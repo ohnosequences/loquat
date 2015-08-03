@@ -12,10 +12,12 @@ import upickle._
 
 case class SNSMessage(Message: String)
 
-abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle, aws) {
+abstract class TerminationDaemon(val resourcesBundle: ResourcesBundle) extends Bundle(resourcesBundle) {
+
+  val aws = resourcesBundle.aws
 
   val logger = Logger(this.getClass)
-  val config = resourcesBundle.config
+  val config = resourcesBundle.aws.config
 
   val TIMEOUT = 300 //5 min
 

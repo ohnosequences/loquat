@@ -2,13 +2,13 @@ package ohnosequences.nispero.bundles.console
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
-import ohnosequences.nispero.bundles.{AWS, LogUploader, Resources}
+import ohnosequences.nispero.bundles.{AWSBundle, LogUploader, ResourcesBundle}
 import java.io.File
 import org.apache.commons.io.FileUtils
 import org.clapper.avsl.Logger
 import ohnosequences.nispero.utils.Utils
 
-abstract class Console(resourcesBundle: Resources, logUploader: LogUploader, farmStateLogger: FarmStateLogger, aws: AWS)
+abstract class Console(resourcesBundle: ResourcesBundle, logUploader: LogUploader, farmStateLogger: FarmStateLogger, aws: AWSBundle)
   extends Bundle(resourcesBundle, logUploader, farmStateLogger, aws) {
 
   val logger = Logger(this.getClass)
@@ -17,7 +17,7 @@ abstract class Console(resourcesBundle: Resources, logUploader: LogUploader, far
 
     // val awsClients = aws
 
-    val config = resourcesBundle.config
+    val config = resourcesBundle.aws.config
 
     logger.info("deploying console data")
 

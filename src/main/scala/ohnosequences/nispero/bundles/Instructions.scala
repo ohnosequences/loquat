@@ -13,4 +13,4 @@ trait AnyInstructions extends AnyBundle {
   // }
 }
 
-abstract class Instructions(deps: AnyBundle*) extends Bundle(deps: _*) with AnyInstructions
+// abstract class Instructions(deps: AnyBundle*) extends Bundle(deps: _*) with AnyInstructions

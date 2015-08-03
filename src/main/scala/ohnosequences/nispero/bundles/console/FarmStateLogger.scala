@@ -18,7 +18,7 @@ import com.amazonaws.services.dynamodbv2.model._
 import scala.collection.JavaConversions._
 
 
-abstract class FarmStateLogger(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle, aws) {
+abstract class FarmStateLogger(resourcesBundle: ResourcesBundle, aws: AWSBundle) extends Bundle(resourcesBundle, aws) {
 
   val logger = Logger(this.getClass)
 

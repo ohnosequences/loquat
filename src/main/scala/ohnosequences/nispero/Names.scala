@@ -1,12 +1,8 @@
 package ohnosequences.nispero
 
-// import ohnosequences.awstools.dynamodb._
-// import ohnosequences.awstools.dynamodb.HashKey
-// import ohnosequences.awstools.dynamodb.RangeKey
-// import ohnosequences.awstools.dynamodb.NumericValue
-// import ohnosequences.awstools.ec2.Tag
 import com.amazonaws.services.dynamodbv2.model.AttributeDefinition
 import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType._
+
 
 object Names {
 

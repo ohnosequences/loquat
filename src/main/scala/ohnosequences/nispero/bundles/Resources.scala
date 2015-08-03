@@ -7,11 +7,9 @@ import ohnosequences.awstools.dynamodb._
 import ohnosequences.logging._
 import org.clapper.avsl.Logger
 
-abstract class Resources(val configuration: Configuration, aws: AWS) extends Bundle(configuration, aws) {
+abstract class ResourcesBundle(val aws: AWSBundle) extends Bundle(aws) {
 
-  val resources = configuration.config.resources
-
-  val config = configuration.config
+  val resources = aws.config.resources
 
   val logger = Logger(this.getClass)
 
@@ -39,25 +37,25 @@ abstract class Resources(val configuration: Configuration, aws: AWS) extends Bun
     logger.info("subscribing output queue to output topic")
     outputTopic.subscribeQueue(outputQueue)
 
-    logger.info("creating notification topic: " + config.notificationTopic)
-    val topic = aws.clients.sns.createTopic(config.notificationTopic)
+    logger.info("creating notification topic: " + aws.config.notificationTopic)
+    val topic = aws.clients.sns.createTopic(aws.config.notificationTopic)
 
-    if (!topic.isEmailSubscribed(config.email)) {
-      logger.info("subscribing " + config.email + " to notification topic")
-      topic.subscribeEmail(config.email)
+    if (!topic.isEmailSubscribed(aws.config.email)) {
+      logger.info("subscribing " + aws.config.email + " to notification topic")
+      topic.subscribeEmail(aws.config.email)
       logger.info("please confirm subscription")
     }
 
     logger.info("creating bucket " + resources.bucket)
-    aws.clients.s3.createBucket(config.resources.bucket)
+    aws.clients.s3.createBucket(aws.config.resources.bucket)
 
     logger.info("creating farm state table")
     DynamoDBUtils.createTable(
       ddb = aws.clients.ddb,
-      tableName = config.resources.workersStateTable,
+      tableName = aws.config.resources.workersStateTable,
       hash = Names.Tables.WORKERS_STATE_HASH_KEY,
       range = Some(Names.Tables.WORKERS_STATE_RANGE_KEY),
-      logger = new ConsoleLogger(config.resources.workersStateTable)
+      logger = new ConsoleLogger(aws.config.resources.workersStateTable)
     )
 
     success("resources bundle finished")

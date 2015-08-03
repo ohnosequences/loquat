@@ -7,7 +7,9 @@ import ohnosequences.awstools.s3.{ObjectAddress, S3}
 import ohnosequences.awstools.ec2.EC2
 import org.clapper.avsl.Logger
 
-abstract class LogUploader(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle, aws) {
+abstract class LogUploader(val resourcesBundle: ResourcesBundle) extends Bundle(resourcesBundle) {
+
+  val aws = resourcesBundle.aws
 
   def install: Results = {
     val logFile = new File("/root/log.txt")
