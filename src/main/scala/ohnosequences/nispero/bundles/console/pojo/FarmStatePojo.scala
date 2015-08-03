@@ -1,6 +1,6 @@
 package ohnosequences.nispero.bundles.console.pojo
 
-import com.amazonaws.services.dynamodb.datamodeling._
+import com.amazonaws.services.dynamodbv2.datamodeling._
 import java.util.Date
 import java.text.SimpleDateFormat
 
@@ -12,8 +12,6 @@ case class FarmState(date: String, timestamp: Long, idleInstances: Int, processi
       .withIdleInstances(idleInstances)
       .withProcessingInstances(processingInstances)
       .withInstallingInstances(installingInstances)
-
-
   }
 }
 
@@ -80,4 +78,3 @@ class FarmStatePojo {
   def withDate(rawDate: String) = this.withTimestamp(format.parse(rawDate).getTime)
 
 }
-

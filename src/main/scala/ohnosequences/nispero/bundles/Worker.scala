@@ -1,31 +1,35 @@
 package ohnosequences.nispero.bundles
 
-import ohnosequences.statika._
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.instructions._
 import ohnosequences.nispero.worker.InstructionsExecutor
-import ohnosequences.typesets._
-import shapeless._
 
-abstract class Worker[I <: InstructionsAux, T <: HList : towerFor[I :~: Resources :~: LogUploader :~: AWS :~: ∅]#is]
-(val instructions: I, val resourcesBundle: Resources, val logUploader: LogUploader, val aws: AWS)
-  extends Bundle[I :~: Resources :~: LogUploader :~: AWS :~: ∅, T](instructions :~: resourcesBundle :~: logUploader :~: aws :~: ∅) with WorkerAux {
-  override type IA = I
+
+abstract class Worker[I <: AnyInstructions](
+  val instructions: I,
+  val resourcesBundle: Resources,
+  val logUploader: LogUploader,
+  val aws: AWS
+) extends AnyWorker {
+
+  type Instructions = I
 }
 
+trait AnyWorker extends AnyBundle {
 
-trait WorkerAux extends AnyBundle {
+  type Instructions <: AnyInstructions
+  val  instructions: Instructions
 
-  type IA <: InstructionsAux
-  val instructions: IA
   val resourcesBundle: Resources
   val aws: AWS
   val logUploader: LogUploader
-  override type Deps = IA :~: Resources :~: LogUploader :~: AWS :~: ∅
-  override val deps = instructions :~: resourcesBundle :~: logUploader :~: aws :~: ∅
 
-  override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+  val bundleDependencies: List[AnyBundle] = List(instructions, resourcesBundle, logUploader, aws)
+
+  def install: Results = {
     val config = resourcesBundle.config
-    val instructionsExecutor = new InstructionsExecutor(config, instructions.instructions, aws.awsClients)
-    instructionsExecutor.run()
+    val instructionsExecutor = new InstructionsExecutor(config, instructions.instructions, aws.clients)
+    instructionsExecutor.run
     success("worker installed")
   }
 }

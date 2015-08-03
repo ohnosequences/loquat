@@ -1,21 +1,19 @@
 package ohnosequences.nispero.bundles
 
-import ohnosequences.statika._
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.instructions._
 import org.clapper.avsl.Logger
 import ohnosequences.nispero._
 import scala.collection.mutable.ListBuffer
 import scala.Some
 import ohnosequences.nispero.TaskResultDescription
 import ohnosequences.nispero.Task
-import ohnosequences.typesets._
 import ohnosequences.nispero.utils.pickles._
 import upickle._
 
 case class SNSMessage(Message: String)
 
-abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle :~: aws :~: ∅) {
-
-  import aws._
+abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle, aws) {
 
   val logger = Logger(this.getClass)
   val config = resourcesBundle.config
@@ -53,7 +51,7 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
         )
 
         reason match {
-          case Some(r) => Undeployer.undeploy(awsClients, config, r)
+          case Some(r) => Undeployer.undeploy(aws.clients, config, r)
           case None => ()
         }
 
@@ -68,15 +66,15 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
 
     rawMessages.map {
       case (handle, rawMessageBody) =>  {
-        val snsMessage: SNSMessage = upickle.read[SNSMessage](rawMessageBody)
-        val r: TaskResultDescription = upickle.read[TaskResultDescription](snsMessage.Message)
+        val snsMessage: SNSMessage = upickle.default.read[SNSMessage](rawMessageBody)
+        val r: TaskResultDescription = upickle.default.read[TaskResultDescription](snsMessage.Message)
         (handle, r)
       }
     }
   }
 
   def getQueueMessagesWithHandles(queueName: String): List[(String, String)] = {
-    sqs.getQueueByName(queueName) match {
+    aws.clients.sqs.getQueueByName(queueName) match {
       case None => Nil
       case Some(queue) => {
         var messages = ListBuffer[(String, String)]()
@@ -98,7 +96,7 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
   }
 
   def checkConditions(terminationConditions: TerminationConditions, successResultsCount: Int, failedResultsCount: Int, initialTasksCount: Option[Int]): Option[String] = {
-    val startTime = as.getCreatedTime(config.managerConfig.groups._1.name).map(_.getTime)
+    val startTime = aws.clients.as.getCreatedTime(config.managerConfig.groups._1.name).map(_.getTime)
 
     if (terminationConditions.terminateAfterInitialTasks && initialTasksCount.isDefined && (successResultsCount >= initialTasksCount.get)) {
       Some("terminated due to terminateAfterInitialTasks: initialTasks count: " + initialTasksCount.get + " current: " + successResultsCount)
@@ -118,8 +116,8 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
 
   def calcInitialTasksCount(): Option[Int] = {
     try {
-      val tasksString = s3.readWholeObject(config.initialTasks)
-      val tasks: List[Task] = upickle.read[List[Task]](tasksString)
+      val tasksString = aws.clients.s3.readWholeObject(config.initialTasks)
+      val tasks: List[Task] = upickle.default.read[List[Task]](tasksString)
       val ids = scala.collection.mutable.HashSet() ++ tasks
       Some(ids.size)
     } catch {
@@ -127,7 +125,7 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
     }
   }
 
-  override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+  def install: Results = {
     success("TerminationDaemon installed")
   }
 

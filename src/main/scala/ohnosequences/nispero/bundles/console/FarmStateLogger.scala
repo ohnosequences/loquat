@@ -1,6 +1,7 @@
 package ohnosequences.nispero.bundles.console
 
-import ohnosequences.statika._
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.instructions._
 
 import ohnosequences.nispero.bundles._
 import org.clapper.avsl.Logger
@@ -8,21 +9,20 @@ import ohnosequences.nispero.bundles.console.pojo.{FarmStatePojo, FarmState}
 import ohnosequences.nispero.{Names, InstanceTags}
 import java.util.Date
 import java.text.SimpleDateFormat
-import ohnosequences.awstools.dynamodb.NumericValue
 import ohnosequences.awstools.ec2.TagFilter
 import ohnosequences.awstools.ec2.RequestStateFilter
 import ohnosequences.awstools.ec2.InstanceStateFilter
 import ohnosequences.awstools.ec2.Tag
-import ohnosequences.typesets._
+import com.amazonaws.services.dynamodbv2.datamodeling._, DynamoDBMapperConfig._
+import com.amazonaws.services.dynamodbv2.model._
+import scala.collection.JavaConversions._
 
 
-abstract class FarmStateLogger(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle :~: aws :~: ∅) {
+abstract class FarmStateLogger(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle, aws) {
 
   val logger = Logger(this.getClass)
 
   val TIMEOUT = 30000
-
-  import aws._
 
   val format: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
 
@@ -34,19 +34,19 @@ abstract class FarmStateLogger(resourcesBundle: Resources, aws: AWS) extends Bun
 
     val groupFilter = TagFilter(Tag(InstanceTags.AUTO_SCALING_GROUP, resourcesBundle.resources.workersGroup.name))
 
-    val installing = ec2.listInstancesByFilters(
+    val installing = aws.clients.ec2.listInstancesByFilters(
       groupFilter,
       TagFilter(InstanceTags.INSTALLING),
       InstanceStateFilter("running")
     ).size
 
-    val idle = ec2.listInstancesByFilters(
+    val idle = aws.clients.ec2.listInstancesByFilters(
       groupFilter,
       TagFilter(InstanceTags.IDLE),
       InstanceStateFilter("running")
     ).size
 
-    val processing = ec2.listInstancesByFilters(
+    val processing = aws.clients.ec2.listInstancesByFilters(
       groupFilter,
       TagFilter(InstanceTags.PROCESSING),
       InstanceStateFilter("running")
@@ -69,12 +69,26 @@ abstract class FarmStateLogger(resourcesBundle: Resources, aws: AWS) extends Bun
     val currentTimestamp = System.currentTimeMillis()
     val fromTimestamp = currentTimestamp - interval
 
-    dynamoMapper.queryRangeInterval(classOf[FarmStatePojo],
-      resourcesBundle.resources.workersStateTable,
-      Names.Tables.WORKERS_STATE_HASH_KEY_VALUE,
-      NumericValue(fromTimestamp),
-      NumericValue(currentTimestamp)
-    ).map {
+    // FIXME: this is weird:
+    val query = new DynamoDBQueryExpression[FarmStatePojo]()
+      .withHashKeyValues(new FarmStatePojo) //new AttributeValue().withN(1.toString)) // Names.Tables.WORKERS_STATE_HASH_KEY_VALUE,
+      .withRangeKeyCondition(
+        Names.Tables.WORKERS_STATE_RANGE_KEY.getAttributeName,
+        new Condition()
+          .withComparisonOperator(ComparisonOperator.BETWEEN)
+          .withAttributeValueList(
+            new AttributeValue().withN(fromTimestamp.toString),
+            new AttributeValue().withN(currentTimestamp.toString)
+          )
+      )
+
+    val mapperConfig = new DynamoDBMapperConfig(new TableNameOverride(resourcesBundle.resources.workersStateTable))
+
+    aws.dynamoMapper.query(
+      classOf[FarmStatePojo],
+      query,
+      mapperConfig
+    ).toList.map {
       pojo => FarmState.fromPojo(pojo)
     }
   }
@@ -85,7 +99,10 @@ abstract class FarmStateLogger(resourcesBundle: Resources, aws: AWS) extends Bun
         val farmState = getFarmState
         logger.info(farmState)
         try {
-          dynamoMapper.save(resourcesBundle.resources.workersStateTable, farmState.toPojo)
+          aws.dynamoMapper.save(
+            farmState.toPojo,
+            new DynamoDBMapperConfig(new TableNameOverride(resourcesBundle.resources.workersStateTable))
+          )
         } catch {
           case t: Throwable => logger.error("couldn't save farm state: " + t)
         }
@@ -95,7 +112,7 @@ abstract class FarmStateLogger(resourcesBundle: Resources, aws: AWS) extends Bun
     }
   }
 
-  override def install[D <: AnyDistribution](distribution: D): InstallResults = {
+  def install: Results = {
     FarmStateLoggerThread.start()
     success("FarmStateLoggerAux finished")
   }

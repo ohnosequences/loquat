@@ -8,6 +8,7 @@ import org.clapper.avsl.Logger
 import ohnosequences.awstools.ec2.{EC2, Tag}
 import ohnosequences.awstools.autoscaling.{AutoScalingGroup, AutoScaling}
 import ohnosequences.awstools.sns.SNS
+import ohnosequences.awstools.AWSClients
 import java.io.File
 import com.amazonaws.auth.{InstanceProfileCredentialsProvider, PropertiesCredentials, AWSCredentialsProvider}
 import com.amazonaws.internal.StaticCredentialsProvider
@@ -94,7 +95,7 @@ abstract class NisperoRunner(nisperoDistribution: NisperoDistributionAux) {
     logger.info("generating userScript for manager")
 
     //val managerUserData = nisperoDistribution.ami.userScript(nisperoDistribution.metadata, nisperoDistribution.fullName, nisperoDistribution.manager.fullName)
-    val managerUserData = nisperoDistribution.userScript(nisperoDistribution.manager)
+    val managerUserData = nisperoDistribution.managerCompat.userScript
 
     logger.info("running manager auto scaling group")
     val managerGroup = as.fixAutoScalingGroupUserData(config.managerConfig.groups._1, managerUserData)
@@ -104,8 +105,7 @@ abstract class NisperoRunner(nisperoDistribution: NisperoDistributionAux) {
 
     logger.info("generating userScript for console")
 
-    //val consoleUserData = nisperoDistribution.ami.userScript(nisperoDistribution.metadata, nisperoDistribution.fullName, nisperoDistribution.console.fullName)
-    val consoleUserData = nisperoDistribution.userScript(nisperoDistribution.console)
+    val consoleUserData = nisperoDistribution.consoleCompat.userScript
 
     logger.info("running manager auto scaling group")
     val consoleGroup = as.fixAutoScalingGroupUserData(config.managerConfig.groups._2, consoleUserData)
@@ -148,7 +148,7 @@ abstract class NisperoRunner(nisperoDistribution: NisperoDistributionAux) {
   }
 
   def undeploy(message: String, args: List[String]) {
-    val awsClients = AWSClients.fromProvider(retrieveCredentialsProvider(args)._1)
+    val awsClients = AWSClients.create(retrieveCredentialsProvider(args)._1)
     Undeployer.undeploy(awsClients, config, message)
   }
 
