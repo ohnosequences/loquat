@@ -3,11 +3,15 @@ package ohnosequences.nispero
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
 
-import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.awstools.ec2.{ InstanceType, InstanceSpecs }
+import ohnosequences.awstools.ec2.{EC2, Tag, InstanceType, InstanceSpecs }
+import ohnosequences.awstools.s3.{ S3, ObjectAddress }
 import ohnosequences.awstools.autoscaling._
 
+import com.amazonaws.AmazonClientException
+import com.amazonaws.AmazonServiceException
+import com.amazonaws.auth.AWSCredentialsProvider
 import java.io.File
+import org.clapper.avsl.Logger
 
 
 /* Manager autoscaling group configuration */
@@ -62,6 +66,9 @@ abstract class AnyNisperoConfig {
 
   // email address for notifications
   val email: String
+
+  // these are credentials that are used to launch nispero
+  val localCredentials: AWSCredentialsProvider
 
   // Metadata generated for your nispero project
   val metadata: AnyArtifactMetadata
@@ -134,7 +141,7 @@ abstract class AnyNisperoConfig {
   val terminationConfig: TerminationConfig
 
   // task provider (@see https://github.com/ohnosequences/nispero/blob/master/doc/tasks-providers.md)
-  val tasksProvider: TasksProvider
+  val tasks: List[AnyTask]
 
   // resources configuration of names for resources: queues, topics, buckets
   lazy final val resourceNames: ResourceNames = ResourceNames(nisperoId)
@@ -144,11 +151,47 @@ abstract class AnyNisperoConfig {
 
   lazy final val notificationTopic: String =
     s"""nisperoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
+
+
+  def check(): Boolean = {
+    val logger = Logger(this.getClass)
+
+    val ec2 = EC2.create(localCredentials)
+    val s3 = S3.create(localCredentials)
+
+    val workers = workersAutoScalingGroup
+
+    if (workers.desiredCapacity < workers.minSize || workers.desiredCapacity > workers.maxSize) {
+      logger.error("desired capacity should be in interval [minSize, maxSize]")
+      return false
+    }
+
+    if(!ec2.isKeyPairExists(keypairName)) {
+      logger.error(s"key pair: ${keypairName} doesn't exists")
+      return false
+    }
+
+    // FIXME: check that fat artifact is published where it is expected
+    try {
+      s3.getObjectStream(fatArtifactS3Object) match {
+        case null => logger.error("artifact isn't uploaded"); false
+        case _ => true
+      }
+    } catch {
+      case s3e: AmazonServiceException if s3e.getStatusCode==301 => true
+      case t: Throwable  => {
+        logger.error("artifact isn't uploaded: " + fatArtifactS3Object + " " + t)
+        false
+      }
+    }
+  }
+
 }
 
 /* This is a constructor for the end-user, exposing only missing parameters */
 case class NisperoConfig[A <: AmazonLinuxAMI](
   val email: String,
+  val localCredentials: AWSCredentialsProvider,
   val metadata: AnyArtifactMetadata,
   val keypairName: String,
   val securityGroups: List[String],
@@ -157,5 +200,5 @@ case class NisperoConfig[A <: AmazonLinuxAMI](
   val managerConfig: ManagerConfig,
   val workersConfig: WorkersConfig,
   val terminationConfig: TerminationConfig,
-  val tasksProvider: TasksProvider
+  val tasks: List[AnyTask]
 ) extends AnyNisperoConfig { type AMI = A }

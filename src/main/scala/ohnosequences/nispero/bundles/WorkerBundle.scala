@@ -5,7 +5,7 @@ import ohnosequences.statika.instructions._
 
 import ohnosequences.nispero._
 import ohnosequences.nispero.bundles._
-import ohnosequences.nispero.utils.Utils
+import ohnosequences.nispero.utils
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sns.Topic
 import ohnosequences.awstools.sqs.Queue
@@ -14,25 +14,23 @@ import ohnosequences.awstools.AWSClients
 import org.clapper.avsl.Logger
 import java.io.File
 import scala.concurrent.Future
-import ohnosequences.nispero.utils.pickles._
-import upickle._
 import org.apache.commons.io.FileUtils
 
 
 trait AnyWorkerBundle extends AnyBundle {
 
-  type InstructionsBundle <: AnyInstructionsBundle
-  val  instructionsBundle: InstructionsBundle
+  type Instructions <: AnyInstructionsBundle
+  val  instructions: Instructions
 
-  type ResourcesBundle <: AnyResourcesBundle
-  val  resources: ResourcesBundle
+  type Resources <: AnyResourcesBundle
+  val  resources: Resources
 
   val logUploader: LogUploaderBundle
 
-  val bundleDependencies: List[AnyBundle] = List(instructionsBundle, resources, logUploader)
+  val bundleDependencies: List[AnyBundle] = List(instructions, resources, logUploader)
 
   def install: Results = {
-    InstructionsExecutor(resources.config, instructionsBundle, resources.aws).runLoop
+    InstructionsExecutor(resources.config, instructions, resources.aws).runLoop
     success("worker installed")
   }
 }
@@ -40,20 +38,20 @@ trait AnyWorkerBundle extends AnyBundle {
 abstract class WorkerBundle[
   I <: AnyInstructionsBundle,
   R <: AnyResourcesBundle
-](val instructionsBundle: I,
+](val instructions: I,
   val resources: R,
   val logUploader: LogUploaderBundle
 ) extends AnyWorkerBundle {
 
-  type InstructionsBundle = I
-  type ResourcesBundle = R
+  type Instructions = I
+  type Resources = R
 }
 
 
 // TODO: rewrite all this and make it Worker's install
 case class InstructionsExecutor(
   val config: AnyNisperoConfig,
-  val instructionsBundle: AnyInstructionsBundle,
+  val instructions: AnyInstructionsBundle,
   val aws: AWSClients
 ) {
 
@@ -109,7 +107,7 @@ case class InstructionsExecutor(
               case e: Throwable => logger.info("Couldn't change the visibility timeout")
             }
             Thread.sleep(step)
-            logger.info("Solving task: " + Utils.printInterval(timeSpent()))
+            logger.info("Solving task: " + utils.printInterval(timeSpent()))
             it += 1
           }
           case Some(scala.util.Success(r)) => stopWaiting = true; taskResult = r
@@ -155,7 +153,7 @@ case class InstructionsExecutor(
           inputObjs.map { case (name, content: String) =>
             val inputFile = new File(inputDir, name)
             logger.info("trying to create input object: " + name)
-            Utils.writeStringToFile(content, inputFile)
+            utils.writeStringToFile(content, inputFile)
             inputFile
           }.toList
         /* if it's a big task, we download objects from S3 */
@@ -169,7 +167,7 @@ case class InstructionsExecutor(
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val result = instructionsBundle.processTask(task, inputFiles, outputDir)
+      val result = instructions.processTask(task, inputFiles, outputDir)
 
       val messageFile = new File(workingDir, "message")
 

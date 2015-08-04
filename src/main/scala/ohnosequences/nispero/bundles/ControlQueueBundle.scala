@@ -5,7 +5,6 @@ import ohnosequences.statika.instructions._
 import ohnosequences.awstools.sqs.{Message, Queue}
 import ohnosequences.nispero._
 import org.clapper.avsl.Logger
-import ohnosequences.nispero.utils.pickles._
 import upickle._, default._
 
 import ohnosequences.awstools.sqs.Message
@@ -18,12 +17,7 @@ case object commands {
     val command: String
     val arg: String
   }
-  // abstract class RawCommand(val command: String, val arg: String) extends AnyRawCommand
 
-  case class UnDeploy(reason: String) extends AnyRawCommand {
-    val command = "UnDeploy"
-    val arg = reason
-  }
   case class AddTasks(tasks: List[AnyTask]) extends AnyRawCommand {
     val command = "AddTasks"
     val arg = tasks.toString()
@@ -68,9 +62,6 @@ abstract class ControlQueueBundle(resources: AnyResourcesBundle) extends Bundle(
         logger.info("received command: " + message.body)
         val command = read[AnyRawCommand](message.body)
         command match {
-          case UnDeploy(reason: String) => {
-            Undeployer.undeploy(aws, config, reason)
-          }
           case AddTasks(tasks: List[AnyTask]) => {
             tasks.foreach { task =>
               inputQueue.sendMessage(upickle.default.write(task))

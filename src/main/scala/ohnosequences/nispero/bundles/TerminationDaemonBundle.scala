@@ -7,8 +7,7 @@ import ohnosequences.nispero._
 import scala.collection.mutable.ListBuffer
 import scala.Some
 import ohnosequences.nispero._
-import ohnosequences.nispero.utils.pickles._
-import upickle._
+
 
 case class SNSMessage(Message: String)
 
@@ -52,7 +51,7 @@ abstract class TerminationDaemonBundle(val resources: AnyResourcesBundle) extend
         )
 
         reason match {
-          case Some(r) => Undeployer.undeploy(aws, config, r)
+          case Some(r) => Nispero.undeploy(config)
           case None => ()
         }
 

@@ -4,13 +4,11 @@ import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 import ohnosequences.statika.aws._
 
-import ohnosequences.nispero.{TasksProvider, InstanceTags}
 import org.clapper.avsl.Logger
 
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.nispero.utils.Utils
-import ohnosequences.nispero.utils.pickles._, upickle._
+import ohnosequences.nispero._
 
 
 trait AnyManagerBundle extends AnyBundle {
@@ -37,11 +35,10 @@ trait AnyManagerBundle extends AnyBundle {
   val aws = resources.aws
   val logger = Logger(this.getClass)
 
-  def uploadInitialTasks(taskProvider: TasksProvider, initialTasks: ObjectAddress) {
+  def uploadInitialTasks(tasks: List[AnyTask], initialTasks: ObjectAddress) {
 
     try {
       logger.info("generating tasks")
-      val tasks = taskProvider.tasks(aws.s3)
 
       // NOTE: It's not used anywhere, but serializing can take too long
       // logger.info("uploading initial tasks to S3")
@@ -68,7 +65,7 @@ trait AnyManagerBundle extends AnyBundle {
     try {
 
       if (aws.s3.listObjects(config.tasksUploaded.bucket, config.tasksUploaded.key).isEmpty) {
-        uploadInitialTasks(config.tasksProvider, config.initialTasks)
+        uploadInitialTasks(config.tasks, config.initialTasks)
       } else {
         logger.warn("skipping uploading tasks")
       }
@@ -84,13 +81,13 @@ trait AnyManagerBundle extends AnyBundle {
 
       val groupName = config.workersAutoScalingGroup.name
 
-      Utils.waitForResource[AutoScalingGroup] {
+      utils.waitForResource[AutoScalingGroup] {
         println("waiting for manager autoscalling")
         aws.as.getAutoScalingGroupByName(groupName)
       }
 
       logger.info("creating tags")
-      Utils.tagAutoScalingGroup(aws.as, groupName, InstanceTags.INSTALLING.value)
+      utils.tagAutoScalingGroup(aws.as, groupName, InstanceTags.INSTALLING.value)
 
       logger.info("starting termination daemon")
       terminationDaemon.TerminationDaemonThread.start()

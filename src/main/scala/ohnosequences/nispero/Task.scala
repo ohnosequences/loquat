@@ -1,9 +1,6 @@
 package ohnosequences.nispero
 
 import ohnosequences.awstools.s3.{ObjectAddress, S3}
-import java.io.File
-import ohnosequences.nispero.utils.pickles._
-import upickle._
 
 sealed trait AnyTask {
 

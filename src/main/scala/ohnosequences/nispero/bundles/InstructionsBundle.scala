@@ -10,7 +10,7 @@ import java.io.File
 import org.clapper.avsl.Logger
 import ohnosequences.awstools.s3.LoadingManager
 import org.apache.commons.io.FileUtils
-import ohnosequences.nispero.utils.Utils
+import ohnosequences.nispero.utils
 
 
 trait AnyInstructionsBundle extends AnyBundle {
