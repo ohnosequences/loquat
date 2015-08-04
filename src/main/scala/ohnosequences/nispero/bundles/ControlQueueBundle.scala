@@ -1,14 +1,13 @@
 package ohnosequences.nispero.bundles
 
+import ohnosequences.nispero._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
-import ohnosequences.awstools.sqs.{Message, Queue}
-import ohnosequences.nispero._
-import org.clapper.avsl.Logger
-import upickle._, default._
 
-import ohnosequences.awstools.sqs.Message
-import ohnosequences.awstools.sqs.Queue
+import ohnosequences.awstools.sqs.{Message, Queue}
+
+import org.clapper.avsl.Logger
 
 // NOTE: probably this whole thing can be safely removed (I guess it is related to the web-console)
 case object commands {
@@ -60,7 +59,7 @@ case class ControlQueueBundle(resources: AnyResourcesBundle) extends Bundle(reso
         val message = waitForTask(controlQueue)
 
         logger.info("received command: " + message.body)
-        val command = read[AnyRawCommand](message.body)
+        val command = upickle.default.read[AnyRawCommand](message.body)
         command match {
           case AddTasks(tasks: List[AnyTask]) => {
             tasks.foreach { task =>

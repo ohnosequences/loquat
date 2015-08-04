@@ -1,16 +1,11 @@
 package ohnosequences.nispero.bundles
 
 import ohnosequences.nispero._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
-import ohnosequences.awstools.s3.S3
 import java.io.File
-
-import org.clapper.avsl.Logger
-import ohnosequences.awstools.s3.LoadingManager
-import org.apache.commons.io.FileUtils
-import ohnosequences.nispero.utils
 
 
 trait AnyInstructionsBundle extends AnyBundle {

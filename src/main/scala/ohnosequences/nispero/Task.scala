@@ -1,6 +1,6 @@
 package ohnosequences.nispero
 
-import ohnosequences.awstools.s3.{ObjectAddress, S3}
+import ohnosequences.awstools.s3.ObjectAddress
 
 sealed trait AnyTask {
 

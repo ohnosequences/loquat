@@ -1,16 +1,10 @@
 package ohnosequences.nispero
 
-import ohnosequences.statika.bundles._
-import ohnosequences.statika.aws._
 import ohnosequences.nispero.bundles._
+import ohnosequences.statika.bundles._
 
-import org.clapper.avsl.Logger
-import ohnosequences.awstools.ec2.{EC2, Tag}
-import ohnosequences.awstools.s3.S3
-import ohnosequences.awstools.autoscaling.{AutoScalingGroup, AutoScaling}
-import ohnosequences.awstools.sns.SNS
 import ohnosequences.awstools.AWSClients
-import java.io.File
+import org.clapper.avsl.Logger
 
 
 abstract class Nispero[

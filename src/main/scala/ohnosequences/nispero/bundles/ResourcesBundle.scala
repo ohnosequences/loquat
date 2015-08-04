@@ -1,10 +1,10 @@
 package ohnosequences.nispero.bundles
 
 import ohnosequences.nispero._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
-import ohnosequences.awstools.dynamodb._
-import ohnosequences.logging._
+
 import org.clapper.avsl.Logger
 
 import ohnosequences.awstools.AWSClients

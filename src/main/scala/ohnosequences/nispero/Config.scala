@@ -7,11 +7,10 @@ import ohnosequences.awstools.ec2.{EC2, Tag, InstanceType, InstanceSpecs }
 import ohnosequences.awstools.s3.{ S3, ObjectAddress }
 import ohnosequences.awstools.autoscaling._
 
-import com.amazonaws.AmazonClientException
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.auth.AWSCredentialsProvider
-import java.io.File
 import org.clapper.avsl.Logger
+import java.io.File
 
 
 /* Manager autoscaling group configuration */

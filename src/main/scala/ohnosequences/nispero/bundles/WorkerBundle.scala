@@ -4,10 +4,7 @@ import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
 import ohnosequences.nispero._
-import ohnosequences.nispero.bundles._
-import ohnosequences.nispero.utils
 import ohnosequences.awstools.sqs.Message
-import ohnosequences.awstools.sns.Topic
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.awstools.AWSClients

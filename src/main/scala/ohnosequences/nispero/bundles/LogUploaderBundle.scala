@@ -2,10 +2,12 @@ package ohnosequences.nispero.bundles
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
-import java.io.File
-import ohnosequences.awstools.s3.{ObjectAddress, S3}
-import ohnosequences.awstools.ec2.EC2
+
+import ohnosequences.awstools.s3.ObjectAddress
+
 import org.clapper.avsl.Logger
+import java.io.File
+
 
 case class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
 

@@ -1,12 +1,12 @@
 package ohnosequences.nispero.bundles
 
+import ohnosequences.nispero._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
+
 import org.clapper.avsl.Logger
-import ohnosequences.nispero._
 import scala.collection.mutable.ListBuffer
-import scala.Some
-import ohnosequences.nispero._
 
 
 case class SNSMessage(Message: String)

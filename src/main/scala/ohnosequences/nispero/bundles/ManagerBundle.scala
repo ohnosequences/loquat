@@ -1,14 +1,14 @@
 package ohnosequences.nispero.bundles
 
+import ohnosequences.nispero._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
-import ohnosequences.statika.aws._
 
 import org.clapper.avsl.Logger
 
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.nispero._
 
 
 trait AnyManagerBundle extends AnyBundle {
