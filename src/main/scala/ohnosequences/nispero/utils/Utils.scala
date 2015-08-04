@@ -56,7 +56,6 @@ object Utils {
 
   def copyInputStreamToFile(stream: InputStream, file: File) {
     FileUtils.copyInputStreamToFile(stream, file)
-
   }
 
   def recursiveListFiles(file: File, exclude: List[File] = Nil, root: Boolean = true): List[File] =

@@ -101,7 +101,7 @@ trait AnyManagerBundle extends AnyBundle {
     } catch {
       case t: Throwable => {
         t.printStackTrace()
-        aws.ec2.getCurrentInstance.foreach(_.terminate())
+        aws.ec2.getCurrentInstance.foreach(_.terminate)
         failure("manager fails")
       }
     }

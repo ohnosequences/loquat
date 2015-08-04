@@ -7,6 +7,9 @@ import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.awstools.ec2.{ InstanceType, InstanceSpecs }
 import ohnosequences.awstools.autoscaling._
 
+import java.io.File
+
+
 /* Manager autoscaling group configuration */
 case class ManagerConfig(
   instanceType: InstanceType,
@@ -17,7 +20,7 @@ case class ManagerConfig(
 case class WorkersConfig(
   instanceType: InstanceType,
   purchaseModel: PurchaseModel = SpotAuto,
-  workingDir: String = "/media/ephemeral0",
+  workingDir: File = new File("/media/ephemeral0"),
   desiredCapacity: Int = 1,
   minSize: Int = 0,
   maxSize: Int = 10
