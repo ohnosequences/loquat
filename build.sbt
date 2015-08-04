@@ -14,9 +14,6 @@ libraryDependencies ++= Seq(
   "org.clapper" %% "avsl" % "1.0.2",
   // json:
   "com.lihaoyi" %% "upickle" % "0.3.4",
-  // web-console:
-  "net.databinder" %% "unfiltered-filter" % "0.8.4",
-  "net.databinder" %% "unfiltered-jetty"  % "0.8.4",
   // internal structure:
   "ohnosequences" %% "statika"     % "2.0.0-SNAPSHOT",
   "ohnosequences" %% "aws-statika" % "2.0.0-SNAPSHOT",
@@ -25,9 +22,7 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides ++= Set(
-  "commons-codec" % "commons-codec" % "1.6",
-  "jline" % "jline" % "2.12.1",
-  "org.scala-lang.modules" %% "scala-xml" % "1.0.4"
+  "jline" % "jline" % "2.12.1"
 )
 
 wartremoverErrors in (Compile, compile) := Seq()
