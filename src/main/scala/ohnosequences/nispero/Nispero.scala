@@ -23,12 +23,9 @@ abstract class Nispero[
 
   // Bundles hierarchy:
   case object resources extends ResourcesBundle(config)
-  case object controlQueue extends ControlQueueBundle(resources)
-  case object logUploader extends LogUploaderBundle(resources)
-  case object terminationDaemon extends TerminationDaemonBundle(resources)
 
-  case object worker extends WorkerBundle(instructions, resources, logUploader)
-  case object manager extends ManagerBundle(controlQueue, terminationDaemon, logUploader, worker, resources)
+  case object worker extends WorkerBundle(instructions, resources)
+  case object manager extends ManagerBundle(worker)
 
   case object managerCompat extends Compatible(config.ami, manager, config.metadata)
 

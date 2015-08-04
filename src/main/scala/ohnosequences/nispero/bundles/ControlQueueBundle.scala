@@ -29,7 +29,7 @@ case object commands {
 }
 
 
-abstract class ControlQueueBundle(resources: AnyResourcesBundle) extends Bundle(resources) {
+case class ControlQueueBundle(resources: AnyResourcesBundle) extends Bundle(resources) {
   import commands._
 
   val logger = Logger(this.getClass)

@@ -11,7 +11,7 @@ import ohnosequences.nispero._
 
 case class SNSMessage(Message: String)
 
-abstract class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
+case class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
 
   val aws = resources.aws
 

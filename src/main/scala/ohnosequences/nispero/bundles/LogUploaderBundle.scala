@@ -7,7 +7,7 @@ import ohnosequences.awstools.s3.{ObjectAddress, S3}
 import ohnosequences.awstools.ec2.EC2
 import org.clapper.avsl.Logger
 
-abstract class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
+case class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
 
   val aws = resources.aws
 

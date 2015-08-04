@@ -16,20 +16,20 @@ trait AnyManagerBundle extends AnyBundle {
   type Worker <: AnyWorkerBundle
   val  worker: Worker
 
-  case object workerCompat extends Compatible[Resources#Config#AMI, Worker](
+  case object workerCompat extends Compatible[Worker#Resources#Config#AMI, Worker](
     environment = resources.config.ami,
     bundle = worker,
     metadata = resources.config.metadata
   )
 
-  type Resources <: AnyResourcesBundle
-  val  resources: Resources
+  // type Resources <: AnyResourcesBundle
+  val  resources = worker.resources
 
-  val logUploader: LogUploaderBundle
-  val controlQueue: ControlQueueBundle
-  val terminationDaemon: TerminationDaemonBundle
+  val logUploader = LogUploaderBundle(resources)
+  val controlQueue = ControlQueueBundle(resources)
+  val terminationDaemon = TerminationDaemonBundle(resources)
 
-  val bundleDependencies: List[AnyBundle] = List(controlQueue, terminationDaemon, resources, logUploader)
+  val bundleDependencies: List[AnyBundle] = List(controlQueue, terminationDaemon, logUploader)
 
   val config = resources.config
   val aws = resources.aws
@@ -105,16 +105,7 @@ trait AnyManagerBundle extends AnyBundle {
   }
 }
 
-abstract class ManagerBundle[
-  W <: AnyWorkerBundle,
-  R <: AnyResourcesBundle
-](val controlQueue: ControlQueueBundle,
-  val terminationDaemon: TerminationDaemonBundle,
-  val logUploader: LogUploaderBundle,
-  val worker: W,
-  val resources: R
-) extends AnyManagerBundle {
+abstract class ManagerBundle[W <: AnyWorkerBundle](val worker: W) extends AnyManagerBundle {
 
   type Worker = W
-  type Resources = R
 }

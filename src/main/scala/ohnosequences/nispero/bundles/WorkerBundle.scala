@@ -25,9 +25,9 @@ trait AnyWorkerBundle extends AnyBundle {
   type Resources <: AnyResourcesBundle
   val  resources: Resources
 
-  val logUploader: LogUploaderBundle
+  val logUploader: LogUploaderBundle = LogUploaderBundle(resources)
 
-  val bundleDependencies: List[AnyBundle] = List(instructions, resources, logUploader)
+  val bundleDependencies: List[AnyBundle] = List(instructions, logUploader)
 
   def install: Results = {
     InstructionsExecutor(resources.config, instructions, resources.aws).runLoop
@@ -39,8 +39,7 @@ abstract class WorkerBundle[
   I <: AnyInstructionsBundle,
   R <: AnyResourcesBundle
 ](val instructions: I,
-  val resources: R,
-  val logUploader: LogUploaderBundle
+  val resources: R
 ) extends AnyWorkerBundle {
 
   type Instructions = I
