@@ -8,8 +8,6 @@ bucketSuffix := "era7.com"
 scalaVersion := "2.11.7"
 
 libraryDependencies ++= Seq(
-  // file/stream utils:
-  "commons-io" % "commons-io" % "2.4",
   // logging:
   "org.clapper" %% "avsl" % "1.0.2",
   // json:
@@ -21,8 +19,7 @@ libraryDependencies ++= Seq(
   "ohnosequences" %% "aws-scala-tools" % "0.12.0"
 )
 
-dependencyOverrides ++= Set(
-  "jline" % "jline" % "2.12.1"
-)
+dependencyOverrides += "jline" % "jline" % "2.12.1"
 
+// FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()

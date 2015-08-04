@@ -37,6 +37,17 @@ object utils {
     writer.close()
   }
 
+  def listRecursively(f: File): Seq[File] = {
+    f.listFiles.filter(_.isDirectory).flatMap(listRecursively) ++
+    f.listFiles
+  }
+
+  def deleteRecursively(file: File) = {
+    listRecursively(file).foreach{ f => 
+      if (!f.delete) throw new RuntimeException("Failed to delete " + f.getAbsolutePath)
+    }
+  }
+
   def printInterval(intervalSecs: Long): String = {
     (intervalSecs / 60) + " min " + (intervalSecs % 60) + " sec"
   }

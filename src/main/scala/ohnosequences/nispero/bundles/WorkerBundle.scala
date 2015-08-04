@@ -11,7 +11,6 @@ import ohnosequences.awstools.AWSClients
 import org.clapper.avsl.Logger
 import java.io.File
 import scala.concurrent.Future
-import org.apache.commons.io.FileUtils
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -125,18 +124,18 @@ case class InstructionsExecutor(
     try {
     // val cleanWorkingDir: Results = {
       logger.info("cleaning working directory: " + workingDir.getAbsolutePath)
-      FileUtils.deleteDirectory(workingDir)
+      utils.deleteRecursively(workingDir)
       logger.info("creating working directory: " + workingDir.getAbsolutePath)
       workingDir.mkdir()
 
       val inputDir = new File(workingDir, "input")
       logger.info("cleaning input directory: " + inputDir.getAbsolutePath)
-      FileUtils.deleteDirectory(inputDir)
+      utils.deleteRecursively(inputDir)
       inputDir.mkdir()
 
       val outputDir = new File(workingDir, "output")
       logger.info("cleaning output directory: " + outputDir.getAbsolutePath)
-      FileUtils.deleteDirectory(outputDir)
+      utils.deleteRecursively(outputDir)
       outputDir.mkdir()
 
     //   success("cleaned working directories")
