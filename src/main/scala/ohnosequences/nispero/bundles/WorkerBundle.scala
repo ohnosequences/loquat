@@ -11,15 +11,15 @@ trait AnyWorkerBundle extends AnyBundle {
   val  instructionsBundle: InstructionsBundle
 
   type ResourcesBundle <: AnyResourcesBundle
-  val  resourcesBundle: ResourcesBundle
+  val  resources: ResourcesBundle
 
-  val logUploaderBundle: LogUploaderBundle
+  val logUploader: LogUploaderBundle
 
-  val bundleDependencies: List[AnyBundle] = List(instructionsBundle, resourcesBundle, logUploaderBundle)
+  val bundleDependencies: List[AnyBundle] = List(instructionsBundle, resources, logUploader)
 
   def install: Results = {
-    val config = resourcesBundle.config
-    val instructionsExecutor = new InstructionsExecutor(config, instructionsBundle, resourcesBundle.awsClients)
+    val config = resources.config
+    val instructionsExecutor = new InstructionsExecutor(config, instructionsBundle, resources.aws)
     instructionsExecutor.run
     success("worker installed")
   }
@@ -29,8 +29,8 @@ abstract class WorkerBundle[
   I <: AnyInstructionsBundle,
   R <: AnyResourcesBundle
 ](val instructionsBundle: I,
-  val resourcesBundle: R,
-  val logUploaderBundle: LogUploaderBundle
+  val resources: R,
+  val logUploader: LogUploaderBundle
 ) extends AnyWorkerBundle {
 
   type InstructionsBundle = I

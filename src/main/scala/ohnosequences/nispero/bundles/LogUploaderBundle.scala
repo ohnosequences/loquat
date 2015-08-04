@@ -7,27 +7,27 @@ import ohnosequences.awstools.s3.{ObjectAddress, S3}
 import ohnosequences.awstools.ec2.EC2
 import org.clapper.avsl.Logger
 
-abstract class LogUploaderBundle(val resourcesBundle: AnyResourcesBundle) extends Bundle(resourcesBundle) {
+abstract class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
 
-  val awsClients = resourcesBundle.awsClients
+  val aws = resources.aws
 
   def install: Results = {
     val logFile = new File("/root/log.txt")
 
     val logger = Logger(this.getClass)
 
-    val bucket = resourcesBundle.config.resourceNames.bucket
+    val bucket = resources.config.resourceNames.bucket
 
-    awsClients.ec2.getCurrentInstanceId match {
+    aws.ec2.getCurrentInstanceId match {
       case Some(id) => {
-        val logUploaderBundle = new Thread(new Runnable {
+        val logUploader = new Thread(new Runnable {
           def run() {
             while(true) {
               try {
-                if(awsClients.s3.getBucket(bucket).isEmpty) {
+                if(aws.s3.getBucket(bucket).isEmpty) {
                     logger.warn("bucket " + bucket + " doesn't exist")
                   } else {
-                    awsClients.s3.putObject(ObjectAddress(bucket, id), logFile)
+                    aws.s3.putObject(ObjectAddress(bucket, id), logFile)
                   }
 
                 Thread.sleep(1000 * 30)
@@ -36,10 +36,10 @@ abstract class LogUploaderBundle(val resourcesBundle: AnyResourcesBundle) extend
               }
             }
           }
-        }, "logUploaderBundle")
-        logUploaderBundle.setDaemon(true)
-        logUploaderBundle.start()
-        success("logUploaderBundle started")
+        }, "logUploader")
+        logUploader.setDaemon(true)
+        logUploader.start()
+        success("logUploader started")
       }
       case None => failure("can't obtain instanceId")
     }

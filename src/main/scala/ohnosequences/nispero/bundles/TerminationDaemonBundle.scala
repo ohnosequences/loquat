@@ -12,12 +12,12 @@ import upickle._
 
 case class SNSMessage(Message: String)
 
-abstract class TerminationDaemonBundle(val resourcesBundle: AnyResourcesBundle) extends Bundle(resourcesBundle) {
+abstract class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
 
-  val awsClients = resourcesBundle.awsClients
+  val aws = resources.aws
 
   val logger = Logger(this.getClass)
-  val config = resourcesBundle.config
+  val config = resources.config
 
   val TIMEOUT = 300 //5 min
 
@@ -52,7 +52,7 @@ abstract class TerminationDaemonBundle(val resourcesBundle: AnyResourcesBundle) 
         )
 
         reason match {
-          case Some(r) => Undeployer.undeploy(awsClients, config, r)
+          case Some(r) => Undeployer.undeploy(aws, config, r)
           case None => ()
         }
 
@@ -75,7 +75,7 @@ abstract class TerminationDaemonBundle(val resourcesBundle: AnyResourcesBundle) 
   }
 
   def getQueueMessagesWithHandles(queueName: String): List[(String, String)] = {
-    awsClients.sqs.getQueueByName(queueName) match {
+    aws.sqs.getQueueByName(queueName) match {
       case None => Nil
       case Some(queue) => {
         var messages = ListBuffer[(String, String)]()
@@ -97,7 +97,7 @@ abstract class TerminationDaemonBundle(val resourcesBundle: AnyResourcesBundle) 
   }
 
   def checkConditions(terminationConfig: TerminationConfig, successResultsCount: Int, failedResultsCount: Int, initialTasksCount: Option[Int]): Option[String] = {
-    val startTime = awsClients.as.getCreatedTime(config.managerAutoScalingGroup.name).map(_.getTime)
+    val startTime = aws.as.getCreatedTime(config.managerAutoScalingGroup.name).map(_.getTime)
 
     if (terminationConfig.terminateAfterInitialTasks && initialTasksCount.isDefined && (successResultsCount >= initialTasksCount.get)) {
       Some("terminated due to terminateAfterInitialTasks: initialTasks count: " + initialTasksCount.get + " current: " + successResultsCount)
@@ -117,7 +117,7 @@ abstract class TerminationDaemonBundle(val resourcesBundle: AnyResourcesBundle) 
 
   def calcInitialTasksCount(): Option[Int] = {
     try {
-      val tasksString = awsClients.s3.readWholeObject(config.initialTasks)
+      val tasksString = aws.s3.readWholeObject(config.initialTasks)
       val tasks: List[AnyTask] = upickle.default.read[List[AnyTask]](tasksString)
       val ids = scala.collection.mutable.HashSet() ++ tasks
       Some(ids.size)

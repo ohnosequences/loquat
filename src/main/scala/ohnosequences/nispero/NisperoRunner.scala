@@ -24,7 +24,7 @@ abstract class NisperoRunner[
 ](val config: C, val manager: M) {
 
   type Config = C
-  // val  config: Config = nisperoDistribution.manager.resourcesBundle.config
+  // val  config: Config = nisperoDistribution.manager.resources.config
 
   type Manager = M
   // val  manager: Manager
@@ -132,8 +132,8 @@ abstract class NisperoRunner[
   }
 
   def undeploy(message: String, args: List[String]) {
-    val awsClients = AWSClients.create(retrieveCredentialsProvider(args)._1)
-    Undeployer.undeploy(awsClients, config, message)
+    val aws = AWSClients.create(retrieveCredentialsProvider(args)._1)
+    Undeployer.undeploy(aws, config, message)
   }
 
 }

@@ -12,8 +12,32 @@ import upickle._, default._
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 
+// NOTE: probably this whole thing can be safely removed (I guess it is related to the web-console)
+case object commands {
 
-abstract class ControlQueueBundle(resourcesBundle: AnyResourcesBundle) extends Bundle(resourcesBundle) {
+  sealed trait AnyRawCommand {
+    val command: String
+    val arg: String
+  }
+  // abstract class RawCommand(val command: String, val arg: String) extends AnyRawCommand
+
+  case class UnDeploy(reason: String) extends AnyRawCommand {
+    val command = "UnDeploy"
+    val arg = reason
+  }
+  case class AddTasks(tasks: List[AnyTask]) extends AnyRawCommand {
+    val command = "AddTasks"
+    val arg = tasks.toString()
+  }
+  case class ChangeCapacity(capacity: Int) extends AnyRawCommand {
+    val command = "ChangeCapacity"
+    val arg = capacity.toString
+  }
+}
+
+
+abstract class ControlQueueBundle(resources: AnyResourcesBundle) extends Bundle(resources) {
+  import commands._
 
   val logger = Logger(this.getClass)
 
@@ -33,29 +57,28 @@ abstract class ControlQueueBundle(resourcesBundle: AnyResourcesBundle) extends B
   }
 
   def run() {
-    val config = resourcesBundle.config
-    val awsClients = resourcesBundle.awsClients
-    val controlQueue = awsClients.sqs.getQueueByName(config.resourceNames.controlQueue).get
-    val inputQueue =  awsClients.sqs.getQueueByName(config.resourceNames.inputQueue).get
+    val config = resources.config
+    val aws = resources.aws
+    val controlQueue = aws.sqs.getQueueByName(config.resourceNames.controlQueue).get
+    val inputQueue =  aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
 
     while(true) {
       try {
         val message = waitForTask(controlQueue)
 
-        val command: RawCommand = read[RawCommand](message.body)
-        logger.info("received command: " + command)
+        logger.info("received command: " + message.body)
+        val command = read[AnyRawCommand](message.body)
         command match {
-          case RawCommand("UnDeploy", reason: String) => {
-            Undeployer.undeploy(awsClients, config, reason)
+          case UnDeploy(reason: String) => {
+            Undeployer.undeploy(aws, config, reason)
           }
-          case RawCommand("AddTasks", tasks: String) => {
-            val parsedTasks = upickle.default.read[List[AnyTask]](tasks)
-            parsedTasks.foreach { task =>
+          case AddTasks(tasks: List[AnyTask]) => {
+            tasks.foreach { task =>
               inputQueue.sendMessage(upickle.default.write(task))
             }
           }
-          case RawCommand("ChangeCapacity", n: String) => {
-            awsClients.as.setDesiredCapacity(config.workersAutoScalingGroup, n.toInt)
+          case ChangeCapacity(n: Int) => {
+            aws.as.setDesiredCapacity(config.workersAutoScalingGroup, n)
           }
         }
         controlQueue.deleteMessage(message)

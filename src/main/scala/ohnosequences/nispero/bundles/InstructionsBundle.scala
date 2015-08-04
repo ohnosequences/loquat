@@ -11,10 +11,7 @@ import java.io.File
 trait AnyInstructionsBundle extends AnyBundle {
 
   def execute(s3: S3, task: AnyTask, workingDir: File = new File(".")): TaskResult
-
-  // def install: Results = {
-  //   success("instructions installed")
-  // }
 }
 
-// abstract class Instructions(deps: AnyBundle*) extends Bundle(deps: _*) with AnyInstructions
+abstract class InstructionsBundle(deps: AnyBundle*)
+  extends Bundle(deps: _*) with AnyInstructionsBundle
