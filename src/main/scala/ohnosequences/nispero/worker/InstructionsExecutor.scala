@@ -13,7 +13,7 @@ import ohnosequences.nispero.utils.pickles._
 import upickle._
 
 
-class InstructionsExecutor(config: Config, instructions: Instructions, val awsClients: AWSClients) {
+class InstructionsExecutor(config: AnyConfig, instructions: Instructions, val awsClients: AWSClients) {
 
   val MESSAGE_TIMEOUT = 5000
 
@@ -55,7 +55,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
     var it = 0
     while(!stopWaiting) {
-      if(timeSpent() > config.taskProcessTimeout) {
+      if(timeSpent() > config.terminationConfig.taskProcessTimeout) {
         stopWaiting = true
         taskResult = TaskResult.Failure("Timeout: " + timeSpent + " > taskProcessTimeout")
         terminate()
@@ -94,9 +94,9 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
     logger.info("InstructionsExecutor started at " + instance.map(_.getInstanceId))
 
-    val inputQueue = sqs.getQueueByName(config.resources.inputQueue).get
-    val outputTopic = sns.createTopic(config.resources.outputTopic)
-    val errorTopic = sns.createTopic(config.resources.errorTopic)
+    val inputQueue = sqs.getQueueByName(config.resourceNames.inputQueue).get
+    val outputTopic = sns.createTopic(config.resourceNames.outputTopic)
+    val errorTopic = sns.createTopic(config.resourceNames.errorTopic)
 
     while(!stopped) {
       var taskId = ""
@@ -113,7 +113,7 @@ class InstructionsExecutor(config: Config, instructions: Instructions, val awsCl
 
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
-          instructions.execute(s3, task, new File(config.workersDir))
+          instructions.execute(s3, task, new File(config.workersConfig.workingDir))
         }
 
         val (taskResult, timeSpent) = waitForResult(futureResult, message)

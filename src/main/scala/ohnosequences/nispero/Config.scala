@@ -1,90 +1,147 @@
 package ohnosequences.nispero
 
+import ohnosequences.statika.bundles._
+import ohnosequences.statika.aws._, amazonLinuxAMIs._
+// import ohnosequences.nispero.utils.pickles._
+
 import ohnosequences.awstools.s3.ObjectAddress
-import ohnosequences.awstools.autoscaling.AutoScalingGroup
-import ohnosequences.nispero.utils.pickles._
-import upickle._
+import ohnosequences.awstools.ec2.{ InstanceType, InstanceSpecs }
+import ohnosequences.awstools.autoscaling._
 
-/**
- * configuration for nispero
- * @param managerConfig configuration for Manager and Console
- * @param email e-mail address for notifications
- * @param terminationConditions termination conditions
- * @param resources configuration of names for resources: queues, topics, buckets
- * @param workersDir working directory dor worker
- * @param tasksProvider task provider (@see https://github.com/ohnosequences/nispero/blob/master/doc/tasks-providers.md)
- * @param taskProcessTimeout maximum time for processing task
- */
 
-case class Config(
-  managerConfig: ManagerConfig,
-  email: String,
-  terminationConditions: TerminationConditions,
-  resources: ResourcesBundle,
-  workersDir: String,
-  tasksProvider: TasksProvider = EmptyTasks,
-  jarAddress: ObjectAddress,
-  taskProcessTimeout: Int = 60 * 60 * 10 // 10 hours
-) {
+/* Configuration for nispero */
+abstract class AnyConfig {
 
-  def initialTasks = ObjectAddress(resources.bucket, "initialTasks")
+  // email address for notifications
+  val email: String
 
-  def tasksUploaded = ObjectAddress(resources.bucket, "tasksUploaded")
+  // Metadata generated for your nispero project
+  val metadata: AnyArtifactMetadata
 
-  def notificationTopic: String = {
-    "nisperoNotificationTopic" + email.replace("@", "").replace("-", "").replace(".", "")
+  lazy final val fatArtifactS3Object: ObjectAddress = {
+    val s3url = """s3://(.+)/(.+)""".r
+    metadata.artifactUrl match {
+      case s3url(bucket, key) => ObjectAddress(bucket, key)
+      case _ => throw new Error("Wrong fat jar url, it should be published to S3")
+    }
   }
 
+  // Unique id  of the nispero instance
+  lazy final val nisperoName: String = metadata.artifact.replace(".", "").toLowerCase
+  lazy final val nisperoVersion: String = metadata.version.replace(".", "").toLowerCase
+  lazy final val nisperoId: String = (nisperoName + nisperoVersion)
+
+  // keypair name for connecting to the nispero instances
+  val keypairName: String
+  val securityGroups: List[String]
+  val iamRoleName: String
+
+  type AMI <: AmazonLinuxAMI
+  val  ami: AMI
+
+  // Configuration for Manager autoscaling group
+  val managerConfig: ManagerConfig
+
+  lazy final val managerAutoScalingGroup = AutoScalingGroup(
+    name = "nisperoManagerGroup" + nisperoVersion,
+    minSize = 1,
+    maxSize = 1,
+    desiredCapacity = 1,
+    launchingConfiguration = LaunchConfiguration(
+      name = "nisperoManagerLaunchConfiguration" + nisperoVersion,
+      instanceSpecs = InstanceSpecs(
+        instanceType = managerConfig.instanceType,
+        amiId = ami.id,
+        securityGroups = securityGroups,
+        keyName = keypairName,
+        instanceProfile = Some(iamRoleName)
+      ),
+      purchaseModel = managerConfig.purchaseModel
+    )
+  )
+
+  // Configuration for Workers autoscaling group
+  val workersConfig: WorkersConfig
+
+  lazy final val workersAutoScalingGroup = AutoScalingGroup(
+    name = "nisperoWorkersGroup" + nisperoVersion,
+    minSize = workersConfig.minSize,
+    maxSize = workersConfig.maxSize,
+    desiredCapacity = workersConfig.desiredCapacity,
+    launchingConfiguration = LaunchConfiguration(
+      name = "nisperoWorkersLaunchConfiguration" + nisperoVersion,
+      instanceSpecs = InstanceSpecs(
+        instanceType = workersConfig.instanceType,
+        amiId = ami.id,
+        securityGroups = securityGroups,
+        keyName = keypairName,
+        instanceProfile = Some(iamRoleName)
+      ),
+      purchaseModel = workersConfig.purchaseModel
+    )
+  )
+
+  // Termination conditions
+  val terminationConfig: TerminationConfig
+
+  // task provider (@see https://github.com/ohnosequences/nispero/blob/master/doc/tasks-providers.md)
+  val tasksProvider: TasksProvider
+
+  // resources configuration of names for resources: queues, topics, buckets
+  lazy final val resourceNames: ResourceNames = ResourceNames(nisperoId)
+
+  lazy final val initialTasks: ObjectAddress = ObjectAddress(resourceNames.bucket, "initialTasks")
+  lazy final val tasksUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, "tasksUploaded")
+
+  lazy final val notificationTopic: String = s"""nisperoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
+
 }
 
 
-/**
- * configuration of resources
- * @param id unique name of nispero instance
- * @param inputQueue name of queue with tasks
- * @param controlQueue name of queue for interaction with Manager
- * @param outputTopic name of topic for tasks result notifications
- * @param outputQueue name of queue with tasks results notifications (will be subscribed to outputTopic)
- * @param errorTopic name of topic for errors
- * @param errorQueue name of queue with errors (will be subscribed to errorTopic)
- * @param bucket name of bucket for logs and console static files
- * @param workersStateTable name of DynamoDB table with workers statistics
- * @param workersGroup configuration of worker group
- */
-case class ResourcesBundle(
-  id: String,
-  workersGroup: AutoScalingGroup
-) {
-  val inputQueue: String = "nisperoInputQueue" + id
-  val controlQueue: String = "nisperoControlQueue" + id
-  val outputQueue: String = "nisperoOutputQueue" + id
-  val outputTopic: String = "nisperoOutputTopic" + id
-  val errorTopic: String = "nisperoErrorQueue" + id
-  val errorQueue: String = "nisperoErrorTopic" + id
-  val bucket: String = "nisperobucket" + id.replace("_", "-")
-  val workersStateTable: String = "nisperoworkersStateTable" + id
+/* Configuration of resources */
+case class ResourceNames(nisperoId: String) {
+  // name of queue with tasks
+  val inputQueue: String = "nisperoInputQueue" + nisperoId
+  // name of queue for interaction with Manager
+  val controlQueue: String = "nisperoControlQueue" + nisperoId
+  // name of topic for tasks result notifications
+  val outputQueue: String = "nisperoOutputQueue" + nisperoId
+  // name of queue with tasks results notifications (will be subscribed to outputTopic)
+  val outputTopic: String = "nisperoOutputTopic" + nisperoId
+  // name of topic for errors
+  val errorTopic: String = "nisperoErrorQueue" + nisperoId
+  // name of queue with errors (will be subscribed to errorTopic)
+  val errorQueue: String = "nisperoErrorTopic" + nisperoId
+  // name of bucket for logs and console static files
+  val bucket: String = "nisperobucket" + nisperoId.replace("_", "-")
+  // name of DynamoDB table with workers statistics
+  val workersStateTable: String = "nisperoworkersStateTable" + nisperoId
 }
 
-/**
- * configuration for Manager and Console
- * @param port http port for Console
- * @param groups configuration of auto scaling for Manager and Console
- * @param password password for Console
- */
+/* Manager autoscaling group configuration */
 case class ManagerConfig(
-  port: Int = 443,
-  group: AutoScalingGroup,
-  password: String
+  instanceType: InstanceType,
+  purchaseModel: PurchaseModel = SpotAuto
 )
 
-/**
- * configuration of termination conditions
- * @param terminateAfterInitialTasks if true nispero will terminate after solving all initial tasks
- * @param errorsThreshold if true nispero will terminate after errorQueue will contain more unique messages then threshold
- * @param timeout if true nispero will terminate after this timeout reached. Time units are sceonds.
- */
-case class TerminationConditions(
+/* Workers autoscaling group configuration */
+case class WorkersConfig(
+  workingDir: String,
+  desiredCapacity: Int = 1,
+  minSize: Int = 0,
+  maxSize: Int = 10,
+  instanceType: InstanceType,
+  purchaseModel: PurchaseModel = SpotAuto
+)
+
+/* Configuration of termination conditions */
+case class TerminationConfig(
+  // maximum time for processing task
+  taskProcessTimeout: Int = 60 * 60 * 10, // 10 hours
+  // if true nispero will terminate after solving all initial tasks
   terminateAfterInitialTasks: Boolean,
+  // if true nispero will terminate after errorQueue will contain more unique messages then threshold
   errorsThreshold: Option[Int] = None,
+  // if true nispero will terminate after this timeout reached. Time units are sceonds.
   timeout: Option[Int] = None
 )

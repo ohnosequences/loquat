@@ -33,10 +33,10 @@ abstract class ControlQueueHandler(resourcesBundle: ResourcesBundle) extends Bun
   }
 
   def run() {
-    val config = resourcesBundle.aws.config
-    val aws = resourcesBundle.aws
-    val controlQueue = aws.clients.sqs.getQueueByName(resourcesBundle.resources.controlQueue).get
-    val inputQueue =  aws.clients.sqs.getQueueByName(resourcesBundle.resources.inputQueue).get
+    val config = resourcesBundle.config
+    val awsClients = resourcesBundle.awsClients
+    val controlQueue = awsClients.sqs.getQueueByName(config.resourceNames.controlQueue).get
+    val inputQueue =  awsClients.sqs.getQueueByName(config.resourceNames.inputQueue).get
 
     while(true) {
       try {
@@ -46,7 +46,7 @@ abstract class ControlQueueHandler(resourcesBundle: ResourcesBundle) extends Bun
         logger.info("received command: " + command)
         command match {
           case RawCommand("UnDeploy", reason: String) => {
-            Undeployer.undeploy(aws.clients, config, reason)
+            Undeployer.undeploy(awsClients, config, reason)
           }
           case RawCommand("AddTasks", tasks: String) => {
             val parsedTasks = upickle.default.read[List[AnyTask]](tasks)
@@ -55,7 +55,7 @@ abstract class ControlQueueHandler(resourcesBundle: ResourcesBundle) extends Bun
             }
           }
           case RawCommand("ChangeCapacity", n: String) => {
-            aws.clients.as.setDesiredCapacity(config.resources.workersGroup, n.toInt)
+            awsClients.as.setDesiredCapacity(config.workersAutoScalingGroup, n.toInt)
           }
         }
         controlQueue.deleteMessage(message)

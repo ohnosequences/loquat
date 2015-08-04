@@ -22,39 +22,40 @@ trait AnyManager extends AnyBundle {
   val logUploader: LogUploader
   val controlQueueHandler: ControlQueueHandler
   val terminationDaemon: TerminationDaemon
-  val aws: AWSBundle
 
-  val metadata: AnyArtifactMetadata = resourcesBundle.aws.metadata
+  val metadata: AnyArtifactMetadata = resourcesBundle.config.metadata
 
-  type AMI = resourcesBundle.aws.AMI
-  val  ami = resourcesBundle.aws.ami
+  type AMI = resourcesBundle.config.AMI
+  val  ami = resourcesBundle.config.ami
+
+  val awsClients = resourcesBundle.awsClients
 
   case object workerCompat extends Compatible(ami, worker, metadata)
 
   //val m: ami.Metadata = resourcesBundle.configuration.metadata.asInstanceOf[ami.Metadata]
   //val metadata = m
 
-  val bundleDependencies: List[AnyBundle] = List(controlQueueHandler, terminationDaemon, resourcesBundle, logUploader, aws)
+  val bundleDependencies: List[AnyBundle] = List(controlQueueHandler, terminationDaemon, resourcesBundle, logUploader)
 
   val logger = Logger(this.getClass)
 
   def uploadInitialTasks(taskProvider: TasksProvider, initialTasks: ObjectAddress) {
     try {
       logger.info("generating tasks")
-      val tasks = taskProvider.tasks(aws.clients.s3)
+      val tasks = taskProvider.tasks(awsClients.s3)
 
       // NOTE: It's not used anywhere, but serializing can take too long
       // logger.info("uploading initial tasks to S3")
       // aws.s3.putWholeObject(initialTasks, upickle.default.write(tasks))
 
       logger.info("adding initial tasks to SQS")
-      val inputQueue = aws.clients.sqs.createQueue(resourcesBundle.resources.inputQueue)
+      val inputQueue = awsClients.sqs.createQueue(resourcesBundle.config.resourceNames.inputQueue)
 
       // NOTE: we can send messages in parallel
       tasks.par.foreach { task =>
         inputQueue.sendMessage(upickle.default.write(task))
       }
-      aws.clients.s3.putWholeObject(resourcesBundle.aws.config.tasksUploaded, "")
+      awsClients.s3.putWholeObject(resourcesBundle.config.tasksUploaded, "")
       logger.info("initial tasks are ready")
 
     } catch {
@@ -65,13 +66,13 @@ trait AnyManager extends AnyBundle {
 
   def install: Results = {
 
-    val config = resourcesBundle.aws.config
+    val config = resourcesBundle.config
 
     logger.info("manager is started")
 
     try {
 
-      if (aws.clients.s3.listObjects(config.tasksUploaded.bucket, config.tasksUploaded.key).isEmpty) {
+      if (awsClients.s3.listObjects(config.tasksUploaded.bucket, config.tasksUploaded.key).isEmpty) {
         uploadInitialTasks(config.tasksProvider, config.initialTasks)
       } else {
         logger.warn("skipping uploading tasks")
@@ -82,20 +83,20 @@ trait AnyManager extends AnyBundle {
       // val workerUserScript = userScript(worker)
       // val workerUserScript = ami.userScript(metadata, this.fullName, worker.fullName)
 
-      val workersGroup = aws.clients.as.fixAutoScalingGroupUserData(config.resources.workersGroup, workerCompat.userScript)
+      val workersGroup = awsClients.as.fixAutoScalingGroupUserData(config.workersAutoScalingGroup, workerCompat.userScript)
 
       logger.info("running workers auto scaling group")
-      aws.clients.as.createAutoScalingGroup(workersGroup)
+      awsClients.as.createAutoScalingGroup(workersGroup)
 
-      val groupName = config.resources.workersGroup.name
+      val groupName = config.workersAutoScalingGroup.name
 
       Utils.waitForResource[AutoScalingGroup] {
         println("waiting for manager autoscalling")
-        aws.clients.as.getAutoScalingGroupByName(groupName)
+        awsClients.as.getAutoScalingGroupByName(groupName)
       }
 
       logger.info("creating tags")
-      Utils.tagAutoScalingGroup(aws.clients.as, groupName, InstanceTags.INSTALLING.value)
+      Utils.tagAutoScalingGroup(awsClients.as, groupName, InstanceTags.INSTALLING.value)
 
       logger.info("starting termination daemon")
       terminationDaemon.TerminationDaemonThread.start()
@@ -108,7 +109,7 @@ trait AnyManager extends AnyBundle {
     } catch {
       case t: Throwable => {
         t.printStackTrace()
-        aws.clients.ec2.getCurrentInstance.foreach(_.terminate())
+        awsClients.ec2.getCurrentInstance.foreach(_.terminate())
         failure("manager fails")
       }
     }
@@ -120,6 +121,5 @@ abstract class Manager[W <: AnyWorker](
   val terminationDaemon: TerminationDaemon,
   val resourcesBundle: ResourcesBundle,
   val logUploader: LogUploader,
-  val aws: AWSBundle,
   val worker: W
 ) extends AnyManager { type Worker = W }
