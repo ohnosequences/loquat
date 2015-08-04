@@ -70,14 +70,6 @@ object Undeployer {
       case t: Throwable => logger.error("error during deleting control queue " + t.getMessage)
     }
 
-
-
-    try {
-      awsClients.ddb.deleteTable(config.resourceNames.workersStateTable)
-    } catch {
-      case t: Throwable => logger.error("error during deleting workers state table: " + t.getMessage)
-    }
-
     try {
       logger.info("delete manager group")
       awsClients.as.deleteAutoScalingGroup(config.managerAutoScalingGroup)

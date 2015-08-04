@@ -58,15 +58,6 @@ abstract class ResourcesBundle extends Bundle() {
     logger.info("creating bucket " + resourceNames.bucket)
     awsClients.s3.createBucket(config.resourceNames.bucket)
 
-    logger.info("creating farm state table")
-    DynamoDBUtils.createTable(
-      ddb = awsClients.ddb,
-      tableName = config.resourceNames.workersStateTable,
-      hash = Names.Tables.WORKERS_STATE_HASH_KEY,
-      range = Some(Names.Tables.WORKERS_STATE_RANGE_KEY),
-      logger = new ConsoleLogger(config.resourceNames.workersStateTable)
-    )
-
     success("resources bundle installed")
   }
 

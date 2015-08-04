@@ -2,11 +2,56 @@ package ohnosequences.nispero
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
-// import ohnosequences.nispero.utils.pickles._
 
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.awstools.ec2.{ InstanceType, InstanceSpecs }
 import ohnosequences.awstools.autoscaling._
+
+/* Manager autoscaling group configuration */
+case class ManagerConfig(
+  instanceType: InstanceType,
+  purchaseModel: PurchaseModel = SpotAuto
+)
+
+/* Workers autoscaling group configuration */
+case class WorkersConfig(
+  workingDir: String,
+  desiredCapacity: Int = 1,
+  minSize: Int = 0,
+  maxSize: Int = 10,
+  instanceType: InstanceType,
+  purchaseModel: PurchaseModel = SpotAuto
+)
+
+/* Configuration of termination conditions */
+case class TerminationConfig(
+  // maximum time for processing task
+  taskProcessTimeout: Int = 60 * 60 * 10, // 10 hours
+  // if true nispero will terminate after solving all initial tasks
+  terminateAfterInitialTasks: Boolean,
+  // if true nispero will terminate after errorQueue will contain more unique messages then threshold
+  errorsThreshold: Option[Int] = None,
+  // if true nispero will terminate after this timeout reached. Time units are sceonds.
+  timeout: Option[Int] = None
+)
+
+/* Configuration of resources */
+case class ResourceNames(nisperoId: String) {
+  // name of queue with tasks
+  val inputQueue: String = "nisperoInputQueue" + nisperoId
+  // name of queue for interaction with Manager
+  val controlQueue: String = "nisperoControlQueue" + nisperoId
+  // name of topic for tasks result notifications
+  val outputQueue: String = "nisperoOutputQueue" + nisperoId
+  // name of queue with tasks results notifications (will be subscribed to outputTopic)
+  val outputTopic: String = "nisperoOutputTopic" + nisperoId
+  // name of topic for errors
+  val errorTopic: String = "nisperoErrorQueue" + nisperoId
+  // name of queue with errors (will be subscribed to errorTopic)
+  val errorQueue: String = "nisperoErrorTopic" + nisperoId
+  // name of bucket for logs and console static files
+  val bucket: String = "nisperobucket" + nisperoId.replace("_", "-")
+}
 
 
 /* Configuration for nispero */
@@ -96,52 +141,3 @@ abstract class AnyConfig {
   lazy final val notificationTopic: String = s"""nisperoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
 
 }
-
-
-/* Configuration of resources */
-case class ResourceNames(nisperoId: String) {
-  // name of queue with tasks
-  val inputQueue: String = "nisperoInputQueue" + nisperoId
-  // name of queue for interaction with Manager
-  val controlQueue: String = "nisperoControlQueue" + nisperoId
-  // name of topic for tasks result notifications
-  val outputQueue: String = "nisperoOutputQueue" + nisperoId
-  // name of queue with tasks results notifications (will be subscribed to outputTopic)
-  val outputTopic: String = "nisperoOutputTopic" + nisperoId
-  // name of topic for errors
-  val errorTopic: String = "nisperoErrorQueue" + nisperoId
-  // name of queue with errors (will be subscribed to errorTopic)
-  val errorQueue: String = "nisperoErrorTopic" + nisperoId
-  // name of bucket for logs and console static files
-  val bucket: String = "nisperobucket" + nisperoId.replace("_", "-")
-  // name of DynamoDB table with workers statistics
-  val workersStateTable: String = "nisperoworkersStateTable" + nisperoId
-}
-
-/* Manager autoscaling group configuration */
-case class ManagerConfig(
-  instanceType: InstanceType,
-  purchaseModel: PurchaseModel = SpotAuto
-)
-
-/* Workers autoscaling group configuration */
-case class WorkersConfig(
-  workingDir: String,
-  desiredCapacity: Int = 1,
-  minSize: Int = 0,
-  maxSize: Int = 10,
-  instanceType: InstanceType,
-  purchaseModel: PurchaseModel = SpotAuto
-)
-
-/* Configuration of termination conditions */
-case class TerminationConfig(
-  // maximum time for processing task
-  taskProcessTimeout: Int = 60 * 60 * 10, // 10 hours
-  // if true nispero will terminate after solving all initial tasks
-  terminateAfterInitialTasks: Boolean,
-  // if true nispero will terminate after errorQueue will contain more unique messages then threshold
-  errorsThreshold: Option[Int] = None,
-  // if true nispero will terminate after this timeout reached. Time units are sceonds.
-  timeout: Option[Int] = None
-)
