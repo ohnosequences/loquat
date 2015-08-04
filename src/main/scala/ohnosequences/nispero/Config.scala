@@ -15,12 +15,12 @@ case class ManagerConfig(
 
 /* Workers autoscaling group configuration */
 case class WorkersConfig(
-  workingDir: String,
+  instanceType: InstanceType,
+  purchaseModel: PurchaseModel = SpotAuto,
+  workingDir: String = "/media/ephemeral0",
   desiredCapacity: Int = 1,
   minSize: Int = 0,
-  maxSize: Int = 10,
-  instanceType: InstanceType,
-  purchaseModel: PurchaseModel = SpotAuto
+  maxSize: Int = 10
 )
 
 /* Configuration of termination conditions */
@@ -55,7 +55,7 @@ case class ResourceNames(nisperoId: String) {
 
 
 /* Configuration for nispero */
-abstract class AnyConfig {
+abstract class AnyNisperoConfig {
 
   // email address for notifications
   val email: String
@@ -120,7 +120,8 @@ abstract class AnyConfig {
         amiId = ami.id,
         securityGroups = securityGroups,
         keyName = keypairName,
-        instanceProfile = Some(iamRoleName)
+        instanceProfile = Some(iamRoleName),
+        deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
       ),
       purchaseModel = workersConfig.purchaseModel
     )
@@ -138,6 +139,20 @@ abstract class AnyConfig {
   lazy final val initialTasks: ObjectAddress = ObjectAddress(resourceNames.bucket, "initialTasks")
   lazy final val tasksUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, "tasksUploaded")
 
-  lazy final val notificationTopic: String = s"""nisperoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
-
+  lazy final val notificationTopic: String =
+    s"""nisperoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
 }
+
+/* This is a constructor for the end-user, exposing only missing parameters */
+case class NisperoConfig[A <: AmazonLinuxAMI](
+  val email: String,
+  val metadata: AnyArtifactMetadata,
+  val keypairName: String,
+  val securityGroups: List[String],
+  val iamRoleName: String,
+  val ami: A,
+  val managerConfig: ManagerConfig,
+  val workersConfig: WorkersConfig,
+  val terminationConfig: TerminationConfig,
+  val tasksProvider: TasksProvider
+) extends AnyNisperoConfig { type AMI = A }

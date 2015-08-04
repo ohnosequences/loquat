@@ -19,8 +19,8 @@ import ohnosequences.awstools.s3.S3
 
 
 abstract class NisperoRunner[
-  C <: AnyConfig,
-  M <: AnyManager
+  C <: AnyNisperoConfig,
+  M <: AnyManagerBundle
 ](val config: C, val manager: M) {
 
   type Config = C

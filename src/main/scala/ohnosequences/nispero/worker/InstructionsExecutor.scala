@@ -1,6 +1,7 @@
 package ohnosequences.nispero.worker
 
 import ohnosequences.nispero._
+import ohnosequences.nispero.bundles._
 import ohnosequences.nispero.utils.Utils
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sns.Topic
@@ -13,7 +14,7 @@ import ohnosequences.nispero.utils.pickles._
 import upickle._
 
 
-class InstructionsExecutor(config: AnyConfig, instructions: Instructions, val awsClients: AWSClients) {
+class InstructionsExecutor(config: AnyNisperoConfig, instructionsBundle: AnyInstructionsBundle, val awsClients: AWSClients) {
 
   val MESSAGE_TIMEOUT = 5000
 
@@ -113,7 +114,7 @@ class InstructionsExecutor(config: AnyConfig, instructions: Instructions, val aw
 
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
-          instructions.execute(s3, task, new File(config.workersConfig.workingDir))
+          instructionsBundle.execute(s3, task, new File(config.workersConfig.workingDir))
         }
 
         val (taskResult, timeSpent) = waitForResult(futureResult, message)

@@ -7,7 +7,7 @@ import ohnosequences.awstools.s3.{ObjectAddress, S3}
 import ohnosequences.awstools.ec2.EC2
 import org.clapper.avsl.Logger
 
-abstract class LogUploader(val resourcesBundle: ResourcesBundle) extends Bundle(resourcesBundle) {
+abstract class LogUploaderBundle(val resourcesBundle: AnyResourcesBundle) extends Bundle(resourcesBundle) {
 
   val awsClients = resourcesBundle.awsClients
 
@@ -20,7 +20,7 @@ abstract class LogUploader(val resourcesBundle: ResourcesBundle) extends Bundle(
 
     awsClients.ec2.getCurrentInstanceId match {
       case Some(id) => {
-        val logUploader = new Thread(new Runnable {
+        val logUploaderBundle = new Thread(new Runnable {
           def run() {
             while(true) {
               try {
@@ -36,10 +36,10 @@ abstract class LogUploader(val resourcesBundle: ResourcesBundle) extends Bundle(
               }
             }
           }
-        }, "logUploader")
-        logUploader.setDaemon(true)
-        logUploader.start()
-        success("logUploader started")
+        }, "logUploaderBundle")
+        logUploaderBundle.setDaemon(true)
+        logUploaderBundle.start()
+        success("logUploaderBundle started")
       }
       case None => failure("can't obtain instanceId")
     }

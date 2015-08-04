@@ -7,7 +7,7 @@ import ohnosequences.awstools.AWSClients
 object Undeployer {
 
 
-  def undeploy(awsClients: AWSClients, config: AnyConfig, reason: String) {
+  def undeploy(awsClients: AWSClients, config: AnyNisperoConfig, reason: String) {
     import awsClients._
 
     val logger = Logger(this.getClass())

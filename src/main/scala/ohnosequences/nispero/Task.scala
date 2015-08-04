@@ -29,10 +29,6 @@ case class TinyTask(
 ) extends AnyTask { type InputObj = String }
 
 
-trait Instructions {
-  def execute(s3: S3, task: AnyTask, workingDir: File = new File(".")): TaskResult
-}
-
 sealed abstract class TaskResult {
   val message: String
 }

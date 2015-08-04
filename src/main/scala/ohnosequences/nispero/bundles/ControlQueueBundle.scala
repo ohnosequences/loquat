@@ -13,7 +13,7 @@ import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 
 
-abstract class ControlQueueHandler(resourcesBundle: ResourcesBundle) extends Bundle(resourcesBundle) {
+abstract class ControlQueueBundle(resourcesBundle: AnyResourcesBundle) extends Bundle(resourcesBundle) {
 
   val logger = Logger(this.getClass)
 
@@ -70,7 +70,7 @@ abstract class ControlQueueHandler(resourcesBundle: ResourcesBundle) extends Bun
   }
 
   def install: Results = {
-    success("ControlQueueHandler installed")
+    success("ControlQueueBundle installed")
   }
 
 }

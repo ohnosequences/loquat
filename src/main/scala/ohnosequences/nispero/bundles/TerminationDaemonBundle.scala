@@ -12,7 +12,7 @@ import upickle._
 
 case class SNSMessage(Message: String)
 
-abstract class TerminationDaemon(val resourcesBundle: ResourcesBundle) extends Bundle(resourcesBundle) {
+abstract class TerminationDaemonBundle(val resourcesBundle: AnyResourcesBundle) extends Bundle(resourcesBundle) {
 
   val awsClients = resourcesBundle.awsClients
 
@@ -24,11 +24,11 @@ abstract class TerminationDaemon(val resourcesBundle: ResourcesBundle) extends B
   val successResults = scala.collection.mutable.HashMap[String, String]()
   val failedResults = scala.collection.mutable.HashMap[String, String]()
 
-  object TerminationDaemonThread extends Thread("TerminationDaemon") {
+  object TerminationDaemonThread extends Thread("TerminationDaemonBundle") {
 
 
     override def run() {
-      logger.info("TerminationDaemon started")
+      logger.info("TerminationDaemonBundle started")
       val initialTasksCount: Option[Int] = calcInitialTasksCount()
 
       while(true) {
@@ -127,7 +127,7 @@ abstract class TerminationDaemon(val resourcesBundle: ResourcesBundle) extends B
   }
 
   def install: Results = {
-    success("TerminationDaemon installed")
+    success("TerminationDaemonBundle installed")
   }
 
 }

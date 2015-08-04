@@ -13,15 +13,17 @@ import ohnosequences.nispero.utils.Utils
 import ohnosequences.nispero.utils.pickles._, upickle._
 
 
-trait AnyManager extends AnyBundle {
+trait AnyManagerBundle extends AnyBundle {
 
-  type Worker <: AnyWorker
+  type Worker <: AnyWorkerBundle
   val  worker: Worker
 
-  val resourcesBundle: ResourcesBundle
-  val logUploader: LogUploader
-  val controlQueueHandler: ControlQueueHandler
-  val terminationDaemon: TerminationDaemon
+  type ResourcesBundle <: AnyResourcesBundle
+  val  resourcesBundle: ResourcesBundle
+
+  val logUploaderBundle: LogUploaderBundle
+  val controlQueueHandler: ControlQueueBundle
+  val terminationDaemon: TerminationDaemonBundle
 
   val metadata: AnyArtifactMetadata = resourcesBundle.config.metadata
 
@@ -32,10 +34,7 @@ trait AnyManager extends AnyBundle {
 
   case object workerCompat extends Compatible(ami, worker, metadata)
 
-  //val m: ami.Metadata = resourcesBundle.configuration.metadata.asInstanceOf[ami.Metadata]
-  //val metadata = m
-
-  val bundleDependencies: List[AnyBundle] = List(controlQueueHandler, terminationDaemon, resourcesBundle, logUploader)
+  val bundleDependencies: List[AnyBundle] = List(controlQueueHandler, terminationDaemon, resourcesBundle, logUploaderBundle)
 
   val logger = Logger(this.getClass)
 
@@ -116,10 +115,16 @@ trait AnyManager extends AnyBundle {
   }
 }
 
-abstract class Manager[W <: AnyWorker](
-  val controlQueueHandler: ControlQueueHandler,
-  val terminationDaemon: TerminationDaemon,
-  val resourcesBundle: ResourcesBundle,
-  val logUploader: LogUploader,
-  val worker: W
-) extends AnyManager { type Worker = W }
+abstract class ManagerBundle[
+  W <: AnyWorkerBundle,
+  R <: AnyResourcesBundle
+](val controlQueueHandler: ControlQueueBundle,
+  val terminationDaemon: TerminationDaemonBundle,
+  val logUploaderBundle: LogUploaderBundle,
+  val worker: W,
+  val resourcesBundle: R
+) extends AnyManagerBundle {
+
+  type Worker = W
+  type ResourcesBundle = R
+}

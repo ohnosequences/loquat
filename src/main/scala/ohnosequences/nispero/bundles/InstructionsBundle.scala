@@ -1,12 +1,16 @@
 package ohnosequences.nispero.bundles
 
+import ohnosequences.nispero._
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
+import ohnosequences.awstools.s3.S3
+import java.io.File
 
-trait AnyInstructions extends AnyBundle {
 
-  val instructions: ohnosequences.nispero.Instructions
+trait AnyInstructionsBundle extends AnyBundle {
+
+  def execute(s3: S3, task: AnyTask, workingDir: File = new File(".")): TaskResult
 
   // def install: Results = {
   //   success("instructions installed")

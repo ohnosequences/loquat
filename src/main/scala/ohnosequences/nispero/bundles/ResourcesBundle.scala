@@ -11,9 +11,11 @@ import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 
-abstract class ResourcesBundle extends Bundle() {
+trait AnyResourcesBundle extends AnyBundle {
 
-  type Config <: AnyConfig
+  val bundleDependencies: List[AnyBundle] = List()
+
+  type Config <: AnyNisperoConfig
   val  config: Config
 
   lazy val resourceNames: ResourceNames = config.resourceNames
@@ -62,3 +64,6 @@ abstract class ResourcesBundle extends Bundle() {
   }
 
 }
+
+abstract class ResourcesBundle[C <: AnyNisperoConfig](val config: C)
+  extends AnyResourcesBundle { type Config = C }
