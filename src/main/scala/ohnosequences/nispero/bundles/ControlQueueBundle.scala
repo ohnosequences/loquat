@@ -4,7 +4,6 @@ import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 import ohnosequences.awstools.sqs.{Message, Queue}
 import ohnosequences.nispero._
-import ohnosequences.nispero.manager._
 import org.clapper.avsl.Logger
 import ohnosequences.nispero.utils.pickles._
 import upickle._, default._

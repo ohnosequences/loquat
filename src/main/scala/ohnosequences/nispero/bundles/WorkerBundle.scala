@@ -18,8 +18,7 @@ trait AnyWorkerBundle extends AnyBundle {
   val bundleDependencies: List[AnyBundle] = List(instructionsBundle, resources, logUploader)
 
   def install: Results = {
-    val config = resources.config
-    val instructionsExecutor = new InstructionsExecutor(config, instructionsBundle, resources.aws)
+    val instructionsExecutor = new InstructionsExecutor(resources.config, instructionsBundle, resources.aws)
     instructionsExecutor.run
     success("worker installed")
   }

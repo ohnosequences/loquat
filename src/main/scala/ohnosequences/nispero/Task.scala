@@ -29,16 +29,6 @@ case class TinyTask(
 ) extends AnyTask { type InputObj = String }
 
 
-sealed abstract class TaskResult {
-  val message: String
-}
-
-object TaskResult {
-
-  case class Success(message: String) extends TaskResult
-  case class Failure(message: String) extends TaskResult
-}
-
 case class TaskResultDescription(
   id: String,
   message: String,

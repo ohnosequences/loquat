@@ -1,5 +1,6 @@
 package ohnosequences.nispero.worker
 
+import ohnosequences.statika.instructions._
 import ohnosequences.nispero._
 import ohnosequences.nispero.bundles._
 import ohnosequences.nispero.utils.Utils
@@ -38,7 +39,7 @@ class InstructionsExecutor(config: AnyNisperoConfig, instructionsBundle: AnyInst
     message.get
   }
 
-  def waitForResult(futureResult: Future[TaskResult], message: Message): (TaskResult, Int) = {
+  def waitForResult(futureResult: Future[Results], message: Message): (Results, Int) = {
     val startTime = System.currentTimeMillis()
     val step = 1000 // 1s
 
@@ -49,14 +50,14 @@ class InstructionsExecutor(config: AnyNisperoConfig, instructionsBundle: AnyInst
 
     var stopWaiting = false
 
-    var taskResult: TaskResult = TaskResult.Failure("internal error during waiting for task result")
+    var taskResult: Results = failure("internal error during waiting for task result")
 
 
     var it = 0
     while(!stopWaiting) {
       if(timeSpent() > config.terminationConfig.taskProcessTimeout) {
         stopWaiting = true
-        taskResult = TaskResult.Failure("Timeout: " + timeSpent + " > taskProcessTimeout")
+        taskResult = failure("Timeout: " + timeSpent + " > taskProcessTimeout")
         terminate()
       } else {
         futureResult.value match {
@@ -72,7 +73,7 @@ class InstructionsExecutor(config: AnyNisperoConfig, instructionsBundle: AnyInst
             it += 1
           }
           case Some(scala.util.Success(r)) => stopWaiting = true; taskResult = r
-          case Some(scala.util.Failure(t)) => stopWaiting = true; taskResult = TaskResult.Failure("future error: " + t.getMessage)
+          case Some(scala.util.Failure(t)) => stopWaiting = true; taskResult = failure("future error: " + t.getMessage)
         }
       }
     }
@@ -121,22 +122,19 @@ class InstructionsExecutor(config: AnyNisperoConfig, instructionsBundle: AnyInst
 
         val taskResultDescription = TaskResultDescription(
           id = task.id,
-          message = taskResult.message,
+          message = taskResult.toString,
           instanceId = instance.map(_.getInstanceId()),
           time = timeSpent
         )
 
         logger.info("publishing result to topic")
 
-        taskResult match {
-          case TaskResult.Success(msg) => {
-            outputTopic.publish(upickle.default.write(taskResultDescription.copy(message = msg)))
-            logger.info("InstructionsExecutor deleting message with from input queue")
-            inputQueue.deleteMessage(message)
-          }
-          case TaskResult.Failure(msg) => {
-            errorTopic.publish(upickle.default.write(taskResultDescription.copy(message = msg)))
-          }
+        if (taskResult.hasFailures) {
+          errorTopic.publish(upickle.default.write(taskResultDescription))
+        } else {
+          outputTopic.publish(upickle.default.write(taskResultDescription))
+          logger.info("InstructionsExecutor deleting message with from input queue")
+          inputQueue.deleteMessage(message)
         }
       } catch {
         case e: Throwable =>  {
