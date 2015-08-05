@@ -1,9 +1,9 @@
-package ohnosequences.nispero.bundles
+package ohnosequences.nisperito.bundles
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
-import ohnosequences.nispero._
+import ohnosequences.nisperito._
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3.ObjectAddress
@@ -45,7 +45,7 @@ abstract class WorkerBundle[
 
 // TODO: rewrite all this and make it Worker's install
 case class InstructionsExecutor(
-  val config: AnyNisperoConfig,
+  val config: AnyNisperitoConfig,
   val instructions: AnyInstructionsBundle,
   val aws: AWSClients
 ) {

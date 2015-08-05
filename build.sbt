@@ -1,7 +1,7 @@
 Nice.scalaProject
 
 name         := "nisperito"
-description  := "abstract nispero with small tasks"
+description  := "🍋"
 organization := "ohnosequences"
 bucketSuffix := "era7.com"
 
@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
   "ohnosequences" %% "statika"     % "2.0.0-SNAPSHOT",
   "ohnosequences" %% "aws-statika" % "2.0.0-SNAPSHOT",
   // amazon:
-  "ohnosequences" %% "aws-scala-tools" % "0.12.0"
+  "ohnosequences" %% "aws-scala-tools" % "0.13.2"
 )
 
 dependencyOverrides += "jline" % "jline" % "2.12.1"

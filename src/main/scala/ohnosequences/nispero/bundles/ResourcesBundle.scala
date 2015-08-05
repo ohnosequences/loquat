@@ -1,6 +1,6 @@
-package ohnosequences.nispero.bundles
+package ohnosequences.nisperito.bundles
 
-import ohnosequences.nispero._
+import ohnosequences.nisperito._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -15,7 +15,7 @@ trait AnyResourcesBundle extends AnyBundle {
 
   val bundleDependencies: List[AnyBundle] = List()
 
-  type Config <: AnyNisperoConfig
+  type Config <: AnyNisperitoConfig
   val  config: Config
 
   lazy val resourceNames: ResourceNames = config.resourceNames
@@ -65,5 +65,5 @@ trait AnyResourcesBundle extends AnyBundle {
 
 }
 
-abstract class ResourcesBundle[C <: AnyNisperoConfig](val config: C)
+abstract class ResourcesBundle[C <: AnyNisperitoConfig](val config: C)
   extends AnyResourcesBundle { type Config = C }

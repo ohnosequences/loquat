@@ -1,4 +1,4 @@
-package ohnosequences.nispero.bundles
+package ohnosequences.nisperito.bundles
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._

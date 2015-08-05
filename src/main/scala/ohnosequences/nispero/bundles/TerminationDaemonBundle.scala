@@ -1,6 +1,6 @@
-package ohnosequences.nispero.bundles
+package ohnosequences.nisperito.bundles
 
-import ohnosequences.nispero._
+import ohnosequences.nisperito._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -51,7 +51,7 @@ case class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bu
         )
 
         reason match {
-          case Some(r) => Nispero.undeploy(config)
+          case Some(r) => Nisperito.undeploy(config)
           case None => ()
         }
 

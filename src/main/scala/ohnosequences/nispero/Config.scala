@@ -1,4 +1,4 @@
-package ohnosequences.nispero
+package ohnosequences.nisperito
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
@@ -33,43 +33,43 @@ case class WorkersConfig(
 case class TerminationConfig(
   // maximum time for processing task
   taskProcessTimeout: Int = 60 * 60 * 10, // 10 hours
-  // if true nispero will terminate after solving all initial tasks
+  // if true nisperito will terminate after solving all initial tasks
   terminateAfterInitialTasks: Boolean,
-  // if true nispero will terminate after errorQueue will contain more unique messages then threshold
+  // if true nisperito will terminate after errorQueue will contain more unique messages then threshold
   errorsThreshold: Option[Int] = None,
-  // if true nispero will terminate after this timeout reached. Time units are sceonds.
+  // if true nisperito will terminate after this timeout reached. Time units are seconds.
   timeout: Option[Int] = None
 )
 
 /* Configuration of resources */
-case class ResourceNames(nisperoId: String) {
+case class ResourceNames(nisperitoId: String) {
   // name of queue with tasks
-  val inputQueue: String = "nisperoInputQueue" + nisperoId
+  val inputQueue: String = "nisperitoInputQueue" + nisperitoId
   // name of queue for interaction with Manager
-  val controlQueue: String = "nisperoControlQueue" + nisperoId
+  val controlQueue: String = "nisperitoControlQueue" + nisperitoId
   // name of topic for tasks result notifications
-  val outputQueue: String = "nisperoOutputQueue" + nisperoId
+  val outputQueue: String = "nisperitoOutputQueue" + nisperitoId
   // name of queue with tasks results notifications (will be subscribed to outputTopic)
-  val outputTopic: String = "nisperoOutputTopic" + nisperoId
+  val outputTopic: String = "nisperitoOutputTopic" + nisperitoId
   // name of topic for errors
-  val errorTopic: String = "nisperoErrorQueue" + nisperoId
+  val errorTopic: String = "nisperitoErrorQueue" + nisperitoId
   // name of queue with errors (will be subscribed to errorTopic)
-  val errorQueue: String = "nisperoErrorTopic" + nisperoId
+  val errorQueue: String = "nisperitoErrorTopic" + nisperitoId
   // name of bucket for logs and console static files
-  val bucket: String = "nisperobucket" + nisperoId.replace("_", "-")
+  val bucket: String = "nisperitobucket" + nisperitoId.replace("_", "-")
 }
 
 
-/* Configuration for nispero */
-abstract class AnyNisperoConfig {
+/* Configuration for nisperito */
+abstract class AnyNisperitoConfig {
 
   // email address for notifications
   val email: String
 
-  // these are credentials that are used to launch nispero
+  // these are credentials that are used to launch nisperito
   val localCredentials: AWSCredentialsProvider
 
-  // Metadata generated for your nispero project
+  // Metadata generated for your nisperito project
   val metadata: AnyArtifactMetadata
 
   lazy final val fatArtifactS3Object: ObjectAddress = {
@@ -80,16 +80,17 @@ abstract class AnyNisperoConfig {
     }
   }
 
-  // Unique id  of the nispero instance
-  lazy final val nisperoName: String = metadata.artifact.replace(".", "").toLowerCase
-  lazy final val nisperoVersion: String = metadata.version.replace(".", "").toLowerCase
-  lazy final val nisperoId: String = (nisperoName + nisperoVersion)
+  // Unique id  of the nisperito instance
+  lazy final val nisperitoName: String = metadata.artifact.replace(".", "").toLowerCase
+  lazy final val nisperitoVersion: String = metadata.version.replace(".", "").toLowerCase
+  lazy final val nisperitoId: String = (nisperitoName + nisperitoVersion)
 
-  // keypair name for connecting to the nispero instances
+  // keypair name for connecting to the nisperito instances
   val keypairName: String
   val securityGroups: List[String]
   val iamRoleName: String
 
+  // AMI that will be used for manager and worker instances
   type AMI <: AmazonLinuxAMI
   val  ami: AMI
 
@@ -97,12 +98,12 @@ abstract class AnyNisperoConfig {
   val managerConfig: ManagerConfig
 
   lazy final val managerAutoScalingGroup = AutoScalingGroup(
-    name = "nisperoManagerGroup" + nisperoVersion,
+    name = "nisperitoManagerGroup" + nisperitoVersion,
     minSize = 1,
     maxSize = 1,
     desiredCapacity = 1,
     launchingConfiguration = LaunchConfiguration(
-      name = "nisperoManagerLaunchConfiguration" + nisperoVersion,
+      name = "nisperitoManagerLaunchConfiguration" + nisperitoVersion,
       instanceSpecs = InstanceSpecs(
         instanceType = managerConfig.instanceType,
         amiId = ami.id,
@@ -118,12 +119,12 @@ abstract class AnyNisperoConfig {
   val workersConfig: WorkersConfig
 
   lazy final val workersAutoScalingGroup = AutoScalingGroup(
-    name = "nisperoWorkersGroup" + nisperoVersion,
+    name = "nisperitoWorkersGroup" + nisperitoVersion,
     minSize = workersConfig.minSize,
     maxSize = workersConfig.maxSize,
     desiredCapacity = workersConfig.desiredCapacity,
     launchingConfiguration = LaunchConfiguration(
-      name = "nisperoWorkersLaunchConfiguration" + nisperoVersion,
+      name = "nisperitoWorkersLaunchConfiguration" + nisperitoVersion,
       instanceSpecs = InstanceSpecs(
         instanceType = workersConfig.instanceType,
         amiId = ami.id,
@@ -139,17 +140,17 @@ abstract class AnyNisperoConfig {
   // Termination conditions
   val terminationConfig: TerminationConfig
 
-  // task provider (@see https://github.com/ohnosequences/nispero/blob/master/doc/tasks-providers.md)
+  // task provider (@see https://github.com/ohnosequences/nisperito/blob/master/doc/tasks-providers.md)
   val tasks: List[AnyTask]
 
   // resources configuration of names for resources: queues, topics, buckets
-  lazy final val resourceNames: ResourceNames = ResourceNames(nisperoId)
+  lazy final val resourceNames: ResourceNames = ResourceNames(nisperitoId)
 
   lazy final val initialTasks: ObjectAddress = ObjectAddress(resourceNames.bucket, "initialTasks")
   lazy final val tasksUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, "tasksUploaded")
 
   lazy final val notificationTopic: String =
-    s"""nisperoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
+    s"""nisperitoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
 
 
   def check(): Boolean = {
@@ -187,17 +188,17 @@ abstract class AnyNisperoConfig {
 
 }
 
-/* This is a constructor for the end-user, exposing only missing parameters */
-case class NisperoConfig[A <: AmazonLinuxAMI](
-  val email: String,
-  val localCredentials: AWSCredentialsProvider,
-  val metadata: AnyArtifactMetadata,
-  val keypairName: String,
-  val securityGroups: List[String],
-  val iamRoleName: String,
-  val ami: A,
-  val managerConfig: ManagerConfig,
-  val workersConfig: WorkersConfig,
-  val terminationConfig: TerminationConfig,
-  val tasks: List[AnyTask]
-) extends AnyNisperoConfig { type AMI = A }
+// /* This is a constructor for the end-user, exposing only missing parameters */
+// case class NisperitoConfig[A <: AmazonLinuxAMI](
+//   val email: String,
+//   val localCredentials: AWSCredentialsProvider,
+//   val metadata: AnyArtifactMetadata,
+//   val keypairName: String,
+//   val securityGroups: List[String],
+//   val iamRoleName: String,
+//   val ami: A,
+//   val managerConfig: ManagerConfig,
+//   val workersConfig: WorkersConfig,
+//   val terminationConfig: TerminationConfig,
+//   val tasks: List[AnyTask]
+// ) extends AnyNisperitoConfig { type AMI = A }

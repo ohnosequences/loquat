@@ -1,4 +1,4 @@
-package ohnosequences.nispero
+package ohnosequences.nisperito
 
 import ohnosequences.awstools.s3.ObjectAddress
 

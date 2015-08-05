@@ -1,14 +1,14 @@
-package ohnosequences.nispero
+package ohnosequences.nisperito
 
-import ohnosequences.nispero.bundles._
+import ohnosequences.nisperito.bundles._
 import ohnosequences.statika.bundles._
 
 import ohnosequences.awstools.AWSClients
 import org.clapper.avsl.Logger
 
 
-abstract class Nispero[
-  C <: AnyNisperoConfig,
+abstract class Nisperito[
+  C <: AnyNisperitoConfig,
   I <: AnyInstructionsBundle
 ](val config: C, val instructions: I) {
 
@@ -24,18 +24,18 @@ abstract class Nispero[
   case object managerCompat extends Compatible(config.ami, manager, config.metadata)
 
   def main(args: Array[String]): Unit = args.toList match {
-    case List("deploy") => Nispero.deploy(config, managerCompat.userScript)
-    case List("undeploy") => Nispero.undeploy(config)
+    case List("deploy") => Nisperito.deploy(config, managerCompat.userScript)
+    case List("undeploy") => Nisperito.undeploy(config)
     case _ => println("Wrong command. Should be either 'deploy' or 'undeploy' without arguments.")
   }
 }
 
 
 
-object Nispero {
+object Nisperito {
 
   def deploy(
-    config: AnyNisperoConfig,
+    config: AnyNisperitoConfig,
     managerUserScript: String
   ): Unit = {
 
@@ -68,14 +68,14 @@ object Nispero {
   }
 
 
-  def undeploy(config: AnyNisperoConfig): Unit = {
+  def undeploy(config: AnyNisperitoConfig): Unit = {
 
     val logger = Logger(this.getClass)
     val aws = AWSClients.create(config.localCredentials)
 
     logger.info("send notification")
     try {
-      val subject = "Nispero " + config.nisperoId + " terminated"
+      val subject = "Nisperito " + config.nisperitoId + " terminated"
       val notificationTopic = aws.sns.createTopic(config.notificationTopic)
       notificationTopic.publish("manual termination", subject)
     } catch {

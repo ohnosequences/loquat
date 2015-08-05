@@ -1,4 +1,4 @@
-package ohnosequences.nispero
+package ohnosequences.nisperito
 
 import java.io.{PrintWriter, File}
 import ohnosequences.awstools.ec2.Tag
@@ -6,7 +6,7 @@ import ohnosequences.awstools.autoscaling.AutoScaling
 
 
 object InstanceTags {
-  val PRODUCT_TAG = Tag("product", "nispero")
+  val PRODUCT_TAG = Tag("product", "nisperito")
 
   val STATUS_TAG_NAME = "status"
 
