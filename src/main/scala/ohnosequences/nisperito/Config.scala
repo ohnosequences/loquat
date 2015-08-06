@@ -1,5 +1,7 @@
 package ohnosequences.nisperito
 
+import ohnosequences.nisperito.tasks._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
 
@@ -148,7 +150,7 @@ abstract class AnyNisperitoConfig {
   // resources configuration of names for resources: queues, topics, buckets
   lazy final val resourceNames: ResourceNames = ResourceNames(nisperitoId)
 
-  lazy final val initialTasks: ObjectAddress = ObjectAddress(resourceNames.bucket, "initialTasks")
+  // FIXME: this is just an empty object in S3 witnessing that the initial tasks were uploaded:
   lazy final val tasksUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, "tasksUploaded")
 
   lazy final val notificationTopic: String =

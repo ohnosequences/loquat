@@ -1,6 +1,6 @@
 package ohnosequences.nisperito.bundles
 
-import ohnosequences.nisperito._
+import ohnosequences.nisperito._, tasks._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -34,14 +34,8 @@ trait AnyManagerBundle extends AnyBundle {
   val aws = resources.aws
   val logger = Logger(this.getClass)
 
-  def uploadInitialTasks(tasks: List[AnyTask], initialTasks: ObjectAddress) {
-
+  def uploadInitialTasks(tasks: List[AnyTask]) {
     try {
-      logger.info("generating tasks")
-
-      // NOTE: It's not used anywhere, but serializing can take too long
-      // logger.info("uploading initial tasks to S3")
-      // aws.s3.putWholeObject(initialTasks, upickle.default.write(tasks))
 
       logger.info("adding initial tasks to SQS")
       val inputQueue = aws.sqs.createQueue(resources.config.resourceNames.inputQueue)
@@ -64,7 +58,7 @@ trait AnyManagerBundle extends AnyBundle {
     try {
 
       if (aws.s3.listObjects(config.tasksUploaded.bucket, config.tasksUploaded.key).isEmpty) {
-        uploadInitialTasks(config.tasks, config.initialTasks)
+        uploadInitialTasks(config.tasks)
       } else {
         logger.warn("skipping uploading tasks")
       }

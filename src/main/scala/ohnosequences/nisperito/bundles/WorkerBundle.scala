@@ -1,9 +1,10 @@
 package ohnosequences.nisperito.bundles
 
+import ohnosequences.nisperito._, tasks._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
-import ohnosequences.nisperito._
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3.ObjectAddress
@@ -166,7 +167,7 @@ case class InstructionsExecutor(
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val result = instructions.processTask(inputFiles, outputFiles)
+      val result = instructions.processTask
 
       val messageFile = new File(workingDir, "message")
 
@@ -177,7 +178,7 @@ case class InstructionsExecutor(
         ""
       }
 
-      if (result.hasFailures) {
+      if (result._1.hasFailures) {
         logger.error("script finished with non zero code: " + result)
         if (message.isEmpty) {
           failure("script finished with non zero code: " + result)
@@ -216,7 +217,7 @@ case class InstructionsExecutor(
     val errorTopic = aws.sns.createTopic(config.resourceNames.errorTopic)
 
     while(!stopped) {
-      var taskId = ""
+      var taskId: Int = 0
       var lastTimeSpent = 0
       try {
         val message = waitForTask(inputQueue)

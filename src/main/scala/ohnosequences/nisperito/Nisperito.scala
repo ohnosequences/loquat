@@ -1,6 +1,8 @@
 package ohnosequences.nisperito
 
 import ohnosequences.nisperito.bundles._
+import ohnosequences.nisperito.tasks._
+
 import ohnosequences.statika.bundles._
 
 import ohnosequences.awstools.AWSClients
