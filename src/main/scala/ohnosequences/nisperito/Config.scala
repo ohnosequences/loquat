@@ -31,10 +31,10 @@ case class WorkersConfig(
 
 /* Configuration of termination conditions */
 case class TerminationConfig(
-  // maximum time for processing task
-  taskProcessTimeout: Int = 60 * 60 * 10, // 10 hours
   // if true nisperito will terminate after solving all initial tasks
   terminateAfterInitialTasks: Boolean,
+  // maximum time for processing task
+  taskProcessTimeout: Int = 60 * 60 * 10, // 10 hours
   // if true nisperito will terminate after errorQueue will contain more unique messages then threshold
   errorsThreshold: Option[Int] = None,
   // if true nisperito will terminate after this timeout reached. Time units are seconds.
@@ -72,6 +72,30 @@ abstract class AnyNisperitoConfig {
   // Metadata generated for your nisperito project
   val metadata: AnyArtifactMetadata
 
+  // keypair name for connecting to the nisperito instances
+  val keypairName: String
+  val securityGroups: List[String]
+  val iamRoleName: String
+
+  // AMI that will be used for manager and worker instances
+  type AMI <: AmazonLinuxAMI
+  val  ami: AMI
+
+  // Configuration for Manager autoscaling group
+  val managerConfig: ManagerConfig
+
+  // Configuration for Workers autoscaling group
+  val workersConfig: WorkersConfig
+
+  // Termination conditions
+  val terminationConfig: TerminationConfig
+
+  // List of tiny or big tasks
+  val tasks: List[AnyTask]
+
+
+  /* Here follow all the values that are dependent on those defined on top */
+
   lazy final val fatArtifactS3Object: ObjectAddress = {
     val s3url = """s3://(.+)/(.+)""".r
     metadata.artifactUrl match {
@@ -84,18 +108,6 @@ abstract class AnyNisperitoConfig {
   lazy final val nisperitoName: String = metadata.artifact.replace(".", "").toLowerCase
   lazy final val nisperitoVersion: String = metadata.version.replace(".", "").toLowerCase
   lazy final val nisperitoId: String = (nisperitoName + nisperitoVersion)
-
-  // keypair name for connecting to the nisperito instances
-  val keypairName: String
-  val securityGroups: List[String]
-  val iamRoleName: String
-
-  // AMI that will be used for manager and worker instances
-  type AMI <: AmazonLinuxAMI
-  val  ami: AMI
-
-  // Configuration for Manager autoscaling group
-  val managerConfig: ManagerConfig
 
   lazy final val managerAutoScalingGroup = AutoScalingGroup(
     name = "nisperitoManagerGroup" + nisperitoVersion,
@@ -114,9 +126,6 @@ abstract class AnyNisperitoConfig {
       purchaseModel = managerConfig.purchaseModel
     )
   )
-
-  // Configuration for Workers autoscaling group
-  val workersConfig: WorkersConfig
 
   lazy final val workersAutoScalingGroup = AutoScalingGroup(
     name = "nisperitoWorkersGroup" + nisperitoVersion,
@@ -137,12 +146,6 @@ abstract class AnyNisperitoConfig {
     )
   )
 
-  // Termination conditions
-  val terminationConfig: TerminationConfig
-
-  // task provider (@see https://github.com/ohnosequences/nisperito/blob/master/doc/tasks-providers.md)
-  val tasks: List[AnyTask]
-
   // resources configuration of names for resources: queues, topics, buckets
   lazy final val resourceNames: ResourceNames = ResourceNames(nisperitoId)
 
@@ -153,7 +156,8 @@ abstract class AnyNisperitoConfig {
     s"""nisperitoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
 
 
-  def check(): Boolean = {
+  /* This performs some runtime checks of the config */
+  def check: Boolean = {
     val logger = Logger(this.getClass)
 
     val ec2 = EC2.create(localCredentials)
@@ -187,18 +191,3 @@ abstract class AnyNisperitoConfig {
   }
 
 }
-
-// /* This is a constructor for the end-user, exposing only missing parameters */
-// case class NisperitoConfig[A <: AmazonLinuxAMI](
-//   val email: String,
-//   val localCredentials: AWSCredentialsProvider,
-//   val metadata: AnyArtifactMetadata,
-//   val keypairName: String,
-//   val securityGroups: List[String],
-//   val iamRoleName: String,
-//   val ami: A,
-//   val managerConfig: ManagerConfig,
-//   val workersConfig: WorkersConfig,
-//   val terminationConfig: TerminationConfig,
-//   val tasks: List[AnyTask]
-// ) extends AnyNisperitoConfig { type AMI = A }
