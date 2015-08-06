@@ -14,7 +14,7 @@ trait AnyInstructionsBundle extends AnyBundle {
      - it gets the list of input files
      - it must produce output files declared in the task
   */
-  def processTask(task: AnyTask, inputFiles: List[File], outputDir: File): Results
+  def processTask(inputFiles: Map[String, File], outputFiles: Map[String, File]): Results
 }
 
 abstract class InstructionsBundle(deps: AnyBundle*)

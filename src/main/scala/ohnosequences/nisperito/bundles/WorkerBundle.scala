@@ -142,27 +142,31 @@ case class InstructionsExecutor(
     // }
 
       logger.info("downloading task input")
-      val inputFiles: List[File] = task match {
+      val inputFiles: Map[String, File] = task match {
         /* if it's a tiny task, we just create the files with input messages */
         case TinyTask(_, inputObjs, _) =>
           inputObjs.map { case (name, content: String) =>
             val inputFile = new File(inputDir, name)
             logger.info("trying to create input object: " + name)
             utils.writeStringToFile(content, inputFile)
-            inputFile
-          }.toList
+            (name -> inputFile)
+          }
         /* if it's a big task, we download objects from S3 */
         case BigTask(_, inputObjs, _) =>
           inputObjs.map { case (name, objAddress: ObjectAddress) =>
             val inputFile = new File(inputDir, name)
             logger.info("trying to create input object: " + name)
             aws.s3.createLoadingManager.download(objAddress, inputFile)
-            inputFile
-          }.toList
+            (name -> inputFile)
+          }
+      }
+
+      val outputFiles: Map[String, File] = task.outputObjects map { case (name, _) =>
+        (name -> new File(outputDir, name))
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val result = instructions.processTask(task, inputFiles, outputDir)
+      val result = instructions.processTask(inputFiles, outputFiles)
 
       val messageFile = new File(workingDir, "message")
 
