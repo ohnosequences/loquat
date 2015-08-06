@@ -26,10 +26,9 @@ trait AnyManagerBundle extends AnyBundle {
   val  resources = worker.resources
 
   val logUploader = LogUploaderBundle(resources)
-  val controlQueue = ControlQueueBundle(resources)
   val terminationDaemon = TerminationDaemonBundle(resources)
 
-  val bundleDependencies: List[AnyBundle] = List(controlQueue, terminationDaemon, logUploader)
+  val bundleDependencies: List[AnyBundle] = List(terminationDaemon, logUploader)
 
   val config = resources.config
   val aws = resources.aws
@@ -91,8 +90,6 @@ trait AnyManagerBundle extends AnyBundle {
 
       logger.info("starting termination daemon")
       terminationDaemon.TerminationDaemonThread.start()
-
-      controlQueue.run()
 
       success("manager installed")
     } catch {

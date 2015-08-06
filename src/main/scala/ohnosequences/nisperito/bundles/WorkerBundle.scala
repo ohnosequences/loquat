@@ -88,7 +88,7 @@ case class InstructionsExecutor(
 
     var it = 0
     while(!stopWaiting) {
-      if(timeSpent() > min(config.terminationConfig.taskProcessTimeout, 12 * 60 * 60)) {
+      if(timeSpent() > math.min(config.terminationConfig.taskProcessTimeout, 12 * 60 * 60)) {
         stopWaiting = true
         taskResult = failure("Timeout: " + timeSpent + " > taskProcessTimeout")
         terminateWorker

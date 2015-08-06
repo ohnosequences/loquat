@@ -38,9 +38,6 @@ trait AnyResourcesBundle extends AnyBundle {
     logger.info("creating input queue: " + resourceNames.inputQueue)
     val inputQueue = aws.sqs.createQueue(resourceNames.inputQueue)
 
-    logger.info("creating control queue: " + resourceNames.controlQueue)
-    aws.sqs.createQueue(resourceNames.controlQueue)
-
     logger.info("creating output topic: " + resourceNames.outputTopic)
     val outputTopic = aws.sns.createTopic(resourceNames.outputTopic)
     logger.info("creating output queue: " + resourceNames.outputQueue)

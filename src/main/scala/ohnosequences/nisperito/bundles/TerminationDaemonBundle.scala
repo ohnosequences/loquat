@@ -51,7 +51,7 @@ case class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bu
         )
 
         reason match {
-          case Some(r) => Nisperito.undeploy(config)
+          case Some(r) => NisperitoOps.undeploy(config)
           case None => ()
         }
 

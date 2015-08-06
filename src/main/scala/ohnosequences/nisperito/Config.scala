@@ -20,13 +20,13 @@ case class ManagerConfig(
 )
 
 /* Workers autoscaling group configuration */
+case class WorkersGroupSize(min: Int, desired: Int, max: Int)
+
 case class WorkersConfig(
   instanceType: InstanceType,
   purchaseModel: PurchaseModel = SpotAuto,
   workingDir: File = new File("/media/ephemeral0"),
-  desiredCapacity: Int = 1,
-  minSize: Int = 0,
-  maxSize: Int = 10
+  groupSize: WorkersGroupSize = WorkersGroupSize(0, 1, 10)
 )
 
 /* Configuration of termination conditions */
@@ -45,8 +45,6 @@ case class TerminationConfig(
 case class ResourceNames(nisperitoId: String) {
   // name of queue with tasks
   val inputQueue: String = "nisperitoInputQueue" + nisperitoId
-  // name of queue for interaction with Manager
-  val controlQueue: String = "nisperitoControlQueue" + nisperitoId
   // name of topic for tasks result notifications
   val outputQueue: String = "nisperitoOutputQueue" + nisperitoId
   // name of queue with tasks results notifications (will be subscribed to outputTopic)
@@ -93,6 +91,7 @@ abstract class AnyNisperitoConfig {
   // List of tiny or big tasks
   val tasks: List[AnyTask]
 
+  // TODO: AWS region should be also configurable
 
   /* Here follow all the values that are dependent on those defined on top */
 
@@ -129,9 +128,9 @@ abstract class AnyNisperitoConfig {
 
   lazy final val workersAutoScalingGroup = AutoScalingGroup(
     name = "nisperitoWorkersGroup" + nisperitoVersion,
-    minSize = workersConfig.minSize,
-    maxSize = workersConfig.maxSize,
-    desiredCapacity = workersConfig.desiredCapacity,
+    minSize = workersConfig.groupSize.min,
+    maxSize = workersConfig.groupSize.max,
+    desiredCapacity = workersConfig.groupSize.desired,
     launchingConfiguration = LaunchConfiguration(
       name = "nisperitoWorkersLaunchConfiguration" + nisperitoVersion,
       instanceSpecs = InstanceSpecs(
