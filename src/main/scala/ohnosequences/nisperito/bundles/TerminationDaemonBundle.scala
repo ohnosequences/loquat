@@ -1,56 +1,57 @@
-package ohnosequences.nispero.bundles
+package ohnosequences.nisperito.bundles
+
+import ohnosequences.nisperito._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
+
 import org.clapper.avsl.Logger
-import ohnosequences.nispero._
 import scala.collection.mutable.ListBuffer
-import scala.Some
-import ohnosequences.nispero._
-import ohnosequences.nispero.utils.pickles._
-import upickle._
+
 
 case class SNSMessage(Message: String)
 
-abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends Bundle(resourcesBundle, aws) {
+case class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
+
+  val aws = resources.aws
 
   val logger = Logger(this.getClass)
-  val config = resourcesBundle.config
+  val config = resources.config
 
   val TIMEOUT = 300 //5 min
 
   val successResults = scala.collection.mutable.HashMap[String, String]()
   val failedResults = scala.collection.mutable.HashMap[String, String]()
 
-  object TerminationDaemonThread extends Thread("TerminationDaemon") {
+  object TerminationDaemonThread extends Thread("TerminationDaemonBundle") {
 
 
     override def run() {
-      logger.info("TerminationDaemon started")
+      logger.info("TerminationDaemonBundle started")
       val initialTasksCount: Option[Int] = calcInitialTasksCount()
 
       while(true) {
-        logger.info("TerminationDeaemon conditions: " + config.terminationConditions)
+        logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
         logger.info("TerminationDeaemon success results: " + successResults.size)
         logger.info("TerminationDeaemon failed results: " + failedResults.size)
 
-        receiveTasksResults(config.resources.outputQueue).foreach { case (handle, result) =>
+        receiveTasksResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
           successResults.put(result.id, result.message)
         }
 
-        receiveTasksResults(config.resources.errorQueue).foreach { case (handle, result) =>
+        receiveTasksResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
           failedResults.put(handle, result.message)
         }
 
         val reason = checkConditions(
-          terminationConditions = config.terminationConditions,
+          terminationConfig = config.terminationConfig,
           successResultsCount = successResults.size,
           failedResultsCount = failedResults.size,
           initialTasksCount = initialTasksCount
         )
 
         reason match {
-          case Some(r) => Undeployer.undeploy(aws.clients, config, r)
+          case Some(r) => NisperitoOps.undeploy(config)
           case None => ()
         }
 
@@ -73,7 +74,7 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
   }
 
   def getQueueMessagesWithHandles(queueName: String): List[(String, String)] = {
-    aws.clients.sqs.getQueueByName(queueName) match {
+    aws.sqs.getQueueByName(queueName) match {
       case None => Nil
       case Some(queue) => {
         var messages = ListBuffer[(String, String)]()
@@ -94,15 +95,15 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
     }
   }
 
-  def checkConditions(terminationConditions: TerminationConditions, successResultsCount: Int, failedResultsCount: Int, initialTasksCount: Option[Int]): Option[String] = {
-    val startTime = aws.clients.as.getCreatedTime(config.managerConfig.groups._1.name).map(_.getTime)
+  def checkConditions(terminationConfig: TerminationConfig, successResultsCount: Int, failedResultsCount: Int, initialTasksCount: Option[Int]): Option[String] = {
+    val startTime = aws.as.getCreatedTime(config.managerAutoScalingGroup.name).map(_.getTime)
 
-    if (terminationConditions.terminateAfterInitialTasks && initialTasksCount.isDefined && (successResultsCount >= initialTasksCount.get)) {
+    if (terminationConfig.terminateAfterInitialTasks && initialTasksCount.isDefined && (successResultsCount >= initialTasksCount.get)) {
       Some("terminated due to terminateAfterInitialTasks: initialTasks count: " + initialTasksCount.get + " current: " + successResultsCount)
-    } else if (terminationConditions.errorsThreshold.isDefined && (failedResultsCount >= terminationConditions.errorsThreshold.get)) {
-      Some("terminated due to errorsThreshold: errorsThreshold count: " + terminationConditions.errorsThreshold.get + " current: " + failedResultsCount)
+    } else if (terminationConfig.errorsThreshold.isDefined && (failedResultsCount >= terminationConfig.errorsThreshold.get)) {
+      Some("terminated due to errorsThreshold: errorsThreshold count: " + terminationConfig.errorsThreshold.get + " current: " + failedResultsCount)
     } else {
-      (startTime, terminationConditions.timeout) match {
+      (startTime, terminationConfig.timeout) match {
         case (None, _) => Some("start timeout is undefined!")
         case (Some(timestamp), Some(timeout)) if ((System.currentTimeMillis() - timestamp) > timeout) => {
           Some("terminated due to global timeout!")
@@ -115,7 +116,7 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
 
   def calcInitialTasksCount(): Option[Int] = {
     try {
-      val tasksString = aws.clients.s3.readWholeObject(config.initialTasks)
+      val tasksString = aws.s3.readWholeObject(config.initialTasks)
       val tasks: List[AnyTask] = upickle.default.read[List[AnyTask]](tasksString)
       val ids = scala.collection.mutable.HashSet() ++ tasks
       Some(ids.size)
@@ -125,7 +126,7 @@ abstract class TerminationDaemon(resourcesBundle: Resources, aws: AWS) extends B
   }
 
   def install: Results = {
-    success("TerminationDaemon installed")
+    success("TerminationDaemonBundle installed")
   }
 
 }

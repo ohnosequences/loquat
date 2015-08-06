@@ -1,9 +1,6 @@
-package ohnosequences.nispero
+package ohnosequences.nisperito
 
-import ohnosequences.awstools.s3.{ObjectAddress, S3}
-import java.io.File
-import ohnosequences.nispero.utils.pickles._
-import upickle._
+import ohnosequences.awstools.s3.ObjectAddress
 
 sealed trait AnyTask {
 
@@ -28,20 +25,6 @@ case class TinyTask(
   val outputObjects: Map[String, ObjectAddress]
 ) extends AnyTask { type InputObj = String }
 
-
-trait Instructions {
-  def execute(s3: S3, task: AnyTask, workingDir: File = new File(".")): TaskResult
-}
-
-sealed abstract class TaskResult {
-  val message: String
-}
-
-object TaskResult {
-
-  case class Success(message: String) extends TaskResult
-  case class Failure(message: String) extends TaskResult
-}
 
 case class TaskResultDescription(
   id: String,
