@@ -5,16 +5,19 @@ object instructionsExample {
   import ohnosequences.statika.instructions._
   import ohnosequences.nisperito._, tasks._, bundles._, instructions._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
+  import ohnosequences.cosas.ops.records._
   import java.io.File
 
 
+  // inputs:
   object sample extends S3InputKey
   object fastaq extends S3InputKey
 
+  // outputs:
   object stats extends S3OutputKey
   object results extends S3OutputKey
-  object outFiles extends Record(stats :~: results :~: ∅)
 
+  // instructions:
   case object instructs extends InstructionsBundle()(
     inputKeys = sample :~: fastaq :~: ∅,
     outputKeys = stats :~: results :~: ∅
@@ -26,12 +29,17 @@ object instructionsExample {
       val files =
         Files(
           stats(new File("")) :~:
-          results(new File("")) :~:
+          results(sample.file) :~:
           ∅
         )
       (success("foo"), files)
     }
   }
 
+  val outputs = instructs.processTask._2
+
+  // NOTE: here we can use Map.apply safely, because we know
+  // that filesMap contains all the outputKeys by construction
+  val resultsFile: File = outputs.filesMap(results.label)
 
 }

@@ -3,10 +3,14 @@ package ohnosequences.nisperito
 case object tasks {
 
   import bundles._, instructions._
-  import ohnosequences.awstools.s3.ObjectAddress
+
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import ohnosequences.cosas.ops.typeSets._
+
+  import ohnosequences.awstools.s3.ObjectAddress
   import java.io.File
+  import upickle.Js
+
 
   sealed trait AnyTask {
 
@@ -58,8 +62,16 @@ case object tasks {
     /* These two implicits check that the remote references records' keys
        corespond to the keys from the instructinos bundle */
     // should be provided implicitly:
-    implicit val checkInputKeys: TypesOf[InputRemotes] { type Out = Instructions#InputKeys }
-    implicit val checkOutputKeys: TypesOf[OutputRemotes] { type Out = Instructions#OutputKeys }
+    val checkInputKeys: TypesOf[InputRemotes] { type Out = Instructions#InputKeys }
+    val checkOutputKeys: TypesOf[OutputRemotes] { type Out = Instructions#OutputKeys }
+
+    /* These two vals a needed for serialization of the task to JSON */
+    // should be provided implicitly:
+    val inputsToList: InputRemotes ToListOf AnyRemote
+    val outputsToList: OutputRemotes ToListOf AnyRemote
+
+    lazy final val inputRemotesList: List[AnyRemote] = inputsToList(inputRemotes)
+    lazy final val outputRemotesList: List[AnyRemote] = outputsToList(outputRemotes)
   }
 
   case class CoolTask[
@@ -72,7 +84,9 @@ case object tasks {
     val outputRemotes: OR
   )(implicit
     val checkInputKeys: TypesOf[IR] { type Out = I#InputKeys },
-    val checkOutputKeys: TypesOf[OR] { type Out = I#OutputKeys }
+    val checkOutputKeys: TypesOf[OR] { type Out = I#OutputKeys },
+    val inputsToList: IR ToListOf AnyRemote,
+    val outputsToList: OR ToListOf AnyRemote
   ) extends AnyCoolTask {
 
     type Instructions = I
@@ -80,5 +94,16 @@ case object tasks {
     type OutputRemotes = OR
   }
 
+  /* serialization of AnyTask to JSON */
+  object AnyCoolTask {
+
+    implicit val taskWriter = upickle.default.Writer[AnyCoolTask]{ t =>
+      Js.Obj(
+        "id" -> Js.Str(t.id),
+        "inputs" -> Js.Arr( t.inputRemotesList.map{ AnyRemote.writer.write(_) }: _* ),
+        "outputs" -> Js.Arr( t.outputRemotesList.map{ AnyRemote.writer.write(_) }: _* )
+      )
+    }
+  }
 
 }
