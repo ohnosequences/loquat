@@ -1,6 +1,6 @@
 package ohnosequences.nisperito
 
-import ohnosequences.nisperito.bundles._
+import ohnosequences.nisperito.bundles._, instructions._
 import ohnosequences.nisperito.tasks._
 
 import ohnosequences.statika.bundles._

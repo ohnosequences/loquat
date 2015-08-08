@@ -2,13 +2,15 @@ package ohnosequences.nisperito
 
 case object tasks {
 
+  import bundles._, instructions._
   import ohnosequences.awstools.s3.ObjectAddress
-  import ohnosequences.cosas._, typeSets._, properties._, records._
+  import ohnosequences.cosas._, types._, typeSets._, properties._, records._
+  import ohnosequences.cosas.ops.typeSets._
   import java.io.File
 
   sealed trait AnyTask {
 
-    val id: Int
+    val id: String
 
     type InputObj
     val inputObjects: Map[String, InputObj]
@@ -17,13 +19,13 @@ case object tasks {
   }
 
   case class TinyTask(
-    val id: Int,
+    val id: String,
     val inputObjects: Map[String, String],
     val outputObjects: Map[String, ObjectAddress]
   ) extends AnyTask { type InputObj = String }
 
   case class BigTask(
-    val id: Int,
+    val id: String,
     val inputObjects: Map[String, ObjectAddress],
     val outputObjects: Map[String, ObjectAddress]
   ) extends AnyTask { type InputObj = ObjectAddress }
@@ -31,30 +33,52 @@ case object tasks {
 
 
   case class TaskResultDescription(
-    id: Int,
+    id: String,
     message: String,
     instanceId: Option[String],
     time: Int
   )
 
 
-  trait AnyKey extends AnyProperty {
-    type Raw = File
-    lazy val label: String = this.toString
+  trait AnyCoolTask {
 
-    val prefix: String
-    def file: File = new File(s"${prefix}/${label}")
+    val id: String
+
+    type Instructions <: AnyInstructionsBundle
+    val  instructions: Instructions
+
+    /* These are records with references to the remote locations of
+       where to get inputs and where to put outputs of the task */
+    type InputRemotes <: AnyTypeSet.Of[AnyRemote]
+    val  inputRemotes: InputRemotes
+
+    type OutputRemotes <: AnyTypeSet.Of[AnyRemote]
+    val  outputRemotes: OutputRemotes
+
+    /* These two implicits check that the remote references records' keys
+       corespond to the keys from the instructinos bundle */
+    // should be provided implicitly:
+    implicit val checkInputKeys: TypesOf[InputRemotes] { type Out = Instructions#InputKeys }
+    implicit val checkOutputKeys: TypesOf[OutputRemotes] { type Out = Instructions#OutputKeys }
   }
-  // class Key[R](val prefix: String) extends AnyKey { type Raw = R }
 
-  trait InputKey extends AnyKey { val prefix = "input" }
-  trait OutputKey extends AnyKey { val prefix = "output" }
+  case class CoolTask[
+    I <: AnyInstructionsBundle,
+    IR <: AnyTypeSet.Of[AnyRemote],
+    OR <: AnyTypeSet.Of[AnyRemote]
+  ](val id: String,
+    val instructions: I,
+    val inputRemotes: IR,
+    val outputRemotes: OR
+  )(implicit
+    val checkInputKeys: TypesOf[IR] { type Out = I#InputKeys },
+    val checkOutputKeys: TypesOf[OR] { type Out = I#OutputKeys }
+  ) extends AnyCoolTask {
 
-  type InputKeys = AnyTypeSet.Of[InputKey]
-  type OutputKeys = AnyTypeSet.Of[OutputKey]
-
-  // type OutputFiles = AnyRecord { type Properties <: AnyTypeSet.of[TaskOutput] }
-  type FilesFor[Ks <: AnyTypeSet.Of[AnyKey]] = AnyRecord.withProperties[Ks]
+    type Instructions = I
+    type InputRemotes = IR
+    type OutputRemotes = OR
+  }
 
 
 }

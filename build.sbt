@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
   // json:
   "com.lihaoyi" %% "upickle" % "0.3.4",
   // internal structure:
-  "ohnosequences" %% "cosas"       % "0.6.0",
+  "ohnosequences" %% "cosas"       % "0.7.0-SNAPSHOT",
   "ohnosequences" %% "statika"     % "2.0.0-SNAPSHOT",
   "ohnosequences" %% "aws-statika" % "2.0.0-SNAPSHOT",
   // amazon:

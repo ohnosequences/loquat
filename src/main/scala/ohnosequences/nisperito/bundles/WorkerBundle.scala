@@ -1,6 +1,6 @@
 package ohnosequences.nisperito.bundles
 
-import ohnosequences.nisperito._, tasks._
+import ohnosequences.nisperito._, tasks._, instructions._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -217,7 +217,7 @@ case class InstructionsExecutor(
     val errorTopic = aws.sns.createTopic(config.resourceNames.errorTopic)
 
     while(!stopped) {
-      var taskId: Int = 0
+      var taskId: String = ""
       var lastTimeSpent = 0
       try {
         val message = waitForTask(inputQueue)

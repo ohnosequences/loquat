@@ -20,8 +20,8 @@ case class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bu
 
   val TIMEOUT = 300 //5 min
 
-  val successResults = scala.collection.mutable.HashMap[Int, String]()
-  val failedResults = scala.collection.mutable.HashMap[Int, String]()
+  val successResults = scala.collection.mutable.HashMap[String, String]()
+  val failedResults = scala.collection.mutable.HashMap[String, String]()
 
   object TerminationDaemonThread extends Thread("TerminationDaemonBundle") {
 
