@@ -10,12 +10,12 @@ object instructionsExample {
 
 
   // inputs:
-  object sample extends S3InputKey
-  object fastaq extends S3InputKey
+  object sample extends InputKey
+  object fastaq extends InputKey
 
   // outputs:
-  object stats extends S3OutputKey
-  object results extends S3OutputKey
+  object stats extends OutputKey
+  object results extends OutputKey
 
   // instructions:
   case object instructs extends InstructionsBundle()(

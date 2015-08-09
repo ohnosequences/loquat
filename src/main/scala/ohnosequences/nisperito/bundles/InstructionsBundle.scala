@@ -15,63 +15,28 @@ case object instructions {
   import upickle.Js
 
 
-  sealed trait AnyRemote extends AnyDenotation {
-    type Tpe <: AnyKey
-    type Value = Tpe#RemoteVal
-
-    // For serialization:
-    val label: String
-    val valueWriter: upickle.default.Writer[Value]
-  }
-  case class Remote[K <: AnyKey](
-    val label: String,
-    val value: K#RemoteVal
-  )(implicit
-    val valueWriter: upickle.default.Writer[K#RemoteVal]
-  ) extends AnyRemote { type Tpe = K }
-
-  object AnyRemote {
-    implicit val writer = upickle.default.Writer[AnyRemote]{ r =>
-      Js.Obj(r.label -> r.valueWriter.write(r.value))
-    }
-  }
-
   trait AnyKey extends AnyProperty {
     type Raw = File
     lazy val label: String = this.toString
-
-    type RemoteVal
-    def remote(r: RemoteVal)(implicit
-      valueWriter: upickle.default.Writer[RemoteVal]
-    ): Remote[this.type] =
-       Remote[this.type](label, r)(valueWriter)
   }
 
-  object AnyKey {
-    implicit val keyWriter = upickle.default.Writer[AnyKey]{ k => Js.Str(k.label) }
-  }
-
-  trait AnyInputKey extends AnyKey {
+  trait InputKey extends AnyKey {
     def file: File = new File(s"input/${label}")
   }
-  trait S3InputKey extends AnyInputKey { type RemoteVal = ObjectAddress }
 
-
-  trait AnyOutputKey extends AnyKey
-  trait S3OutputKey extends AnyOutputKey { type RemoteVal = ObjectAddress }
+  trait OutputKey extends AnyKey
 
 
 
   trait AnyInstructionsBundle extends AnyBundle {
 
-    type InputKeys <: AnyTypeSet.Of[AnyInputKey]
+    type InputKeys <: AnyTypeSet.Of[InputKey]
     val  inputKeys: InputKeys
 
-    type OutputKeys <: AnyTypeSet.Of[AnyOutputKey]
+    type OutputKeys <: AnyTypeSet.Of[OutputKey]
     val  outputKeys: OutputKeys
 
     // This is for constructing the result of the task processor
-    // abstract class FilesFor[Keys <: AnyTypeSet.Of[AnyKey]](keys: Keys) extends AnyRecord {
     trait OutputFiles extends AnyRecord {
 
       type Properties = OutputKeys
@@ -112,8 +77,8 @@ case object instructions {
   }
 
   abstract class InstructionsBundle[
-    Is <: AnyTypeSet.Of[AnyInputKey],
-    Os <: AnyTypeSet.Of[AnyOutputKey]
+    Is <: AnyTypeSet.Of[InputKey],
+    Os <: AnyTypeSet.Of[OutputKey]
   ](deps: AnyBundle*)(
     val inputKeys: Is,
     val outputKeys: Os

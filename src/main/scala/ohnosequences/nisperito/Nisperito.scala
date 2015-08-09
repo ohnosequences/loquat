@@ -157,8 +157,7 @@ object NisperitoOps {
     val sqs = SQS.create(nisperito.config.localCredentials)
     val inputQueue = sqs.getQueueByName(nisperito.config.resourceNames.inputQueue).get
     tasks.foreach {
-      case tt@TinyTask(_, _, _) => inputQueue.sendMessage(upickle.default.write[TinyTask](tt))
-      case bt@BigTask(_, _, _) => inputQueue.sendMessage(upickle.default.write[BigTask](bt))
+      t => inputQueue.sendMessage(upickle.default.write[SimpleTask](t))
     }
   }
 

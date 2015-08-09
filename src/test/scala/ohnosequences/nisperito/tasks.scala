@@ -8,16 +8,16 @@ object tasksExample {
   import instructionsExample._
 
 
-  val task = CoolTask(
+  val task = Task(
     id = "task3498734",
     instructions = instructs,
-    inputRemotes =
-      sample.remote(ObjectAddress("", "")) :~:
-      fastaq.remote(ObjectAddress("", "")) :~:
+    inputRefs =
+      S3Ref(sample, ObjectAddress("", "")) :~:
+      S3Ref(fastaq, ObjectAddress("", "")) :~:
       ∅,
-    outputRemotes =
-      stats.remote(ObjectAddress("", "")) :~:
-      results.remote(ObjectAddress("", "")) :~:
+    outputRefs =
+      S3Ref(stats, ObjectAddress("", "")) :~:
+      S3Ref(results, ObjectAddress("", "")) :~:
       ∅
   )
 }

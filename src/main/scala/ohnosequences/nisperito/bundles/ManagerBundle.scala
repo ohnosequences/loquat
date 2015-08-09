@@ -42,7 +42,7 @@ trait AnyManagerBundle extends AnyBundle {
 
       // NOTE: we can send messages in parallel
       tasks.par.foreach { task =>
-        inputQueue.sendMessage(upickle.default.write(task))
+        inputQueue.sendMessage(upickle.default.write[SimpleTask](task))
       }
       aws.s3.putWholeObject(resources.config.tasksUploaded, "")
       logger.info("initial tasks are ready")
