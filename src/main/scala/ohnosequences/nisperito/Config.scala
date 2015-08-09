@@ -74,7 +74,6 @@ abstract class AnyNisperitoConfig {
 
   // keypair name for connecting to the nisperito instances
   val keypairName: String
-  val securityGroups: List[String]
   val iamRoleName: String
 
   // AMI that will be used for manager and worker instances
@@ -120,7 +119,6 @@ abstract class AnyNisperitoConfig {
       instanceSpecs = InstanceSpecs(
         instanceType = managerConfig.instanceType,
         amiId = ami.id,
-        securityGroups = securityGroups,
         keyName = keypairName,
         instanceProfile = Some(iamRoleName)
       ),
@@ -138,7 +136,6 @@ abstract class AnyNisperitoConfig {
       instanceSpecs = InstanceSpecs(
         instanceType = workersConfig.instanceType,
         amiId = ami.id,
-        securityGroups = securityGroups,
         keyName = keypairName,
         instanceProfile = Some(iamRoleName),
         deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
