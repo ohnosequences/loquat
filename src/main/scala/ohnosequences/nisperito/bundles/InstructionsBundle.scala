@@ -73,7 +73,7 @@ case object instructions {
     /* this is where user describes instructions how to process each task:
        - it can assume that the input files are in place (`inputKey.file`)
        - it must produce output files declared in the task */
-    def processTask: (Results, OutputFiles)
+    def processTask(taskId: String): (Results, OutputFiles)
   }
 
   abstract class InstructionsBundle[

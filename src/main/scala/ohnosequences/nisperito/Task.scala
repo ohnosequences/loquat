@@ -34,6 +34,12 @@ case object tasks {
   case class S3Ref[K <: AnyKey](val key: K, val value: ObjectAddress)
     extends AnyS3Ref { type Key = K }
 
+  implicit def keyOps[K <: AnyKey](k: K): KeyOps[K] = KeyOps[K](k)
+  case class KeyOps[K <: AnyKey](k: K) {
+
+    def objectAddress(bucket: String, suffix: String): S3Ref[K] =
+      S3Ref(k, ObjectAddress(bucket, suffix))
+  }
 
 
   trait AnyTask {

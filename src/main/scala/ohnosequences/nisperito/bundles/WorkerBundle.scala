@@ -149,7 +149,7 @@ case class InstructionsExecutor(
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val (result, output) = instructions.processTask
+      val (result, output) = instructions.processTask(task.id)
 
       // FIXME: do it more careful
       val outputMap: Map[File, ObjectAddress] = output.filesMap.map { case (name, file) =>
