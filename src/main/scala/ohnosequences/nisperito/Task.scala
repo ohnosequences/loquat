@@ -39,6 +39,9 @@ case object tasks {
 
     def objectAddress(bucket: String, suffix: String): S3Ref[K] =
       S3Ref(k, ObjectAddress(bucket, suffix))
+
+    def objectAddress(objAddr: ObjectAddress): S3Ref[K] =
+      S3Ref(k, objAddr)
   }
 
 
