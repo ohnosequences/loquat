@@ -11,7 +11,7 @@ import ohnosequences.awstools.autoscaling._
 
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.auth.AWSCredentialsProvider
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import java.io.File
 
 
@@ -61,7 +61,7 @@ case class ResourceNames(nisperitoId: String) {
 
 
 /* Configuration for nisperito */
-abstract class AnyNisperitoConfig {
+abstract class AnyNisperitoConfig extends LazyLogging {
 
   // email address for notifications
   val email: String
@@ -154,19 +154,17 @@ abstract class AnyNisperitoConfig {
     s"""nisperitoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
 
 
-  // FIXME: fix logging
-  val logger = Logger(this.getClass)
-
   /* This performs some runtime checks of the config */
   def check: Boolean = {
 
+    logger.info("checking the config")
     val ec2 = EC2.create(localCredentials)
     val s3 = S3.create(localCredentials)
 
     val workers = workersAutoScalingGroup
 
     if (workers.desiredCapacity < workers.minSize || workers.desiredCapacity > workers.maxSize) {
-      logger.error("desired capacity should be in interval [minSize, maxSize]")
+      logger.error(s"desired capacity [${workers.desiredCapacity}] should be in the interval [${workers.minSize}, ${workers.maxSize}]")
       return false
     }
 
@@ -175,20 +173,13 @@ abstract class AnyNisperitoConfig {
       return false
     }
 
-    // FIXME: check that fat artifact is published where it is expected
-    try {
-      logger.info("checking the fat jar location")
-      s3.getObjectStream(fatArtifactS3Object) match {
-        case null => logger.error("artifact isn't uploaded"); false
-        case _ => true
-      }
-    } catch {
-      case s3e: AmazonServiceException if s3e.getStatusCode==301 => true
-      case t: Throwable  => {
-        logger.error("artifact isn't uploaded: " + fatArtifactS3Object + " " + t)
-        false
-      }
+    // logger.debug(s"checking the fat jar location: ${fatArtifactS3Object.url}")
+    if (s3.objectExists(fatArtifactS3Object).isFailure) {
+      logger.error("Couldn't access the fat artifact (probably you forgot to publish it)")
+      return false
     }
+
+    true
   }
 
 }

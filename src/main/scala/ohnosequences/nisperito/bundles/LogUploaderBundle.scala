@@ -1,24 +1,27 @@
 package ohnosequences.nisperito.bundles
 
+import ohnosequences.nisperito.AnyNisperitoConfig
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
 import ohnosequences.awstools.s3.ObjectAddress
 
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import java.io.File
 
+import ohnosequences.awstools.AWSClients
+import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
-case class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
 
-  val aws = resources.aws
+case class LogUploaderBundle(val config: AnyNisperitoConfig) extends Bundle() with LazyLogging {
+
+  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
   def install: Results = {
     val logFile = new File("/root/log.txt")
 
-    val logger = Logger(this.getClass)
-
-    val bucket = resources.config.resourceNames.bucket
+    val bucket = config.resourceNames.bucket
 
     aws.ec2.getCurrentInstanceId match {
       case Some(id) => {
@@ -34,7 +37,7 @@ case class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(r
 
                 Thread.sleep(1000 * 30)
               } catch {
-                case t: Throwable => logger.error("log upload fails() " + t.toString);
+                case t: Throwable => logger.error("log upload fails", t);
               }
             }
           }

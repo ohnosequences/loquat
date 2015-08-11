@@ -9,10 +9,13 @@ import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.awstools.AWSClients
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import java.io.File
 import scala.concurrent.Future
 import upickle.Js
+
+import ohnosequences.awstools.AWSClients
+import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -20,41 +23,38 @@ trait AnyWorkerBundle extends AnyBundle {
   type Instructions <: AnyInstructionsBundle
   val  instructions: Instructions
 
-  type Resources <: AnyResourcesBundle
-  val  resources: Resources
+  type Config <: AnyNisperitoConfig
+  val  config: Config
 
-  val logUploader: LogUploaderBundle = LogUploaderBundle(resources)
-
-  val bundleDependencies: List[AnyBundle] = List(instructions, logUploader)
+  val bundleDependencies: List[AnyBundle] = List(instructions, LogUploaderBundle(config))
 
   def install: Results = {
-    InstructionsExecutor(resources.config, instructions, resources.aws).runLoop
+    InstructionsExecutor(config, instructions).runLoop
     success("worker installed")
   }
 }
 
 abstract class WorkerBundle[
   I <: AnyInstructionsBundle,
-  R <: AnyResourcesBundle
+  C <: AnyNisperitoConfig
 ](val instructions: I,
-  val resources: R
+  val config: C
 ) extends AnyWorkerBundle {
 
   type Instructions = I
-  type Resources = R
+  type Config = C
 }
 
 
 // TODO: rewrite all this and make it Worker's install
 case class InstructionsExecutor(
   val config: AnyNisperitoConfig,
-  val instructions: AnyInstructionsBundle,
-  val aws: AWSClients
-) {
+  val instructions: AnyInstructionsBundle
+) extends LazyLogging {
+
+  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
   val MESSAGE_TIMEOUT = 5000
-
-  val logger = Logger(this.getClass)
 
   val instance = aws.ec2.getCurrentInstance
 
@@ -157,26 +157,26 @@ case class InstructionsExecutor(
       }
 
       if (result.hasFailures) {
-        logger.error("script finished with non zero code: " + result)
-        failure("script finished with non zero code: " + result)
+        logger.error(s"script finished with non zero code: ${result}")
+        failure(s"script finished with non zero code: ${result}")
       } else {
         logger.info("task finished, uploading results")
         for ((file, objectAddress) <- outputMap) {
           if (file.exists) {
-            logger.info("trying to publish output object " + objectAddress)
+            logger.info(s"trying to publish output object: ${objectAddress}")
             // TODO: publicity should be a configurable option
             aws.s3.putObject(objectAddress, file, public = true)
             logger.info("success")
           } else {
-            logger.error("error: file " + file.getAbsolutePath + " doesn't exists!")
+            logger.error(s"file [${file.getAbsolutePath}] doesn't exists!")
           }
         }
-        success(s"""task ${task.id} successfully finished""")
+        success(s"task [${task.id}] successfully finished")
       }
     } catch {
-      case e: Throwable => {
-        e.printStackTrace()
-        failure(e.getMessage)
+      case t: Throwable => {
+        logger.error("fatal failure during task processing", t)
+        failure(t.getMessage)
       }
     }
   }
@@ -230,7 +230,7 @@ case class InstructionsExecutor(
         }
       } catch {
         case e: Throwable =>  {
-          logger.error("fatal error instance will terminated")
+          logger.error("fatal error! instance will terminated")
           e.printStackTrace()
           val taskResultDescription = TaskResultDescription(
             id = taskId,

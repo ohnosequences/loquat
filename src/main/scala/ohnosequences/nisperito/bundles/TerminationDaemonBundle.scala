@@ -5,18 +5,18 @@ import ohnosequences.nisperito._, tasks._
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
+
+import ohnosequences.awstools.AWSClients
+import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 
 case class SNSMessage(message: String)
 
-case class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
+case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundle() with LazyLogging {
 
-  val aws = resources.aws
-
-  val logger = Logger(this.getClass)
-  val config = resources.config
+  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
   val TIMEOUT = 300 //5 min
 
