@@ -157,26 +157,26 @@ case class InstructionsExecutor(
       }
 
       if (result.hasFailures) {
-        logger.error("script finished with non zero code: " + result)
-        failure("script finished with non zero code: " + result)
+        logger.error(s"script finished with non zero code: ${result}")
+        failure(s"script finished with non zero code: ${result}")
       } else {
         logger.info("task finished, uploading results")
         for ((file, objectAddress) <- outputMap) {
           if (file.exists) {
-            logger.info("trying to publish output object " + objectAddress)
+            logger.info(s"trying to publish output object: ${objectAddress}")
             // TODO: publicity should be a configurable option
             aws.s3.putObject(objectAddress, file, public = true)
             logger.info("success")
           } else {
-            logger.error("error: file " + file.getAbsolutePath + " doesn't exists!")
+            logger.error(s"file [${file.getAbsolutePath}] doesn't exists!")
           }
         }
-        success(s"""task ${task.id} successfully finished""")
+        success(s"task [${task.id}] successfully finished")
       }
     } catch {
-      case e: Throwable => {
-        e.printStackTrace()
-        failure(e.getMessage)
+      case t: Throwable => {
+        logger.error("fatal failure during task processing", t)
+        failure(t.getMessage)
       }
     }
   }
@@ -230,7 +230,7 @@ case class InstructionsExecutor(
         }
       } catch {
         case e: Throwable =>  {
-          logger.error("fatal error instance will terminated")
+          logger.error("fatal error! instance will terminated")
           e.printStackTrace()
           val taskResultDescription = TaskResultDescription(
             id = taskId,

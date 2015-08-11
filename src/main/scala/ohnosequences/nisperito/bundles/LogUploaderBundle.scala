@@ -37,7 +37,7 @@ case class LogUploaderBundle(val config: AnyNisperitoConfig) extends Bundle() wi
 
                 Thread.sleep(1000 * 30)
               } catch {
-                case t: Throwable => logger.error("log upload fails() " + t.toString);
+                case t: Throwable => logger.error("log upload fails", t);
               }
             }
           }
