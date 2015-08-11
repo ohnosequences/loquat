@@ -10,7 +10,7 @@ import ohnosequences.awstools.sqs._
 import ohnosequences.awstools.autoscaling._
 
 import com.amazonaws.services.autoscaling.model._
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 
 
 trait AnyNisperito { nisperito =>
@@ -56,10 +56,7 @@ abstract class Nisperito[
 
 
 
-object NisperitoOps {
-
-  // FIXME: fix logging
-  val logger = Logger(this.getClass)
+object NisperitoOps extends LazyLogging {
 
   def deploy(
     config: AnyNisperitoConfig,

@@ -9,7 +9,7 @@ import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.awstools.AWSClients
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import java.io.File
 import scala.concurrent.Future
 import upickle.Js
@@ -50,11 +50,9 @@ case class InstructionsExecutor(
   val config: AnyNisperitoConfig,
   val instructions: AnyInstructionsBundle,
   val aws: AWSClients
-) {
+) extends LazyLogging {
 
   val MESSAGE_TIMEOUT = 5000
-
-  val logger = Logger(this.getClass)
 
   val instance = aws.ec2.getCurrentInstance
 

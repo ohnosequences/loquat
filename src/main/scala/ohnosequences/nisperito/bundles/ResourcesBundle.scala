@@ -5,13 +5,13 @@ import ohnosequences.nisperito._
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 
 import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 
-trait AnyResourcesBundle extends AnyBundle {
+trait AnyResourcesBundle extends AnyBundle with LazyLogging {
 
   val bundleDependencies: List[AnyBundle] = List()
 
@@ -21,8 +21,6 @@ trait AnyResourcesBundle extends AnyBundle {
   lazy val resourceNames: ResourceNames = config.resourceNames
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
-
-  lazy val logger = Logger(this.getClass)
 
   def install: Results = {
 

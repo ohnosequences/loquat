@@ -5,18 +5,16 @@ import ohnosequences.statika.instructions._
 
 import ohnosequences.awstools.s3.ObjectAddress
 
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 import java.io.File
 
 
-case class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(resources) {
+case class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(resources) with LazyLogging {
 
   val aws = resources.aws
 
   def install: Results = {
     val logFile = new File("/root/log.txt")
-
-    val logger = Logger(this.getClass)
 
     val bucket = resources.config.resourceNames.bucket
 

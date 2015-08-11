@@ -9,7 +9,7 @@ scalaVersion := "2.11.7"
 
 libraryDependencies ++= Seq(
   // logging:
-  "org.clapper" %% "avsl" % "1.0.2",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
   // json:
   "com.lihaoyi" %% "upickle" % "0.3.4",
   // internal structure:

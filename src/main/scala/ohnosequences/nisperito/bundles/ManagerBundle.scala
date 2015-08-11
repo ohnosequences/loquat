@@ -5,7 +5,7 @@ import ohnosequences.nisperito._, tasks._
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
-import org.clapper.avsl.Logger
+import com.typesafe.scalalogging.LazyLogging
 
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 import ohnosequences.awstools.s3.ObjectAddress
@@ -13,7 +13,7 @@ import ohnosequences.awstools.s3.ObjectAddress
 
 // We don't want it to be used outside of this project
 protected[nisperito]
-trait AnyManagerBundle extends AnyBundle { manager =>
+trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   type Worker <: AnyWorkerBundle
   val  worker: Worker
@@ -38,7 +38,6 @@ trait AnyManagerBundle extends AnyBundle { manager =>
 
   val config = resources.config
   val aws = resources.aws
-  val logger = Logger(this.getClass)
 
   def uploadInitialTasks(tasks: List[AnyTask]) {
     try {
