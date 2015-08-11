@@ -25,10 +25,10 @@ object instructionsExample {
 
     def install: Results = success("horay!")
 
-    def processTask: (Results, OutputFiles) = {
+    def processTask(taskId: String): (Results, OutputFiles) = {
       val files =
         Files(
-          stats(new File("")) :~:
+          stats(new File(taskId)) :~:
           results(sample.file) :~:
           ∅
         )
@@ -36,7 +36,7 @@ object instructionsExample {
     }
   }
 
-  val outputs = instructs.processTask._2
+  val outputs = instructs.processTask("foo")._2
 
   // NOTE: here we can use Map.apply safely, because we know
   // that filesMap contains all the outputKeys by construction
