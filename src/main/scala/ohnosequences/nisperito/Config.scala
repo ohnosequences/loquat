@@ -157,13 +157,14 @@ abstract class AnyNisperitoConfig extends LazyLogging {
   /* This performs some runtime checks of the config */
   def check: Boolean = {
 
+    logger.info("checking the config")
     val ec2 = EC2.create(localCredentials)
     val s3 = S3.create(localCredentials)
 
     val workers = workersAutoScalingGroup
 
     if (workers.desiredCapacity < workers.minSize || workers.desiredCapacity > workers.maxSize) {
-      logger.error("desired capacity should be in interval [minSize, maxSize]")
+      logger.error(s"desired capacity [${workers.desiredCapacity}] should be in the interval [${workers.minSize}, ${workers.maxSize}]")
       return false
     }
 
@@ -172,20 +173,13 @@ abstract class AnyNisperitoConfig extends LazyLogging {
       return false
     }
 
-    // FIXME: check that fat artifact is published where it is expected
-    try {
-      logger.info("checking the fat jar location")
-      s3.getObjectStream(fatArtifactS3Object) match {
-        case null => logger.error("artifact isn't uploaded"); false
-        case _ => true
-      }
-    } catch {
-      case s3e: AmazonServiceException if s3e.getStatusCode==301 => true
-      case t: Throwable  => {
-        logger.error("artifact isn't uploaded: " + fatArtifactS3Object + " " + t)
-        false
-      }
+    // logger.debug(s"checking the fat jar location: ${fatArtifactS3Object.url}")
+    if (s3.objectExists(fatArtifactS3Object).isFailure) {
+      logger.error("Couldn't access the fat artifact (probably you forgot to publish it)")
+      return false
     }
+
+    true
   }
 
 }

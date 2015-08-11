@@ -37,12 +37,6 @@ trait AnyNisperito { nisperito =>
 
   final def deploy(): Unit = NisperitoOps.deploy(config, managerCompat.userScript)
   final def undeploy(): Unit = NisperitoOps.undeploy(config)
-
-  // final def main(args: Array[String]): Unit = args.toList match {
-  //   case List("deploy") => deploy()
-  //   case List("undeploy") => undeploy()
-  //   case _ => println("Wrong command. Should be either 'deploy' or 'undeploy' without arguments.")
-  // }
 }
 
 abstract class Nisperito[
@@ -62,104 +56,112 @@ object NisperitoOps extends LazyLogging {
     config: AnyNisperitoConfig,
     managerUserScript: String
   ): Unit = {
+    logger.info(s"deploying nisperito: ${config.nisperitoName} v${config.nisperitoVersion}")
 
     val aws = AWSClients.create(config.localCredentials)
 
-    logger.info("checking config")
-
-    if(config.check)
-      logger.info("config is correct")
+    if(config.check == false)
+      logger.error("something is wrong with the config")
     else {
-      logger.error("something is wrong with config")
-      return
+      logger.info("the config seems to be fine")
+
+      // FIXME: every action here should be checked before proceeding to the next one
+
+      logger.info(s"creating temporary bucket: ${config.resourceNames.bucket}")
+      aws.s3.createBucket(config.resourceNames.bucket)
+
+      logger.info(s"creating notification topic: ${config.notificationTopic}")
+      val topic = aws.sns.createTopic(config.notificationTopic)
+
+      if (!topic.isEmailSubscribed(config.email)) {
+        logger.info(s"subscribing [${config.email}] to the notification topic")
+        topic.subscribeEmail(config.email)
+        logger.info("check your email and confirm subscription")
+      }
+
+      logger.info(s"creating manager group: ${config.managerAutoScalingGroup.name}")
+      val managerGroup = aws.as.fixAutoScalingGroupUserData(config.managerAutoScalingGroup, managerUserScript)
+      aws.as.createAutoScalingGroup(managerGroup)
+
+      logger.info("creating tags for the manager autoscaling group")
+      utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
+
+      logger.info("nisperito is running, now go to the amazon console and keep an eye on the progress")
     }
-
-    logger.info("creating nispero bucket: " + config.resourceNames.bucket)
-    aws.s3.createBucket(config.resourceNames.bucket)
-
-    logger.info("creating notification topic: " + config.notificationTopic)
-    val topic = aws.sns.createTopic(config.notificationTopic)
-
-    if (!topic.isEmailSubscribed(config.email)) {
-      logger.info("subscribing " + config.email + " to notification topic")
-      topic.subscribeEmail(config.email)
-      logger.info("please confirm subscription")
-    }
-
-    logger.info("running manager auto scaling group")
-    // val managerUserScript = managerCompat.userScript
-    val managerGroup = aws.as.fixAutoScalingGroupUserData(config.managerAutoScalingGroup, managerUserScript)
-    aws.as.createAutoScalingGroup(managerGroup)
-
-    logger.info("creating tags")
-    utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
   }
 
 
   def undeploy(config: AnyNisperitoConfig): Unit = {
+    logger.info(s"undeploying nisperito: ${config.nisperitoName} v${config.nisperitoVersion}")
 
-    // val logger = Logger(this.getClass)
     val aws = AWSClients.create(config.localCredentials)
 
-    logger.info("send notification")
+    logger.info("sending notification on your email")
     try {
       val subject = "Nisperito " + config.nisperitoId + " terminated"
       val notificationTopic = aws.sns.createTopic(config.notificationTopic)
       notificationTopic.publish("manual termination", subject)
     } catch {
-      case t: Throwable => logger.error("error: error during sending notification" + t.getMessage)
+      case t: Throwable => logger.error("error during sending notification", t)
     }
 
-
-    logger.info("deleting workers group")
-    aws.as.deleteAutoScalingGroup(config.workersAutoScalingGroup)
-
+    try {
+      logger.info(s"deleting workers group: ${config.workersAutoScalingGroup.name}")
+      aws.as.deleteAutoScalingGroup(config.workersAutoScalingGroup)
+    } catch {
+      case t: Throwable => logger.error("error during deleting workers group", t)
+    }
 
     try {
-      logger.info("deleting bucket " + config.resourceNames.bucket)
+      logger.info(s"deleting temporary bucket: ${config.resourceNames.bucket}")
       aws.s3.deleteBucket(config.resourceNames.bucket)
     } catch {
-      case t: Throwable => logger.error("error during deleting bucket: " + t.getMessage)
+      case t: Throwable => logger.error("error during deleting temporary bucket", t)
     }
 
     try {
-      aws.sqs.getQueueByName(config.resourceNames.errorQueue).foreach(_.delete())
+      logger.info(s"deleting error queue: ${config.resourceNames.errorQueue}")
+      aws.sqs.getQueueByName(config.resourceNames.errorQueue).foreach(_.delete)
     } catch {
-      case t: Throwable => logger.error("error during deleting error queue " + t.getMessage)
+      case t: Throwable => logger.error("error during deleting error queue", t)
     }
 
     try {
-      aws.sns.createTopic(config.resourceNames.errorTopic).delete()
+      logger.info(s"deleting error topic: ${config.resourceNames.errorTopic}")
+      aws.sns.createTopic(config.resourceNames.errorTopic).delete
     } catch {
-      case t: Throwable => logger.error("error during deleting error topic " + t.getMessage)
+      case t: Throwable => logger.error("error during deleting error topic", t)
     }
 
     try {
-      aws.sqs.getQueueByName(config.resourceNames.outputQueue).foreach(_.delete())
+      logger.info(s"deleting output queue: ${config.resourceNames.outputQueue}")
+      aws.sqs.getQueueByName(config.resourceNames.outputQueue).foreach(_.delete)
     } catch {
-      case t: Throwable => logger.error("error during deleting output queue " + t.getMessage)
+      case t: Throwable => logger.error("error during deleting output queue", t)
     }
 
     try {
-      aws.sns.createTopic(config.resourceNames.outputTopic).delete()
+      logger.info(s"deleting output topic: ${config.resourceNames.outputTopic}")
+      aws.sns.createTopic(config.resourceNames.outputTopic).delete
     } catch {
-      case t: Throwable => logger.error("error during deleting output topic " + t.getMessage)
+      case t: Throwable => logger.error("error during deleting output topic", t)
     }
 
     try {
-      aws.sqs.getQueueByName(config.resourceNames.inputQueue).foreach(_.delete())
+      logger.info(s"deleting input queue: ${config.resourceNames.inputQueue}")
+      aws.sqs.getQueueByName(config.resourceNames.inputQueue).foreach(_.delete)
     } catch {
-      case t: Throwable => logger.error("error during deleting input queue " + t.getMessage)
+      case t: Throwable => logger.error("error during deleting input queue", t)
     }
 
     try {
-      logger.info("delete manager group")
+      logger.info(s"deleting manager group: ${config.managerAutoScalingGroup.name}")
       aws.as.deleteAutoScalingGroup(config.managerAutoScalingGroup)
     } catch {
-      case t: Throwable => logger.error("error during deleting manager group: " + t.getMessage)
+      case t: Throwable => logger.error("error during deleting manager group", t)
     }
 
-    logger.info("undeployed")
+    logger.info("nisperito is undeployed")
   }
 
 
