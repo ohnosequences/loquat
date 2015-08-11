@@ -40,9 +40,10 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   def uploadInitialTasks(tasks: List[AnyTask]) {
     try {
-
       logger.info("adding initial tasks to SQS")
-      val inputQueue = aws.sqs.createQueue(config.resourceNames.inputQueue)
+      val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
+
+      // logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")
 
       // NOTE: we can send messages in parallel
       tasks.par.foreach { task =>
@@ -59,14 +60,20 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
   def install: Results = {
 
     logger.info("manager is started")
-    try {
 
+    try {
+      logger.info("checking if the initial tasks are uploaded")
       if (aws.s3.listObjects(config.tasksUploaded.bucket, config.tasksUploaded.key).isEmpty) {
+        logger.warn("uploading initial tasks")
         uploadInitialTasks(config.tasks)
       } else {
         logger.warn("skipping uploading tasks")
       }
+    } catch {
+      case t: Throwable => logger.error("error during uploading initial tasks", t)
+    }
 
+    try {
       logger.info("generating workers userScript")
       val workersGroup = aws.as.fixAutoScalingGroupUserData(
         config.workersAutoScalingGroup,
@@ -85,18 +92,25 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
       logger.info("creating tags")
       utils.tagAutoScalingGroup(aws.as, groupName, InstanceTags.INSTALLING.value)
+    } catch {
+      case t: Throwable => logger.error("error during creating workers autoscaling group", t)
+    }
 
+    try {
       logger.info("starting termination daemon")
       terminationDaemon.TerminationDaemonThread.start()
-
-      success("manager installed")
     } catch {
-      case t: Throwable => {
-        t.printStackTrace()
-        aws.ec2.getCurrentInstance.foreach(_.terminate)
-        failure("manager fails")
-      }
+      case t: Throwable => logger.error("error during starting termination daemon", t)
     }
+
+    success("manager installed")
+    // } catch {
+    //   case t: Throwable => {
+    //     t.printStackTrace()
+    //     aws.ec2.getCurrentInstance.foreach(_.terminate)
+    //     failure("manager fails")
+    //   }
+    // }
   }
 }
 

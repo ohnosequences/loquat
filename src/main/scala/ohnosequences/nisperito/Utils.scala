@@ -38,12 +38,14 @@ object utils {
   }
 
   def listRecursively(f: File): Seq[File] = {
-    f.listFiles.filter(_.isDirectory).flatMap(listRecursively) ++
-    f.listFiles
+    if (f.exists) {
+      f.listFiles.filter(_.isDirectory).flatMap(listRecursively) ++
+      f.listFiles
+    } else Seq()
   }
 
   def deleteRecursively(file: File) = {
-    listRecursively(file).foreach{ f => 
+    listRecursively(file).foreach{ f =>
       if (!f.delete) throw new RuntimeException("Failed to delete " + f.getAbsolutePath)
     }
   }

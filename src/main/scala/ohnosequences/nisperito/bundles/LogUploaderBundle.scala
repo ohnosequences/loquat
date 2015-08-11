@@ -32,7 +32,7 @@ case class LogUploaderBundle(val config: AnyNisperitoConfig) extends Bundle() wi
                 if(aws.s3.getBucket(bucket).isEmpty) {
                     logger.warn("bucket " + bucket + " doesn't exist")
                   } else {
-                    aws.s3.putObject(ObjectAddress(bucket, id), logFile)
+                    aws.s3.putObject(ObjectAddress(bucket, config.nisperitoId) / id, logFile)
                   }
 
                 Thread.sleep(1000 * 30)

@@ -56,7 +56,7 @@ case class ResourceNames(nisperitoId: String) {
   // name of queue with errors (will be subscribed to errorTopic)
   val errorQueue: String = "nisperitoErrorTopic" + nisperitoId
   // name of bucket for logs and console static files
-  val bucket: String = "nisperitobucket" + nisperitoId.replace("_", "-")
+  val bucket: String = "era7nisperos"
 }
 
 
@@ -138,7 +138,7 @@ abstract class AnyNisperitoConfig extends LazyLogging {
         amiId = ami.id,
         keyName = keypairName,
         instanceProfile = Some(iamRoleName),
-        deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
+        deviceMapping = Map("/dev/sdb" -> "ephemeral0")
       ),
       purchaseModel = workersConfig.purchaseModel
     )
@@ -148,7 +148,7 @@ abstract class AnyNisperitoConfig extends LazyLogging {
   lazy final val resourceNames: ResourceNames = ResourceNames(nisperitoId)
 
   // FIXME: this is just an empty object in S3 witnessing that the initial tasks were uploaded:
-  lazy final val tasksUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, "tasksUploaded")
+  lazy final val tasksUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, nisperitoId) / "tasksUploaded"
 
   lazy final val notificationTopic: String =
     s"""nisperitoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
