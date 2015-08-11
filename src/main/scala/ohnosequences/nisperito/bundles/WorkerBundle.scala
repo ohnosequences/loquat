@@ -1,9 +1,10 @@
 package ohnosequences.nisperito.bundles
 
+import ohnosequences.nisperito._, tasks._, instructions._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
-import ohnosequences.nisperito._
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3.ObjectAddress
@@ -11,6 +12,7 @@ import ohnosequences.awstools.AWSClients
 import org.clapper.avsl.Logger
 import java.io.File
 import scala.concurrent.Future
+import upickle.Js
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -120,9 +122,8 @@ case class InstructionsExecutor(
     instance.foreach(_.terminate)
   }
 
-  def processTask(task: AnyTask, workingDir: File): Results = {
+  def processTask(task: SimpleTask, workingDir: File): Results = {
     try {
-    // val cleanWorkingDir: Results = {
       logger.info("cleaning working directory: " + workingDir.getAbsolutePath)
       utils.deleteRecursively(workingDir)
       logger.info("creating working directory: " + workingDir.getAbsolutePath)
@@ -138,66 +139,39 @@ case class InstructionsExecutor(
       utils.deleteRecursively(outputDir)
       outputDir.mkdir()
 
-    //   success("cleaned working directories")
-    // }
 
       logger.info("downloading task input")
-      val inputFiles: Map[String, File] = task match {
-        /* if it's a tiny task, we just create the files with input messages */
-        case TinyTask(_, inputObjs, _) =>
-          inputObjs.map { case (name, content: String) =>
-            val inputFile = new File(inputDir, name)
-            logger.info("trying to create input object: " + name)
-            utils.writeStringToFile(content, inputFile)
-            (name -> inputFile)
-          }
-        /* if it's a big task, we download objects from S3 */
-        case BigTask(_, inputObjs, _) =>
-          inputObjs.map { case (name, objAddress: ObjectAddress) =>
-            val inputFile = new File(inputDir, name)
-            logger.info("trying to create input object: " + name)
-            aws.s3.createLoadingManager.download(objAddress, inputFile)
-            (name -> inputFile)
-          }
-      }
-
-      val outputFiles: Map[String, File] = task.outputObjects map { case (name, _) =>
-        (name -> new File(outputDir, name))
+      task.inputs.foreach { case (name, objectAddress) =>
+        val inputFile = new File(inputDir, name)
+        logger.info("trying to create input object: " + name)
+        aws.s3.createLoadingManager.download(objectAddress, inputFile)
+        // (name -> inputFile)
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val result = instructions.processTask(inputFiles, outputFiles)
+      val (result, output) = instructions.processTask(task.id)
 
-      val messageFile = new File(workingDir, "message")
-
-      val message = if (messageFile.exists()) {
-        scala.io.Source.fromFile(messageFile).mkString
-      } else {
-        logger.warn("couldn't find message file")
-        ""
+      // FIXME: do it more careful
+      val outputMap: Map[File, ObjectAddress] = output.filesMap.map { case (name, file) =>
+        file -> task.outputs(name)
       }
 
       if (result.hasFailures) {
         logger.error("script finished with non zero code: " + result)
-        if (message.isEmpty) {
-          failure("script finished with non zero code: " + result)
-        } else {
-          failure(message)
-        }
+        failure("script finished with non zero code: " + result)
       } else {
-        logger.info("start.sh script finished, uploading results")
-        for ((name, objectAddress) <- task.outputObjects) {
-          val outputFile = new File(outputDir, name)
-          if (outputFile.exists()) {
+        logger.info("task finished, uploading results")
+        for ((file, objectAddress) <- outputMap) {
+          if (file.exists) {
             logger.info("trying to publish output object " + objectAddress)
             // TODO: publicity should be a configurable option
-            aws.s3.putObject(objectAddress, outputFile, public = true)
+            aws.s3.putObject(objectAddress, file, public = true)
             logger.info("success")
           } else {
-            logger.warn("warning: file " + outputFile.getAbsolutePath + " doesn't exists!")
+            logger.error("error: file " + file.getAbsolutePath + " doesn't exists!")
           }
         }
-        success(message)
+        success(s"""task ${task.id} successfully finished""")
       }
     } catch {
       case e: Throwable => {
@@ -216,14 +190,14 @@ case class InstructionsExecutor(
     val errorTopic = aws.sns.createTopic(config.resourceNames.errorTopic)
 
     while(!stopped) {
-      var taskId = ""
+      var taskId: String = ""
       var lastTimeSpent = 0
       try {
         val message = waitForTask(inputQueue)
 
         instance.foreach(_.createTag(InstanceTags.PROCESSING))
         logger.info("InstructionsExecutor: received message " + message)
-        val task = upickle.default.read[AnyTask](message.body)
+        val task = upickle.default.read[SimpleTask](message.body)
         taskId = task.id
 
         logger.info("InstructionsExecutor processing message")
@@ -239,7 +213,7 @@ case class InstructionsExecutor(
         logger.info("task result: " + taskResult)
 
         val taskResultDescription = TaskResultDescription(
-          id = task.id,
+          id = taskId,
           message = taskResult.toString,
           instanceId = instance.map(_.getInstanceId()),
           time = timeSpent

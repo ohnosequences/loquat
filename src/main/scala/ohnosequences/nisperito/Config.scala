@@ -1,5 +1,7 @@
 package ohnosequences.nisperito
 
+import ohnosequences.nisperito.tasks._
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
 
@@ -72,7 +74,6 @@ abstract class AnyNisperitoConfig {
 
   // keypair name for connecting to the nisperito instances
   val keypairName: String
-  val securityGroups: List[String]
   val iamRoleName: String
 
   // AMI that will be used for manager and worker instances
@@ -118,7 +119,6 @@ abstract class AnyNisperitoConfig {
       instanceSpecs = InstanceSpecs(
         instanceType = managerConfig.instanceType,
         amiId = ami.id,
-        securityGroups = securityGroups,
         keyName = keypairName,
         instanceProfile = Some(iamRoleName)
       ),
@@ -136,7 +136,6 @@ abstract class AnyNisperitoConfig {
       instanceSpecs = InstanceSpecs(
         instanceType = workersConfig.instanceType,
         amiId = ami.id,
-        securityGroups = securityGroups,
         keyName = keypairName,
         instanceProfile = Some(iamRoleName),
         deviceMapping = Map("/dev/xvdb" -> "ephemeral0")
@@ -148,16 +147,18 @@ abstract class AnyNisperitoConfig {
   // resources configuration of names for resources: queues, topics, buckets
   lazy final val resourceNames: ResourceNames = ResourceNames(nisperitoId)
 
-  lazy final val initialTasks: ObjectAddress = ObjectAddress(resourceNames.bucket, "initialTasks")
+  // FIXME: this is just an empty object in S3 witnessing that the initial tasks were uploaded:
   lazy final val tasksUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, "tasksUploaded")
 
   lazy final val notificationTopic: String =
     s"""nisperitoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
 
 
+  // FIXME: fix logging
+  val logger = Logger(this.getClass)
+
   /* This performs some runtime checks of the config */
   def check: Boolean = {
-    val logger = Logger(this.getClass)
 
     val ec2 = EC2.create(localCredentials)
     val s3 = S3.create(localCredentials)
@@ -176,6 +177,7 @@ abstract class AnyNisperitoConfig {
 
     // FIXME: check that fat artifact is published where it is expected
     try {
+      logger.info("checking the fat jar location")
       s3.getObjectStream(fatArtifactS3Object) match {
         case null => logger.error("artifact isn't uploaded"); false
         case _ => true

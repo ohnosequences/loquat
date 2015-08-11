@@ -17,3 +17,4 @@ gridBase/grid.config.generated
 
 .tags*
 .ensime*
+.classpath*
