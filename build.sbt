@@ -12,7 +12,7 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.1.3",
   "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
   // json:
-  "com.lihaoyi" %% "upickle" % "0.3.4",
+  "com.lihaoyi" %% "upickle" % "0.3.5",
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.7.0-SNAPSHOT",
   "ohnosequences" %% "statika"     % "2.0.0-SNAPSHOT",
