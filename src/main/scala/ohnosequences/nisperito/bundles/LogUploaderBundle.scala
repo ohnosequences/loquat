@@ -1,5 +1,7 @@
 package ohnosequences.nisperito.bundles
 
+import ohnosequences.nisperito.AnyNisperitoConfig
+
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
 
@@ -8,15 +10,18 @@ import ohnosequences.awstools.s3.ObjectAddress
 import com.typesafe.scalalogging.LazyLogging
 import java.io.File
 
+import ohnosequences.awstools.AWSClients
+import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
-case class LogUploaderBundle(val resources: AnyResourcesBundle) extends Bundle(resources) with LazyLogging {
 
-  val aws = resources.aws
+case class LogUploaderBundle(val config: AnyNisperitoConfig) extends Bundle() with LazyLogging {
+
+  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
   def install: Results = {
     val logFile = new File("/root/log.txt")
 
-    val bucket = resources.config.resourceNames.bucket
+    val bucket = config.resourceNames.bucket
 
     aws.ec2.getCurrentInstanceId match {
       case Some(id) => {

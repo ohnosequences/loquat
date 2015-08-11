@@ -8,14 +8,15 @@ import ohnosequences.statika.instructions._
 import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 
+import ohnosequences.awstools.AWSClients
+import com.amazonaws.auth.InstanceProfileCredentialsProvider
+
 
 case class SNSMessage(message: String)
 
-case class TerminationDaemonBundle(val resources: AnyResourcesBundle) extends Bundle(resources) with LazyLogging {
+case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundle() with LazyLogging {
 
-  val aws = resources.aws
-
-  val config = resources.config
+  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
   val TIMEOUT = 300 //5 min
 

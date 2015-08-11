@@ -14,43 +14,45 @@ import java.io.File
 import scala.concurrent.Future
 import upickle.Js
 
+import ohnosequences.awstools.AWSClients
+import com.amazonaws.auth.InstanceProfileCredentialsProvider
+
 
 trait AnyWorkerBundle extends AnyBundle {
 
   type Instructions <: AnyInstructionsBundle
   val  instructions: Instructions
 
-  type Resources <: AnyResourcesBundle
-  val  resources: Resources
+  type Config <: AnyNisperitoConfig
+  val  config: Config
 
-  val logUploader: LogUploaderBundle = LogUploaderBundle(resources)
-
-  val bundleDependencies: List[AnyBundle] = List(instructions, logUploader)
+  val bundleDependencies: List[AnyBundle] = List(instructions, LogUploaderBundle(config))
 
   def install: Results = {
-    InstructionsExecutor(resources.config, instructions, resources.aws).runLoop
+    InstructionsExecutor(config, instructions).runLoop
     success("worker installed")
   }
 }
 
 abstract class WorkerBundle[
   I <: AnyInstructionsBundle,
-  R <: AnyResourcesBundle
+  C <: AnyNisperitoConfig
 ](val instructions: I,
-  val resources: R
+  val config: C
 ) extends AnyWorkerBundle {
 
   type Instructions = I
-  type Resources = R
+  type Config = C
 }
 
 
 // TODO: rewrite all this and make it Worker's install
 case class InstructionsExecutor(
   val config: AnyNisperitoConfig,
-  val instructions: AnyInstructionsBundle,
-  val aws: AWSClients
+  val instructions: AnyInstructionsBundle
 ) extends LazyLogging {
+
+  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
   val MESSAGE_TIMEOUT = 5000
 

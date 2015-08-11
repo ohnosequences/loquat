@@ -24,9 +24,8 @@ trait AnyNisperito { nisperito =>
   lazy val fullName: String = this.getClass.getName.split("\\$").mkString(".")
 
   // Bundles hierarchy:
-  case object resources extends ResourcesBundle(config)
+  case object worker extends WorkerBundle(instructions, config)
 
-  case object worker extends WorkerBundle(instructions, resources)
   case object manager extends ManagerBundle(worker) {
     override lazy val fullName: String = s"${nisperito.fullName}.${this.toString}"
   }
@@ -59,6 +58,7 @@ object NisperitoOps extends LazyLogging {
     logger.info(s"deploying nisperito: ${config.nisperitoName} v${config.nisperitoVersion}")
 
     val aws = AWSClients.create(config.localCredentials)
+    val names = config.resourceNames
 
     if(config.check == false)
       logger.error("something is wrong with the config")
@@ -66,11 +66,29 @@ object NisperitoOps extends LazyLogging {
       logger.info("the config seems to be fine")
 
       // FIXME: every action here should be checked before proceeding to the next one
+      logger.info("creating resources...")
 
-      logger.info(s"creating temporary bucket: ${config.resourceNames.bucket}")
-      aws.s3.createBucket(config.resourceNames.bucket)
+      logger.debug(s"creating error topic: ${names.errorTopic}")
+      val errorTopic = aws.sns.createTopic(names.errorTopic)
+      logger.debug(s"creating error queue: ${names.errorQueue}")
+      val errorQueue = aws.sqs.createQueue(names.errorQueue)
+      logger.debug("subscribing error queue to error topic")
+      errorTopic.subscribeQueue(errorQueue)
 
-      logger.info(s"creating notification topic: ${config.notificationTopic}")
+      logger.debug(s"creating input queue: ${names.inputQueue}")
+      val inputQueue = aws.sqs.createQueue(names.inputQueue)
+
+      logger.debug(s"creating output topic: ${names.outputTopic}")
+      val outputTopic = aws.sns.createTopic(names.outputTopic)
+      logger.debug(s"creating output queue: ${names.outputQueue}")
+      val outputQueue = aws.sqs.createQueue(names.outputQueue)
+      logger.debug("subscribing output queue to output topic")
+      outputTopic.subscribeQueue(outputQueue)
+
+      logger.debug(s"creating temporary bucket: ${names.bucket}")
+      aws.s3.createBucket(names.bucket)
+
+      logger.debug(s"creating notification topic: ${config.notificationTopic}")
       val topic = aws.sns.createTopic(config.notificationTopic)
 
       if (!topic.isEmailSubscribed(config.email)) {
@@ -79,11 +97,11 @@ object NisperitoOps extends LazyLogging {
         logger.info("check your email and confirm subscription")
       }
 
-      logger.info(s"creating manager group: ${config.managerAutoScalingGroup.name}")
+      logger.debug(s"creating manager group: ${config.managerAutoScalingGroup.name}")
       val managerGroup = aws.as.fixAutoScalingGroupUserData(config.managerAutoScalingGroup, managerUserScript)
       aws.as.createAutoScalingGroup(managerGroup)
 
-      logger.info("creating tags for the manager autoscaling group")
+      logger.debug("creating tags for the manager autoscaling group")
       utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
 
       logger.info("nisperito is running, now go to the amazon console and keep an eye on the progress")
@@ -95,6 +113,7 @@ object NisperitoOps extends LazyLogging {
     logger.info(s"undeploying nisperito: ${config.nisperitoName} v${config.nisperitoVersion}")
 
     val aws = AWSClients.create(config.localCredentials)
+    val names = config.resourceNames
 
     logger.info("sending notification on your email")
     try {
@@ -113,43 +132,43 @@ object NisperitoOps extends LazyLogging {
     }
 
     try {
-      logger.info(s"deleting temporary bucket: ${config.resourceNames.bucket}")
-      aws.s3.deleteBucket(config.resourceNames.bucket)
+      logger.info(s"deleting temporary bucket: ${names.bucket}")
+      aws.s3.deleteBucket(names.bucket)
     } catch {
       case t: Throwable => logger.error("error during deleting temporary bucket", t)
     }
 
     try {
-      logger.info(s"deleting error queue: ${config.resourceNames.errorQueue}")
-      aws.sqs.getQueueByName(config.resourceNames.errorQueue).foreach(_.delete)
+      logger.info(s"deleting error queue: ${names.errorQueue}")
+      aws.sqs.getQueueByName(names.errorQueue).foreach(_.delete)
     } catch {
       case t: Throwable => logger.error("error during deleting error queue", t)
     }
 
     try {
-      logger.info(s"deleting error topic: ${config.resourceNames.errorTopic}")
-      aws.sns.createTopic(config.resourceNames.errorTopic).delete
+      logger.info(s"deleting error topic: ${names.errorTopic}")
+      aws.sns.createTopic(names.errorTopic).delete
     } catch {
       case t: Throwable => logger.error("error during deleting error topic", t)
     }
 
     try {
-      logger.info(s"deleting output queue: ${config.resourceNames.outputQueue}")
-      aws.sqs.getQueueByName(config.resourceNames.outputQueue).foreach(_.delete)
+      logger.info(s"deleting output queue: ${names.outputQueue}")
+      aws.sqs.getQueueByName(names.outputQueue).foreach(_.delete)
     } catch {
       case t: Throwable => logger.error("error during deleting output queue", t)
     }
 
     try {
-      logger.info(s"deleting output topic: ${config.resourceNames.outputTopic}")
-      aws.sns.createTopic(config.resourceNames.outputTopic).delete
+      logger.info(s"deleting output topic: ${names.outputTopic}")
+      aws.sns.createTopic(names.outputTopic).delete
     } catch {
       case t: Throwable => logger.error("error during deleting output topic", t)
     }
 
     try {
-      logger.info(s"deleting input queue: ${config.resourceNames.inputQueue}")
-      aws.sqs.getQueueByName(config.resourceNames.inputQueue).foreach(_.delete)
+      logger.info(s"deleting input queue: ${names.inputQueue}")
+      aws.sqs.getQueueByName(names.inputQueue).foreach(_.delete)
     } catch {
       case t: Throwable => logger.error("error during deleting input queue", t)
     }
