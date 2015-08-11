@@ -13,7 +13,7 @@ import com.amazonaws.services.autoscaling.model._
 import org.clapper.avsl.Logger
 
 
-trait AnyNisperito {
+trait AnyNisperito { nisperito =>
 
   type Config <: AnyNisperitoConfig
   val  config: Config
@@ -21,25 +21,34 @@ trait AnyNisperito {
   type Instructions <: AnyInstructionsBundle
   val  instructions: Instructions
 
+  lazy val fullName: String = this.getClass.getName.split("\\$").mkString(".")
+
   // Bundles hierarchy:
   case object resources extends ResourcesBundle(config)
 
   case object worker extends WorkerBundle(instructions, resources)
-  case object manager extends ManagerBundle(worker)
-
-  case object managerCompat extends Compatible(config.ami, manager, config.metadata)
-
-  def main(args: Array[String]): Unit = args.toList match {
-    case List("deploy") => NisperitoOps.deploy(config, managerCompat.userScript)
-    case List("undeploy") => NisperitoOps.undeploy(config)
-    case _ => println("Wrong command. Should be either 'deploy' or 'undeploy' without arguments.")
+  case object manager extends ManagerBundle(worker) {
+    override lazy val fullName: String = s"${nisperito.fullName}.${this.toString}"
   }
+
+  case object managerCompat extends Compatible(config.ami, manager, config.metadata) {
+    override lazy val fullName: String = s"${nisperito.fullName}.${this.toString}"
+  }
+
+  final def deploy(): Unit = NisperitoOps.deploy(config, managerCompat.userScript)
+  final def undeploy(): Unit = NisperitoOps.undeploy(config)
+
+  // final def main(args: Array[String]): Unit = args.toList match {
+  //   case List("deploy") => deploy()
+  //   case List("undeploy") => undeploy()
+  //   case _ => println("Wrong command. Should be either 'deploy' or 'undeploy' without arguments.")
+  // }
 }
 
 abstract class Nisperito[
   C <: AnyNisperitoConfig,
   I <: AnyInstructionsBundle
-](val config: C, val instructions: I) {
+](val config: C, val instructions: I) extends AnyNisperito {
 
   type Config = C
   type Instructions = I
@@ -49,22 +58,29 @@ abstract class Nisperito[
 
 object NisperitoOps {
 
+  // FIXME: fix logging
+  val logger = Logger(this.getClass)
+
   def deploy(
     config: AnyNisperitoConfig,
     managerUserScript: String
   ): Unit = {
 
-    val logger = Logger(this.getClass)
     val aws = AWSClients.create(config.localCredentials)
 
-    if(config.check) {
+    logger.info("checking config")
+
+    if(config.check)
+      logger.info("config is correct")
+    else {
+      logger.error("something is wrong with config")
       return
     }
 
+    logger.info("creating nispero bucket: " + config.resourceNames.bucket)
     aws.s3.createBucket(config.resourceNames.bucket)
 
     logger.info("creating notification topic: " + config.notificationTopic)
-
     val topic = aws.sns.createTopic(config.notificationTopic)
 
     if (!topic.isEmailSubscribed(config.email)) {
@@ -85,7 +101,7 @@ object NisperitoOps {
 
   def undeploy(config: AnyNisperitoConfig): Unit = {
 
-    val logger = Logger(this.getClass)
+    // val logger = Logger(this.getClass)
     val aws = AWSClients.create(config.localCredentials)
 
     logger.info("send notification")
@@ -94,7 +110,7 @@ object NisperitoOps {
       val notificationTopic = aws.sns.createTopic(config.notificationTopic)
       notificationTopic.publish("manual termination", subject)
     } catch {
-      case t: Throwable => logger.error("error during sending notification" + t.getMessage)
+      case t: Throwable => logger.error("error: error during sending notification" + t.getMessage)
     }
 
 
@@ -143,7 +159,7 @@ object NisperitoOps {
       logger.info("delete manager group")
       aws.as.deleteAutoScalingGroup(config.managerAutoScalingGroup)
     } catch {
-      case t: Throwable => logger.info("error during deleting manager group: " + t.getMessage)
+      case t: Throwable => logger.error("error during deleting manager group: " + t.getMessage)
     }
 
     logger.info("undeployed")
@@ -152,23 +168,23 @@ object NisperitoOps {
 
   // These ops are useful for a running nisperito. Use them from REPL (sbt console)
 
-  def addTasks(nisperito: AnyNisperito, tasks: List[AnyTask]): Unit = {
-
-    val sqs = SQS.create(nisperito.config.localCredentials)
-    val inputQueue = sqs.getQueueByName(nisperito.config.resourceNames.inputQueue).get
-    tasks.foreach {
-      t => inputQueue.sendMessage(upickle.default.write[SimpleTask](t))
-    }
-  }
-
-  def updateWorkersGroupSize(nisperito: AnyNisperito, groupSize: WorkersGroupSize): Unit = {
-
-    val asClient = AutoScaling.create(nisperito.config.localCredentials, nisperito.resources.aws.ec2).as
-    asClient.updateAutoScalingGroup(new UpdateAutoScalingGroupRequest()
-      .withAutoScalingGroupName(nisperito.config.workersAutoScalingGroup.name)
-      .withMinSize(groupSize.min)
-      .withDesiredCapacity(groupSize.desired)
-      .withMaxSize(groupSize.max)
-    )
-  }
+  // def addTasks(nisperito: AnyNisperito, tasks: List[AnyTask]): Unit = {
+  //
+  //   val sqs = SQS.create(nisperito.config.localCredentials)
+  //   val inputQueue = sqs.getQueueByName(nisperito.config.resourceNames.inputQueue).get
+  //   tasks.foreach {
+  //     t => inputQueue.sendMessage(upickle.default.write[SimpleTask](t))
+  //   }
+  // }
+  //
+  // def updateWorkersGroupSize(nisperito: AnyNisperito, groupSize: WorkersGroupSize): Unit = {
+  //
+  //   val asClient = AutoScaling.create(nisperito.config.localCredentials, nisperito.resources.aws.ec2).as
+  //   asClient.updateAutoScalingGroup(new UpdateAutoScalingGroupRequest()
+  //     .withAutoScalingGroupName(nisperito.config.workersAutoScalingGroup.name)
+  //     .withMinSize(groupSize.min)
+  //     .withDesiredCapacity(groupSize.desired)
+  //     .withMaxSize(groupSize.max)
+  //   )
+  // }
 }

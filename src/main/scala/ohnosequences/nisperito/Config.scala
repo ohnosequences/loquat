@@ -154,9 +154,11 @@ abstract class AnyNisperitoConfig {
     s"""nisperitoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
 
 
+  // FIXME: fix logging
+  val logger = Logger(this.getClass)
+
   /* This performs some runtime checks of the config */
   def check: Boolean = {
-    val logger = Logger(this.getClass)
 
     val ec2 = EC2.create(localCredentials)
     val s3 = S3.create(localCredentials)
@@ -175,6 +177,7 @@ abstract class AnyNisperitoConfig {
 
     // FIXME: check that fat artifact is published where it is expected
     try {
+      logger.info("checking the fat jar location")
       s3.getObjectStream(fatArtifactS3Object) match {
         case null => logger.error("artifact isn't uploaded"); false
         case _ => true

@@ -11,16 +11,22 @@ import ohnosequences.awstools.autoscaling.AutoScalingGroup
 import ohnosequences.awstools.s3.ObjectAddress
 
 
-trait AnyManagerBundle extends AnyBundle {
+// We don't want it to be used outside of this project
+protected[nisperito]
+trait AnyManagerBundle extends AnyBundle { manager =>
 
   type Worker <: AnyWorkerBundle
   val  worker: Worker
+
+  val fullName: String
 
   case object workerCompat extends Compatible[Worker#Resources#Config#AMI, Worker](
     environment = resources.config.ami,
     bundle = worker,
     metadata = resources.config.metadata
-  )
+  ) {
+    override lazy val fullName: String = s"${manager.fullName}.${this.toString}"
+  }
 
   // type Resources <: AnyResourcesBundle
   val  resources = worker.resources
@@ -96,6 +102,7 @@ trait AnyManagerBundle extends AnyBundle {
   }
 }
 
+protected[nisperito]
 abstract class ManagerBundle[W <: AnyWorkerBundle](val worker: W) extends AnyManagerBundle {
 
   type Worker = W
