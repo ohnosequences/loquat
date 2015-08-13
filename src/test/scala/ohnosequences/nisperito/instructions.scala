@@ -10,12 +10,12 @@ object instructionsExample {
 
 
   // inputs:
-  object sample extends InputKey
-  object fastaq extends InputKey
+  case object sample extends InputKey("sample")
+  case object fastaq extends InputKey("fastaq")
 
   // outputs:
-  object stats extends OutputKey
-  object results extends OutputKey
+  case object stats extends OutputKey
+  case object results extends OutputKey
 
   // instructions:
   case object instructs extends InstructionsBundle()(
@@ -25,18 +25,18 @@ object instructionsExample {
 
     def install: Results = success("horay!")
 
-    def processPipa(pipaId: String): (Results, OutputFiles) = {
+    def processPipa(pipaId: String, workingDir: File): (Results, OutputFiles) = {
       val files =
         Files(
           stats(new File(pipaId)) :~:
-          results(sample.file) :~:
+          results(sample.file(workingDir)) :~:
           ∅
         )
       (success("foo"), files)
     }
   }
 
-  val outputs = instructs.processPipa("foo")._2
+  val outputs = instructs.processPipa("foo", new File("."))._2
 
   // NOTE: here we can use Map.apply safely, because we know
   // that filesMap contains all the outputKeys by construction

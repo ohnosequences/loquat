@@ -41,6 +41,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
   def uploadInitialPipas(pipas: List[AnyPipa]) {
     try {
       logger.info("adding initial pipas to SQS")
+      // FIXME: match on Option instead of get
       val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
 
       // logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")

@@ -166,7 +166,7 @@ case class InstructionsExecutor(
           if (file.exists) {
             logger.info(s"trying to publish output object: ${objectAddress}")
             // TODO: publicity should be a configurable option
-            aws.s3.putObject(objectAddress, file, public = true)
+            aws.s3.putObject(objectAddress / file.getName, file, public = true)
             logger.info("success")
           } else {
             logger.error(s"file [${file.getAbsolutePath}] doesn't exists!")

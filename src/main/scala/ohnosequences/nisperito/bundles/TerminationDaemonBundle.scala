@@ -65,17 +65,11 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
 
     rawMessages.map {
       case (handle, rawMessageBody) =>  {
-        logger.info(s"rawMessageBody: ${rawMessageBody}")
-        // val descriptionMessage: String = upickle.json.write(upickle.json.read(rawMessageBody)("Message"))
-        // logger.info(s"descriptionMessage: ${descriptionMessage}")
-        // val fixJson = descriptionMessage.replace("\\\"", "\"")
-        // logger.info(s"fixJson: ${fixJson}")
-        // val description: PipaResultDescription = upickle.default.read[PipaResultDescription](fixJson)
         val snsMessage: SNSMessage = upickle.default.read[SNSMessage](rawMessageBody)
-        logger.info(s"snsMessage: ${snsMessage}")
-        val r: PipaResultDescription = upickle.default.read[PipaResultDescription](snsMessage.Message.replace("\\\"", "\""))
-        logger.info(s"r: ${r}")
-        (handle, r)
+        val resultDescription: PipaResultDescription =
+          upickle.default.read[PipaResultDescription](snsMessage.Message.replace("\\\"", "\""))
+        logger.info(resultDescription.toString)
+        (handle, resultDescription)
       }
     }
   }
