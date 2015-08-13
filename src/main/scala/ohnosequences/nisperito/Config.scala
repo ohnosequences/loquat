@@ -1,6 +1,6 @@
 package ohnosequences.nisperito
 
-import ohnosequences.nisperito.tasks._
+import ohnosequences.nisperito.pipas._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
@@ -27,16 +27,15 @@ case class WorkersGroupSize(min: Int, desired: Int, max: Int)
 case class WorkersConfig(
   instanceType: InstanceType,
   purchaseModel: PurchaseModel = SpotAuto,
-  workingDir: File = new File("/media/ephemeral0"),
   groupSize: WorkersGroupSize = WorkersGroupSize(0, 1, 10)
 )
 
 /* Configuration of termination conditions */
 case class TerminationConfig(
-  // if true nisperito will terminate after solving all initial tasks
-  terminateAfterInitialTasks: Boolean,
-  // maximum time for processing task
-  taskProcessTimeout: Int = 60 * 60 * 10, // 10 hours
+  // if true nisperito will terminate after solving all initial pipas
+  terminateAfterInitialPipas: Boolean,
+  // maximum time for processing pipa
+  pipaProcessTimeout: Int = 60 * 60 * 10, // 10 hours
   // if true nisperito will terminate after errorQueue will contain more unique messages then threshold
   errorsThreshold: Option[Int] = None,
   // if true nisperito will terminate after this timeout reached. Time units are seconds.
@@ -45,11 +44,11 @@ case class TerminationConfig(
 
 /* Configuration of resources */
 case class ResourceNames(nisperitoId: String) {
-  // name of queue with tasks
+  // name of queue with pipas
   val inputQueue: String = "nisperitoInputQueue" + nisperitoId
-  // name of topic for tasks result notifications
+  // name of topic for pipas result notifications
   val outputQueue: String = "nisperitoOutputQueue" + nisperitoId
-  // name of queue with tasks results notifications (will be subscribed to outputTopic)
+  // name of queue with pipas results notifications (will be subscribed to outputTopic)
   val outputTopic: String = "nisperitoOutputTopic" + nisperitoId
   // name of topic for errors
   val errorTopic: String = "nisperitoErrorQueue" + nisperitoId
@@ -89,12 +88,15 @@ abstract class AnyNisperitoConfig extends LazyLogging {
   // Termination conditions
   val terminationConfig: TerminationConfig
 
-  // List of tiny or big tasks
-  val tasks: List[AnyTask]
+  // List of tiny or big pipas
+  val pipas: List[AnyPipa]
 
   // TODO: AWS region should be also configurable
 
   /* Here follow all the values that are dependent on those defined on top */
+
+  // FIXME: put this constant somewhere else
+  final val workingDir: File = new File("/media/ephemeral0/applicator/nisperito")
 
   lazy final val fatArtifactS3Object: ObjectAddress = {
     val s3url = """s3://(.+)/(.+)""".r
@@ -147,8 +149,8 @@ abstract class AnyNisperitoConfig extends LazyLogging {
   // resources configuration of names for resources: queues, topics, buckets
   lazy final val resourceNames: ResourceNames = ResourceNames(nisperitoId)
 
-  // FIXME: this is just an empty object in S3 witnessing that the initial tasks were uploaded:
-  lazy final val tasksUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, nisperitoId) / "tasksUploaded"
+  // FIXME: this is just an empty object in S3 witnessing that the initial pipas were uploaded:
+  lazy final val pipasUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, nisperitoId) / "pipasUploaded"
 
   lazy final val notificationTopic: String =
     s"""nisperitoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""

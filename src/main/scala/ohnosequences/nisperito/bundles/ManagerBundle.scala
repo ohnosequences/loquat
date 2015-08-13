@@ -1,6 +1,6 @@
 package ohnosequences.nisperito.bundles
 
-import ohnosequences.nisperito._, tasks._
+import ohnosequences.nisperito._, pipas._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -38,21 +38,21 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-  def uploadInitialTasks(tasks: List[AnyTask]) {
+  def uploadInitialPipas(pipas: List[AnyPipa]) {
     try {
-      logger.info("adding initial tasks to SQS")
+      logger.info("adding initial pipas to SQS")
       val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
 
       // logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")
 
       // NOTE: we can send messages in parallel
-      tasks.par.foreach { task =>
-        inputQueue.sendMessage(upickle.default.write[SimpleTask](task))
+      pipas.par.foreach { pipa =>
+        inputQueue.sendMessage(upickle.default.write[SimplePipa](pipa))
       }
-      aws.s3.putWholeObject(config.tasksUploaded, "")
-      logger.info("initial tasks are ready")
+      aws.s3.putWholeObject(config.pipasUploaded, "")
+      logger.info("initial pipas are ready")
     } catch {
-      case t: Throwable => logger.error("error during uploading initial tasks", t)
+      case t: Throwable => logger.error("error during uploading initial pipas", t)
     }
   }
 
@@ -62,15 +62,15 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     logger.info("manager is started")
 
     try {
-      logger.info("checking if the initial tasks are uploaded")
-      if (aws.s3.listObjects(config.tasksUploaded.bucket, config.tasksUploaded.key).isEmpty) {
-        logger.warn("uploading initial tasks")
-        uploadInitialTasks(config.tasks)
+      logger.info("checking if the initial pipas are uploaded")
+      if (aws.s3.listObjects(config.pipasUploaded.bucket, config.pipasUploaded.key).isEmpty) {
+        logger.warn("uploading initial pipas")
+        uploadInitialPipas(config.pipas)
       } else {
-        logger.warn("skipping uploading tasks")
+        logger.warn("skipping uploading pipas")
       }
     } catch {
-      case t: Throwable => logger.error("error during uploading initial tasks", t)
+      case t: Throwable => logger.error("error during uploading initial pipas", t)
     }
 
     try {

@@ -3,7 +3,7 @@ package ohnosequences.nisperito.test
 object instructionsExample {
 
   import ohnosequences.statika.instructions._
-  import ohnosequences.nisperito._, tasks._, bundles._, instructions._
+  import ohnosequences.nisperito._, pipas._, bundles._, instructions._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import ohnosequences.cosas.ops.records._
   import java.io.File
@@ -25,10 +25,10 @@ object instructionsExample {
 
     def install: Results = success("horay!")
 
-    def processTask(taskId: String): (Results, OutputFiles) = {
+    def processPipa(pipaId: String): (Results, OutputFiles) = {
       val files =
         Files(
-          stats(new File(taskId)) :~:
+          stats(new File(pipaId)) :~:
           results(sample.file) :~:
           ∅
         )
@@ -36,7 +36,7 @@ object instructionsExample {
     }
   }
 
-  val outputs = instructs.processTask("foo")._2
+  val outputs = instructs.processPipa("foo")._2
 
   // NOTE: here we can use Map.apply safely, because we know
   // that filesMap contains all the outputKeys by construction

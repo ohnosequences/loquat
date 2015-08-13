@@ -1,15 +1,15 @@
 package ohnosequences.nisperito.test
 
-object tasksExample {
+object pipasExample {
 
   import ohnosequences.awstools.s3.ObjectAddress
-  import ohnosequences.nisperito._, tasks._
+  import ohnosequences.nisperito._, pipas._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import instructionsExample._
 
 
-  val task = Task(
-    id = "task3498734",
+  val pipa = Pipa(
+    id = "pipa3498734",
     instructions = instructs,
     inputRefs =
       S3Ref(sample, ObjectAddress("", "")) :~:

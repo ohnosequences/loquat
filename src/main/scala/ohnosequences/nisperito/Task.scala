@@ -1,6 +1,6 @@
 package ohnosequences.nisperito
 
-case object tasks {
+case object pipas {
 
   import bundles._, instructions._
 
@@ -12,14 +12,13 @@ case object tasks {
   import upickle.Js
 
 
-  case class TaskResultDescription(
+  case class PipaResultDescription(
     id: String,
     message: String,
     instanceId: Option[String],
     time: Int
   )
 
-  // TODO: ops for AnyKey to construct ref values
   sealed trait AnyKeyRef extends AnyDenotation {
     type Key <: AnyKey
     val  key: Key
@@ -45,7 +44,7 @@ case object tasks {
   }
 
 
-  trait AnyTask {
+  trait AnyPipa {
 
     val id: String
 
@@ -53,7 +52,7 @@ case object tasks {
     val  instructions: Instructions
 
     /* These are records with references to the remote locations of
-       where to get inputs and where to put outputs of the task */
+       where to get inputs and where to put outputs of the pipa */
     // NOTE: at the moment we restrict refs to be only S3 objects
     type InputRefs <: AnyTypeSet.Of[AnyS3Ref]
     val  inputRefs: InputRefs
@@ -73,7 +72,7 @@ case object tasks {
     val outputsToList: OutputRefs ToListOf AnyS3Ref
   }
 
-  case class Task[
+  case class Pipa[
     I <: AnyInstructionsBundle,
     IR <: AnyTypeSet.Of[AnyS3Ref],
     OR <: AnyTypeSet.Of[AnyS3Ref]
@@ -86,7 +85,7 @@ case object tasks {
     val checkOutputKeys: TypesOf[OR] { type Out = I#OutputKeys },
     val inputsToList: IR ToListOf AnyS3Ref,
     val outputsToList: OR ToListOf AnyS3Ref
-  ) extends AnyTask {
+  ) extends AnyPipa {
 
     type Instructions = I
     type InputRefs = IR
@@ -96,19 +95,19 @@ case object tasks {
 
   /* This is easy to parse/serialize */
   protected[nisperito]
-    case class SimpleTask(
+    case class SimplePipa(
       val id: String,
       val inputs: Map[String, ObjectAddress],
       val outputs: Map[String, ObjectAddress]
     )
 
-  /* and we can transfor any task to this simple form */
-  implicit def simplify(task: AnyTask): SimpleTask =
-    SimpleTask(
-      id = task.id,
-      inputs = task.inputsToList(task.inputRefs)
+  /* and we can transfor any pipa to this simple form */
+  implicit def simplify(pipa: AnyPipa): SimplePipa =
+    SimplePipa(
+      id = pipa.id,
+      inputs = pipa.inputsToList(pipa.inputRefs)
         .map{ case ref => (ref.key.label -> ref.value) }.toMap,
-      outputs = task.outputsToList(task.outputRefs)
+      outputs = pipa.outputsToList(pipa.outputRefs)
         .map{ case ref => (ref.key.label -> ref.value) }.toMap
     )
 

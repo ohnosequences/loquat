@@ -17,14 +17,15 @@ case object instructions {
 
   trait AnyKey extends AnyProperty {
     type Raw = File
+  }
+
+  class InputKey(val label: String) extends AnyKey {
+    def file(workingDir: File): File = new File(workingDir, s"input/${label}")
+  }
+
+  trait OutputKey extends AnyKey {
     lazy val label: String = this.toString
   }
-
-  trait InputKey extends AnyKey {
-    def file: File = new File(s"input/${label}")
-  }
-
-  trait OutputKey extends AnyKey
 
 
 
@@ -36,7 +37,7 @@ case object instructions {
     type OutputKeys <: AnyTypeSet.Of[OutputKey]
     val  outputKeys: OutputKeys
 
-    // This is for constructing the result of the task processor
+    // This is for constructing the result of the pipa processor
     trait OutputFiles extends AnyRecord {
 
       type Properties = OutputKeys
@@ -70,10 +71,10 @@ case object instructions {
        type Raw = Vals
      }
 
-    /* this is where user describes instructions how to process each task:
+    /* this is where user describes instructions how to process each pipa:
        - it can assume that the input files are in place (`inputKey.file`)
-       - it must produce output files declared in the task */
-    def processTask(taskId: String): (Results, OutputFiles)
+       - it must produce output files declared in the pipa */
+    def processPipa(pipaId: String, workingDir: File): (Results, OutputFiles)
   }
 
   abstract class InstructionsBundle[

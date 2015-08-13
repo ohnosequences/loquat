@@ -1,7 +1,7 @@
 package ohnosequences.nisperito
 
 import ohnosequences.nisperito.bundles._, instructions._
-import ohnosequences.nisperito.tasks._
+import ohnosequences.nisperito.pipas._
 
 import ohnosequences.statika.bundles._
 
@@ -186,12 +186,12 @@ object NisperitoOps extends LazyLogging {
 
   // These ops are useful for a running nisperito. Use them from REPL (sbt console)
 
-  // def addTasks(nisperito: AnyNisperito, tasks: List[AnyTask]): Unit = {
+  // def addPipas(nisperito: AnyNisperito, pipas: List[AnyPipa]): Unit = {
   //
   //   val sqs = SQS.create(nisperito.config.localCredentials)
   //   val inputQueue = sqs.getQueueByName(nisperito.config.resourceNames.inputQueue).get
-  //   tasks.foreach {
-  //     t => inputQueue.sendMessage(upickle.default.write[SimpleTask](t))
+  //   pipas.foreach {
+  //     t => inputQueue.sendMessage(upickle.default.write[SimplePipa](t))
   //   }
   // }
   //

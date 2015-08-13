@@ -1,6 +1,6 @@
 package ohnosequences.nisperito.bundles
 
-import ohnosequences.nisperito._, tasks._, instructions._
+import ohnosequences.nisperito._, pipas._, instructions._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -60,12 +60,12 @@ case class InstructionsExecutor(
 
   @volatile var stopped = false
 
-  def waitForTask(queue: Queue): Message = {
+  def waitForPipa(queue: Queue): Message = {
 
     var message: Option[Message] = queue.receiveMessage
 
     while(message.isEmpty) {
-      logger.info("InstructionsExecutor wait for task")
+      logger.info("InstructionsExecutor wait for pipa")
       instance.foreach(_.createTag(InstanceTags.IDLE))
       Thread.sleep(MESSAGE_TIMEOUT)
       message = queue.receiveMessage
@@ -85,14 +85,14 @@ case class InstructionsExecutor(
 
     var stopWaiting = false
 
-    var taskResult: Results = failure("internal error during waiting for task result")
+    var pipaResult: Results = failure("internal error during waiting for pipa result")
 
 
     var it = 0
     while(!stopWaiting) {
-      if(timeSpent() > math.min(config.terminationConfig.taskProcessTimeout, 12 * 60 * 60)) {
+      if(timeSpent() > math.min(config.terminationConfig.pipaProcessTimeout, 12 * 60 * 60)) {
         stopWaiting = true
-        taskResult = failure("Timeout: " + timeSpent + " > taskProcessTimeout")
+        pipaResult = failure("Timeout: " + timeSpent + " > pipaProcessTimeout")
         terminateWorker
       } else {
         futureResult.value match {
@@ -104,15 +104,15 @@ case class InstructionsExecutor(
               case e: Throwable => logger.info("Couldn't change the visibility timeout")
             }
             Thread.sleep(step)
-            logger.info("Solving task: " + utils.printInterval(timeSpent()))
+            logger.info("Solving pipa: " + utils.printInterval(timeSpent()))
             it += 1
           }
-          case Some(scala.util.Success(r)) => stopWaiting = true; taskResult = r
-          case Some(scala.util.Failure(t)) => stopWaiting = true; taskResult = failure("future error: " + t.getMessage)
+          case Some(scala.util.Success(r)) => stopWaiting = true; pipaResult = r
+          case Some(scala.util.Failure(t)) => stopWaiting = true; pipaResult = failure("future error: " + t.getMessage)
         }
       }
     }
-    (taskResult, timeSpent())
+    (pipaResult, timeSpent())
   }
 
   def terminateWorker(): Unit = {
@@ -122,45 +122,46 @@ case class InstructionsExecutor(
     instance.foreach(_.terminate)
   }
 
-  def processTask(task: SimpleTask, workingDir: File): Results = {
+  def processPipa(pipa: SimplePipa, workingDir: File): Results = {
     try {
       logger.info("cleaning working directory: " + workingDir.getAbsolutePath)
       utils.deleteRecursively(workingDir)
       logger.info("creating working directory: " + workingDir.getAbsolutePath)
-      workingDir.mkdir()
+      workingDir.mkdir
 
       val inputDir = new File(workingDir, "input")
       logger.info("cleaning input directory: " + inputDir.getAbsolutePath)
       utils.deleteRecursively(inputDir)
-      inputDir.mkdir()
+      inputDir.mkdir
 
       val outputDir = new File(workingDir, "output")
       logger.info("cleaning output directory: " + outputDir.getAbsolutePath)
       utils.deleteRecursively(outputDir)
-      outputDir.mkdir()
+      outputDir.mkdir
 
 
-      logger.info("downloading task input")
-      task.inputs.foreach { case (name, objectAddress) =>
+      logger.info("downloading pipa input")
+      val loadingManager = aws.s3.createLoadingManager
+      pipa.inputs.foreach { case (name, objectAddress) =>
         val inputFile = new File(inputDir, name)
         logger.info("trying to create input object: " + name)
-        aws.s3.createLoadingManager.download(objectAddress, inputFile)
+        loadingManager.download(objectAddress, inputFile)
         // (name -> inputFile)
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val (result, output) = instructions.processTask(task.id)
+      val (result, output) = instructions.processPipa(pipa.id, workingDir)
 
       // FIXME: do it more careful
       val outputMap: Map[File, ObjectAddress] = output.filesMap.map { case (name, file) =>
-        file -> task.outputs(name)
+        file -> pipa.outputs(name)
       }
 
       if (result.hasFailures) {
         logger.error(s"script finished with non zero code: ${result}")
         failure(s"script finished with non zero code: ${result}")
       } else {
-        logger.info("task finished, uploading results")
+        logger.info("pipa finished, uploading results")
         for ((file, objectAddress) <- outputMap) {
           if (file.exists) {
             logger.info(s"trying to publish output object: ${objectAddress}")
@@ -171,11 +172,11 @@ case class InstructionsExecutor(
             logger.error(s"file [${file.getAbsolutePath}] doesn't exists!")
           }
         }
-        success(s"task [${task.id}] successfully finished")
+        result -&- success(s"pipa [${pipa.id}] successfully finished")
       }
     } catch {
       case t: Throwable => {
-        logger.error("fatal failure during task processing", t)
+        logger.error("fatal failure during pipa processing", t)
         failure(t.getMessage)
       }
     }
@@ -190,41 +191,41 @@ case class InstructionsExecutor(
     val errorTopic = aws.sns.createTopic(config.resourceNames.errorTopic)
 
     while(!stopped) {
-      var taskId: String = ""
+      var pipaId: String = ""
       var lastTimeSpent = 0
       try {
-        val message = waitForTask(inputQueue)
+        val message = waitForPipa(inputQueue)
 
         instance.foreach(_.createTag(InstanceTags.PROCESSING))
         logger.info("InstructionsExecutor: received message " + message)
-        val task = upickle.default.read[SimpleTask](message.body)
-        taskId = task.id
+        val pipa = upickle.default.read[SimplePipa](message.body)
+        pipaId = pipa.id
 
         logger.info("InstructionsExecutor processing message")
 
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
-          processTask(task, config.workersConfig.workingDir)
+          processPipa(pipa, config.workingDir)
         }
 
-        val (taskResult, timeSpent) = waitForResult(futureResult, message)
+        val (pipaResult, timeSpent) = waitForResult(futureResult, message)
         lastTimeSpent = timeSpent
 
-        logger.info("task result: " + taskResult)
+        logger.info("pipa result: " + pipaResult)
 
-        val taskResultDescription = TaskResultDescription(
-          id = taskId,
-          message = taskResult.toString,
+        val pipaResultDescription = PipaResultDescription(
+          id = pipaId,
+          message = pipaResult.toString,
           instanceId = instance.map(_.getInstanceId()),
           time = timeSpent
         )
 
         logger.info("publishing result to topic")
 
-        if (taskResult.hasFailures) {
-          errorTopic.publish(upickle.default.write(taskResultDescription))
+        if (pipaResult.hasFailures) {
+          errorTopic.publish(upickle.default.write(pipaResultDescription))
         } else {
-          outputTopic.publish(upickle.default.write(taskResultDescription))
+          outputTopic.publish(upickle.default.write(pipaResultDescription))
           logger.info("InstructionsExecutor deleting message with from input queue")
           inputQueue.deleteMessage(message)
         }
@@ -232,13 +233,13 @@ case class InstructionsExecutor(
         case e: Throwable =>  {
           logger.error("fatal error! instance will terminated")
           e.printStackTrace()
-          val taskResultDescription = TaskResultDescription(
-            id = taskId,
+          val pipaResultDescription = PipaResultDescription(
+            id = pipaId,
             message = e.getMessage,
             instanceId = instance.map(_.getInstanceId()),
             time = lastTimeSpent
           )
-          errorTopic.publish(upickle.default.write(taskResultDescription))
+          errorTopic.publish(upickle.default.write(pipaResultDescription))
           terminateWorker
         }
       }

@@ -1,6 +1,6 @@
 package ohnosequences.nisperito.bundles
 
-import ohnosequences.nisperito._, tasks._
+import ohnosequences.nisperito._, pipas._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -12,7 +12,7 @@ import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 
-case class SNSMessage(message: String)
+case class SNSMessage(Message: String)
 
 case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundle() with LazyLogging {
 
@@ -34,11 +34,11 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
         logger.info("TerminationDeaemon success results: " + successResults.size)
         logger.info("TerminationDeaemon failed results: " + failedResults.size)
 
-        receiveTasksResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
+        receivePipasResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
           successResults.put(result.id, result.message)
         }
 
-        receiveTasksResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
+        receivePipasResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
           failedResults.put(result.id, result.message)
         }
 
@@ -46,7 +46,7 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
           terminationConfig = config.terminationConfig,
           successResultsCount = successResults.size,
           failedResultsCount = failedResults.size,
-          initialTasksCount = config.tasks.length
+          initialPipasCount = config.pipas.length
         )
 
         reason match {
@@ -60,13 +60,21 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
     }
   }
 
-  def receiveTasksResults(queueName: String): List[(String, TaskResultDescription)] = {
+  def receivePipasResults(queueName: String): List[(String, PipaResultDescription)] = {
     val rawMessages: List[(String, String)] = getQueueMessagesWithHandles(queueName)
 
     rawMessages.map {
       case (handle, rawMessageBody) =>  {
+        logger.info(s"rawMessageBody: ${rawMessageBody}")
+        // val descriptionMessage: String = upickle.json.write(upickle.json.read(rawMessageBody)("Message"))
+        // logger.info(s"descriptionMessage: ${descriptionMessage}")
+        // val fixJson = descriptionMessage.replace("\\\"", "\"")
+        // logger.info(s"fixJson: ${fixJson}")
+        // val description: PipaResultDescription = upickle.default.read[PipaResultDescription](fixJson)
         val snsMessage: SNSMessage = upickle.default.read[SNSMessage](rawMessageBody)
-        val r: TaskResultDescription = upickle.default.read[TaskResultDescription](snsMessage.message)
+        logger.info(s"snsMessage: ${snsMessage}")
+        val r: PipaResultDescription = upickle.default.read[PipaResultDescription](snsMessage.Message.replace("\\\"", "\""))
+        logger.info(s"r: ${r}")
         (handle, r)
       }
     }
@@ -98,16 +106,16 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
     terminationConfig: TerminationConfig,
     successResultsCount: Int,
     failedResultsCount: Int,
-    initialTasksCount: Int
+    initialPipasCount: Int
   ): Option[String] = {
 
     val startTime = aws.as.getCreatedTime(config.managerAutoScalingGroup.name).map(_.getTime)
 
     if (
-      terminationConfig.terminateAfterInitialTasks &&
-      (successResultsCount >= initialTasksCount)
+      terminationConfig.terminateAfterInitialPipas &&
+      (successResultsCount >= initialPipasCount)
     ) {
-      Some("terminated due to terminateAfterInitialTasks: initialTasks count: " + initialTasksCount + " current: " + successResultsCount)
+      Some("terminated due to terminateAfterInitialPipas: initialPipas count: " + initialPipasCount + " current: " + successResultsCount)
     } else if (
       terminationConfig.errorsThreshold.map{ failedResultsCount >= _ }.getOrElse(false)
     ) {
