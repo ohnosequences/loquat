@@ -153,9 +153,12 @@ case class InstructionsExecutor(
       val (result, output) = instructions.processPipa(pipa.id, workingDir)
 
       // FIXME: do it more careful
-      val outputMap: Map[File, ObjectAddress] = output.filesMap.map { case (name, file) =>
-        file -> pipa.outputs(name)
-      }
+      val outputMap: Map[File, ObjectAddress] =
+        instructions
+        .filesMap(output)
+        .map { case (name, file) =>
+          file -> pipa.outputs(name)
+        }
 
       if (result.hasFailures) {
         logger.error(s"script finished with non zero code: ${result}")
@@ -166,7 +169,7 @@ case class InstructionsExecutor(
           if (file.exists) {
             logger.info(s"trying to publish output object: ${objectAddress}")
             // TODO: publicity should be a configurable option
-            aws.s3.putObject(objectAddress / file.getName, file, public = true)
+            aws.s3.uploadFile(objectAddress / file.getName, file, public = true)
             logger.info("success")
           } else {
             logger.error(s"file [${file.getAbsolutePath}] doesn't exists!")

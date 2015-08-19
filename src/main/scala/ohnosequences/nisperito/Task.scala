@@ -2,7 +2,7 @@ package ohnosequences.nisperito
 
 case object pipas {
 
-  import bundles._, instructions._
+  import bundles._, instructions._, dataSets._
 
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import ohnosequences.cosas.ops.typeSets._
@@ -19,30 +19,7 @@ case object pipas {
     time: Int
   )
 
-  sealed trait AnyKeyRef extends AnyDenotation {
-    type Key <: AnyKey
-    val  key: Key
-
-    type Tpe = Key
-  }
-
-  abstract class KeyRef[V] extends AnyKeyRef { type Value = V }
-
-  trait AnyS3Ref extends KeyRef[ObjectAddress]
-
-  case class S3Ref[K <: AnyKey](val key: K, val value: ObjectAddress)
-    extends AnyS3Ref { type Key = K }
-
-  implicit def keyOps[K <: AnyKey](k: K): KeyOps[K] = KeyOps[K](k)
-  case class KeyOps[K <: AnyKey](k: K) {
-
-    def objectAddress(bucket: String, suffix: String): S3Ref[K] =
-      S3Ref(k, ObjectAddress(bucket, suffix))
-
-    def objectAddress(objAddr: ObjectAddress): S3Ref[K] =
-      S3Ref(k, objAddr)
-  }
-
+  type RemotesFor[DS <: AnyDataSet] = DS#LocationsAt[S3DataLocation]
 
   trait AnyPipa {
 
@@ -54,42 +31,29 @@ case object pipas {
     /* These are records with references to the remote locations of
        where to get inputs and where to put outputs of the pipa */
     // NOTE: at the moment we restrict refs to be only S3 objects
-    type InputRefs <: AnyTypeSet.Of[AnyS3Ref]
-    val  inputRefs: InputRefs
-
-    type OutputRefs <: AnyTypeSet.Of[AnyS3Ref]
-    val  outputRefs: OutputRefs
-
-    /* These two implicits check that the remote references records' keys
-       corespond to the keys from the instructinos bundle */
-    // should be provided implicitly:
-    val checkInputKeys: TypesOf[InputRefs] { type Out = Instructions#InputKeys }
-    val checkOutputKeys: TypesOf[OutputRefs] { type Out = Instructions#OutputKeys }
+    val remoteInput: RemotesFor[Instructions#Input]
+    val remoteOutput: RemotesFor[Instructions#Output]
 
     /* These two vals a needed for serialization */
     // should be provided implicitly:
-    val inputsToList: InputRefs ToListOf AnyS3Ref
-    val outputsToList: OutputRefs ToListOf AnyS3Ref
+    val inputsToMap:  ToMap[RemotesFor[Instructions#Input],  AnyData, S3DataLocation]
+    val outputsToMap: ToMap[RemotesFor[Instructions#Output], AnyData, S3DataLocation]
   }
 
   case class Pipa[
     I <: AnyInstructionsBundle,
-    IR <: AnyTypeSet.Of[AnyS3Ref],
-    OR <: AnyTypeSet.Of[AnyS3Ref]
+    RI <: RemotesFor[I#Input],
+    RO <: RemotesFor[I#Output]
   ](val id: String,
     val instructions: I,
-    val inputRefs: IR,
-    val outputRefs: OR
+    val remoteInput: RemotesFor[I#Input],
+    val remoteOutput: RemotesFor[I#Output]
   )(implicit
-    val checkInputKeys: TypesOf[IR] { type Out = I#InputKeys },
-    val checkOutputKeys: TypesOf[OR] { type Out = I#OutputKeys },
-    val inputsToList: IR ToListOf AnyS3Ref,
-    val outputsToList: OR ToListOf AnyS3Ref
+    val inputsToMap:  ToMap[RemotesFor[I#Input], AnyData, S3DataLocation],
+    val outputsToMap: ToMap[RemotesFor[I#Output], AnyData, S3DataLocation]
   ) extends AnyPipa {
 
     type Instructions = I
-    type InputRefs = IR
-    type OutputRefs = OR
   }
 
 
@@ -102,13 +66,12 @@ case object pipas {
     )
 
   /* and we can transfor any pipa to this simple form */
-  implicit def simplify(pipa: AnyPipa): SimplePipa =
-    SimplePipa(
-      id = pipa.id,
-      inputs = pipa.inputsToList(pipa.inputRefs)
-        .map{ case ref => (ref.key.label -> ref.value) }.toMap,
-      outputs = pipa.outputsToList(pipa.outputRefs)
-        .map{ case ref => (ref.key.label -> ref.value) }.toMap
-    )
+  def simplify(pipa: AnyPipa): SimplePipa = SimplePipa(
+    id = pipa.id,
+    inputs = pipa.inputsToMap(pipa.remoteInput)
+      .map{ case (data, s3loc) => (data.label -> s3loc.location) },
+    outputs = pipa.outputsToMap(pipa.remoteOutput)
+      .map{ case (data, s3loc) => (data.label -> s3loc.location) }
+  )
 
 }

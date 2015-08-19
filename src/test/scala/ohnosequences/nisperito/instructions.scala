@@ -3,35 +3,33 @@ package ohnosequences.nisperito.test
 object instructionsExample {
 
   import ohnosequences.statika.instructions._
-  import ohnosequences.nisperito._, pipas._, bundles._, instructions._
+  import ohnosequences.nisperito._, pipas._, bundles._, instructions._, dataSets._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
-  import ohnosequences.cosas.ops.records._
   import java.io.File
 
 
   // inputs:
-  case object sample extends InputKey("sample")
-  case object fastaq extends InputKey("fastaq")
+  case object SomeData extends AnyDataType
+  case object sample extends Data(SomeData, "sample")
+  case object fastq extends Data(SomeData, "fastq")
 
   // outputs:
-  case object stats extends OutputKey
-  case object results extends OutputKey
+  case object stats extends Data(SomeData, "stats")
+  case object results extends Data(SomeData, "results")
 
   // instructions:
   case object instructs extends InstructionsBundle()(
-    inputKeys = sample :~: fastaq :~: ∅,
-    outputKeys = stats :~: results :~: ∅
+    input = sample :^: fastq :^: DNil,
+    output = stats :^: results :^: DNil
   ) {
 
     def install: Results = success("horay!")
 
     def processPipa(pipaId: String, workingDir: File): (Results, OutputFiles) = {
       val files =
-        Files(
-          stats(new File(pipaId)) :~:
-          results(sample.file(workingDir)) :~:
-          ∅
-        )
+        stats.inFile(new File(pipaId)) :~:
+        results.inFile(new File("")) :~:
+        ∅
       (success("foo"), files)
     }
   }
@@ -39,7 +37,7 @@ object instructionsExample {
   val outputs = instructs.processPipa("foo", new File("."))._2
 
   // NOTE: here we can use Map.apply safely, because we know
-  // that filesMap contains all the outputKeys by construction
-  val resultsFile: File = outputs.filesMap(results.label)
+  // that filesMap contains all the output by construction
+  // val resultsFile: File = outputs.filesMap(results.label)
 
 }
