@@ -50,7 +50,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       pipas.par.foreach { pipa =>
         inputQueue.sendMessage(upickle.default.write[SimplePipa](simplify(pipa)))
       }
-      aws.s3.putWholeObject(config.pipasUploaded, "")
+      aws.s3.uploadString(config.pipasUploaded, "")
       logger.info("initial pipas are ready")
     } catch {
       case t: Throwable => logger.error("error during uploading initial pipas", t)
