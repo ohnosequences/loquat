@@ -15,20 +15,6 @@ case object instructions {
   import upickle.Js
 
 
-  // trait AnyKey extends AnyProperty {
-  //   type Raw = File
-  // }
-  //
-  // class InputKey(val label: String) extends AnyKey {
-  //   def file(workingDir: File): File = new File(workingDir, s"input/${label}")
-  // }
-  //
-  // trait OutputKey extends AnyKey {
-  //   lazy val label: String = this.toString
-  // }
-
-
-
   trait AnyInstructionsBundle extends AnyBundle {
 
     type Input <: AnyDataSet
@@ -37,50 +23,20 @@ case object instructions {
     type Output <: AnyDataSet
     val  output: Output
 
-    case object remoteInput extends S3Locations(input); type remoteInput = remoteInput.type
-    case object remoteOutput extends S3Locations(output); type remoteOutput = remoteOutput.type
+    type OutputFiles = Output#LocationsAt[FileDataLocation]
 
-    // This is for constructing the result of the pipa processor
-    case object outputFiles extends FileLocations(output)
-    type outputFiles = outputFiles.type
+    // should be provided implicitly:
+    val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
 
-    // trait outputFiles extends AnyRecord {
-    //
-    //   type Properties = Output
-    //   val  properties = output
-    //
-    //   val vals: Raw
-    //
-    //   // should be provided implicitly:
-    //   val keysToList: Output ToListOf AnyKey
-    //   val valsToList: Raw ToListOf AnyDenotation { type Value = File }
-    //
-    //   /* This will be used later, when uploading results,
-    //      to retrieve output files locations by the keys */
-    //   lazy final val filesMap: Map[String, File] = {
-    //     keysToList(output)
-    //       .zip(valsToList(vals))
-    //       .map { case (k, f) => (k.label -> f.value) }
-    //       .toMap
-    //   }
-    // }
-    //
-    // /* Easy to use constructor */
-    // case class Files[Vals <: AnyTypeSet](val vals: Vals)
-    //  (implicit
-    //     val valuesOfProperties: Vals areValuesOf Output,
-    //     val keysToList: Output ToListOf AnyKey,
-    //     val valsToList: Vals ToListOf AnyDenotation { type Value = File }
-    //  ) extends outputFiles {
-    //
-    //    val label = this.toString
-    //    type Raw = Vals
-    //  }
+    def filesMap(filesSet: OutputFiles): Map[String, File] =
+      outputFilesToMap(filesSet).map { case (data, loc) =>
+        data.label -> loc.location
+      }
 
     /* this is where user describes instructions how to process each pipa:
        - it can assume that the input files are in place (`inputKey.file`)
        - it must produce output files declared in the pipa */
-    def processPipa(pipaId: String, workingDir: File): (Results, ValueOf[outputFiles])
+    def processPipa(pipaId: String, workingDir: File): (Results, OutputFiles)
   }
 
   abstract class InstructionsBundle[
@@ -89,6 +45,8 @@ case object instructions {
   ](deps: AnyBundle*)(
     val input: I,
     val output: O
+  )(implicit
+    val outputFilesToMap: ToMap[O#LocationsAt[FileDataLocation], AnyData, FileDataLocation]
   ) extends Bundle(deps: _*) with AnyInstructionsBundle {
 
     type Input = I

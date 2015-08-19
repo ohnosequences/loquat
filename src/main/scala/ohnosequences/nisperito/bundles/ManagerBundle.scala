@@ -48,7 +48,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
       // NOTE: we can send messages in parallel
       pipas.par.foreach { pipa =>
-        inputQueue.sendMessage(upickle.default.write[SimplePipa](pipa))
+        inputQueue.sendMessage(upickle.default.write[SimplePipa](simplify(pipa)))
       }
       aws.s3.putWholeObject(config.pipasUploaded, "")
       logger.info("initial pipas are ready")

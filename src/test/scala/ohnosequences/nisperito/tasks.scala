@@ -8,16 +8,16 @@ object pipasExample {
   import instructionsExample._
 
 
-  val pipa = Pipa(
-    id = "pipa3498734",
-    instructions = instructs,
-    inputRefs =
-      S3Ref(sample, ObjectAddress("", "")) :~:
-      S3Ref(fastaq, ObjectAddress("", "")) :~:
-      ∅,
-    outputRefs =
-      S3Ref(stats, ObjectAddress("", "")) :~:
-      S3Ref(results, ObjectAddress("", "")) :~:
-      ∅
-  )
+  // val pipa = Pipa(
+  //   id = "pipa3498734",
+  //   instructions = instructs,
+  //   inputRefs =
+  //     S3Ref(sample, ObjectAddress("", "")) :~:
+  //     S3Ref(fastaq, ObjectAddress("", "")) :~:
+  //     ∅,
+  //   outputRefs =
+  //     S3Ref(stats, ObjectAddress("", "")) :~:
+  //     S3Ref(results, ObjectAddress("", "")) :~:
+  //     ∅
+  // )
 }
