@@ -1,6 +1,6 @@
 Nice.scalaProject
 
-name         := "nisperito"
+name         := "loquat"
 description  := "🍋"
 organization := "ohnosequences"
 bucketSuffix := "era7.com"

@@ -1,6 +1,6 @@
-package ohnosequences.nisperito.bundles
+package ohnosequences.loquat.bundles
 
-import ohnosequences.nisperito._, pipas._
+import ohnosequences.loquat._, dataMappings._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -14,7 +14,7 @@ import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 case class SNSMessage(Message: String)
 
-case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundle() with LazyLogging {
+case class TerminationDaemonBundle(val config: AnyLoquatConfig) extends Bundle() with LazyLogging {
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
@@ -34,11 +34,11 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
         logger.info("TerminationDeaemon success results: " + successResults.size)
         logger.info("TerminationDeaemon failed results: " + failedResults.size)
 
-        receivePipasResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
+        receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
           successResults.put(result.id, result.message)
         }
 
-        receivePipasResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
+        receiveDataMappingsResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
           failedResults.put(result.id, result.message)
         }
 
@@ -46,11 +46,11 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
           terminationConfig = config.terminationConfig,
           successResultsCount = successResults.size,
           failedResultsCount = failedResults.size,
-          initialPipasCount = config.pipas.length
+          initialDataMappingsCount = config.dataMappings.length
         )
 
         reason match {
-          case Some(r) => NisperitoOps.undeploy(config)
+          case Some(r) => LoquatOps.undeploy(config)
           case None => ()
         }
 
@@ -60,14 +60,14 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
     }
   }
 
-  def receivePipasResults(queueName: String): List[(String, PipaResultDescription)] = {
+  def receiveDataMappingsResults(queueName: String): List[(String, DataMappingResultDescription)] = {
     val rawMessages: List[(String, String)] = getQueueMessagesWithHandles(queueName)
 
     rawMessages.map {
       case (handle, rawMessageBody) =>  {
         val snsMessage: SNSMessage = upickle.default.read[SNSMessage](rawMessageBody)
-        val resultDescription: PipaResultDescription =
-          upickle.default.read[PipaResultDescription](snsMessage.Message.replace("\\\"", "\""))
+        val resultDescription: DataMappingResultDescription =
+          upickle.default.read[DataMappingResultDescription](snsMessage.Message.replace("\\\"", "\""))
         logger.info(resultDescription.toString)
         (handle, resultDescription)
       }
@@ -100,16 +100,16 @@ case class TerminationDaemonBundle(val config: AnyNisperitoConfig) extends Bundl
     terminationConfig: TerminationConfig,
     successResultsCount: Int,
     failedResultsCount: Int,
-    initialPipasCount: Int
+    initialDataMappingsCount: Int
   ): Option[String] = {
 
     val startTime = aws.as.getCreatedTime(config.managerAutoScalingGroup.name).map(_.getTime)
 
     if (
-      terminationConfig.terminateAfterInitialPipas &&
-      (successResultsCount >= initialPipasCount)
+      terminationConfig.terminateAfterInitialDataMappings &&
+      (successResultsCount >= initialDataMappingsCount)
     ) {
-      Some("terminated due to terminateAfterInitialPipas: initialPipas count: " + initialPipasCount + " current: " + successResultsCount)
+      Some("terminated due to terminateAfterInitialDataMappings: initialDataMappings count: " + initialDataMappingsCount + " current: " + successResultsCount)
     } else if (
       terminationConfig.errorsThreshold.map{ failedResultsCount >= _ }.getOrElse(false)
     ) {

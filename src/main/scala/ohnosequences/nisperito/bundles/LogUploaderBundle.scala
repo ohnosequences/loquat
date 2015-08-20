@@ -1,6 +1,6 @@
-package ohnosequences.nisperito.bundles
+package ohnosequences.loquat.bundles
 
-import ohnosequences.nisperito.AnyNisperitoConfig
+import ohnosequences.loquat.AnyLoquatConfig
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -14,7 +14,7 @@ import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 
-case class LogUploaderBundle(val config: AnyNisperitoConfig) extends Bundle() with LazyLogging {
+case class LogUploaderBundle(val config: AnyLoquatConfig) extends Bundle() with LazyLogging {
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
@@ -32,7 +32,7 @@ case class LogUploaderBundle(val config: AnyNisperitoConfig) extends Bundle() wi
                 if(aws.s3.getBucket(bucket).isEmpty) {
                     logger.warn("bucket " + bucket + " doesn't exist")
                   } else {
-                    aws.s3.uploadFile(ObjectAddress(bucket, config.nisperitoId) / id, logFile)
+                    aws.s3.uploadFile(ObjectAddress(bucket, config.loquatId) / id, logFile)
                   }
 
                 Thread.sleep(1000 * 30)

@@ -1,7 +1,7 @@
-package ohnosequences.nisperito
+package ohnosequences.loquat
 
-import ohnosequences.nisperito.bundles._, instructions._
-import ohnosequences.nisperito.pipas._
+import ohnosequences.loquat.bundles._, instructions._
+import ohnosequences.loquat.dataMappings._
 
 import ohnosequences.statika.bundles._
 
@@ -13,9 +13,9 @@ import com.amazonaws.services.autoscaling.model._
 import com.typesafe.scalalogging.LazyLogging
 
 
-trait AnyNisperito { nisperito =>
+trait AnyLoquat { loquat =>
 
-  type Config <: AnyNisperitoConfig
+  type Config <: AnyLoquatConfig
   val  config: Config
 
   type Instructions <: AnyInstructionsBundle
@@ -27,21 +27,21 @@ trait AnyNisperito { nisperito =>
   case object worker extends WorkerBundle(instructions, config)
 
   case object manager extends ManagerBundle(worker) {
-    override lazy val fullName: String = s"${nisperito.fullName}.${this.toString}"
+    override lazy val fullName: String = s"${loquat.fullName}.${this.toString}"
   }
 
   case object managerCompat extends Compatible(config.ami, manager, config.metadata) {
-    override lazy val fullName: String = s"${nisperito.fullName}.${this.toString}"
+    override lazy val fullName: String = s"${loquat.fullName}.${this.toString}"
   }
 
-  final def deploy(): Unit = NisperitoOps.deploy(config, managerCompat.userScript)
-  final def undeploy(): Unit = NisperitoOps.undeploy(config)
+  final def deploy(): Unit = LoquatOps.deploy(config, managerCompat.userScript)
+  final def undeploy(): Unit = LoquatOps.undeploy(config)
 }
 
-abstract class Nisperito[
-  C <: AnyNisperitoConfig,
+abstract class Loquat[
+  C <: AnyLoquatConfig,
   I <: AnyInstructionsBundle
-](val config: C, val instructions: I) extends AnyNisperito {
+](val config: C, val instructions: I) extends AnyLoquat {
 
   type Config = C
   type Instructions = I
@@ -49,13 +49,13 @@ abstract class Nisperito[
 
 
 
-object NisperitoOps extends LazyLogging {
+object LoquatOps extends LazyLogging {
 
   def deploy(
-    config: AnyNisperitoConfig,
+    config: AnyLoquatConfig,
     managerUserScript: String
   ): Unit = {
-    logger.info(s"deploying nisperito: ${config.nisperitoName} v${config.nisperitoVersion}")
+    logger.info(s"deploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
     val aws = AWSClients.create(config.localCredentials)
     val names = config.resourceNames
@@ -104,20 +104,20 @@ object NisperitoOps extends LazyLogging {
       logger.debug("creating tags for the manager autoscaling group")
       utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
 
-      logger.info("nisperito is running, now go to the amazon console and keep an eye on the progress")
+      logger.info("loquat is running, now go to the amazon console and keep an eye on the progress")
     }
   }
 
 
-  def undeploy(config: AnyNisperitoConfig): Unit = {
-    logger.info(s"undeploying nisperito: ${config.nisperitoName} v${config.nisperitoVersion}")
+  def undeploy(config: AnyLoquatConfig): Unit = {
+    logger.info(s"undeploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
     val aws = AWSClients.create(config.localCredentials)
     val names = config.resourceNames
 
     logger.info("sending notification on your email")
     try {
-      val subject = "Nisperito " + config.nisperitoId + " terminated"
+      val subject = "Loquat " + config.loquatId + " terminated"
       val notificationTopic = aws.sns.createTopic(config.notificationTopic)
       notificationTopic.publish("manual termination", subject)
     } catch {
@@ -180,26 +180,26 @@ object NisperitoOps extends LazyLogging {
       case t: Throwable => logger.error("error during deleting manager group", t)
     }
 
-    logger.info("nisperito is undeployed")
+    logger.info("loquat is undeployed")
   }
 
 
-  // These ops are useful for a running nisperito. Use them from REPL (sbt console)
+  // These ops are useful for a running loquat. Use them from REPL (sbt console)
 
-  // def addPipas(nisperito: AnyNisperito, pipas: List[AnyPipa]): Unit = {
+  // def addDataMappings(loquat: AnyLoquat, dataMappings: List[AnyDataMapping]): Unit = {
   //
-  //   val sqs = SQS.create(nisperito.config.localCredentials)
-  //   val inputQueue = sqs.getQueueByName(nisperito.config.resourceNames.inputQueue).get
-  //   pipas.foreach {
-  //     t => inputQueue.sendMessage(upickle.default.write[SimplePipa](t))
+  //   val sqs = SQS.create(loquat.config.localCredentials)
+  //   val inputQueue = sqs.getQueueByName(loquat.config.resourceNames.inputQueue).get
+  //   dataMappings.foreach {
+  //     t => inputQueue.sendMessage(upickle.default.write[SimpleDataMapping](t))
   //   }
   // }
   //
-  // def updateWorkersGroupSize(nisperito: AnyNisperito, groupSize: WorkersGroupSize): Unit = {
+  // def updateWorkersGroupSize(loquat: AnyLoquat, groupSize: WorkersGroupSize): Unit = {
   //
-  //   val asClient = AutoScaling.create(nisperito.config.localCredentials, nisperito.resources.aws.ec2).as
+  //   val asClient = AutoScaling.create(loquat.config.localCredentials, loquat.resources.aws.ec2).as
   //   asClient.updateAutoScalingGroup(new UpdateAutoScalingGroupRequest()
-  //     .withAutoScalingGroupName(nisperito.config.workersAutoScalingGroup.name)
+  //     .withAutoScalingGroupName(loquat.config.workersAutoScalingGroup.name)
   //     .withMinSize(groupSize.min)
   //     .withDesiredCapacity(groupSize.desired)
   //     .withMaxSize(groupSize.max)

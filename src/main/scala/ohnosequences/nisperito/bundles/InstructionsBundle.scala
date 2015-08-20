@@ -1,8 +1,8 @@
-package ohnosequences.nisperito.bundles
+package ohnosequences.loquat.bundles
 
 case object instructions {
 
-  import ohnosequences.nisperito._, dataSets._
+  import ohnosequences.loquat._, dataSets._
 
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import ops.typeSets._
@@ -33,10 +33,10 @@ case object instructions {
         data.label -> loc.location
       }
 
-    /* this is where user describes instructions how to process each pipa:
+    /* this is where user describes instructions how to process each dataMapping:
        - it can assume that the input files are in place (`inputKey.file`)
-       - it must produce output files declared in the pipa */
-    def processPipa(pipaId: String, workingDir: File): (Results, OutputFiles)
+       - it must produce output files declared in the dataMapping */
+    def processDataMapping(dataMappingId: String, workingDir: File): (Results, OutputFiles)
   }
 
   abstract class InstructionsBundle[

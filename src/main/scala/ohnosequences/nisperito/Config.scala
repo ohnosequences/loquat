@@ -1,6 +1,6 @@
-package ohnosequences.nisperito
+package ohnosequences.loquat
 
-import ohnosequences.nisperito.pipas._
+import ohnosequences.loquat.dataMappings._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
@@ -32,46 +32,46 @@ case class WorkersConfig(
 
 /* Configuration of termination conditions */
 case class TerminationConfig(
-  // if true nisperito will terminate after solving all initial pipas
-  terminateAfterInitialPipas: Boolean,
-  // maximum time for processing pipa
-  pipaProcessTimeout: Int = 60 * 60 * 10, // 10 hours
-  // if true nisperito will terminate after errorQueue will contain more unique messages then threshold
+  // if true loquat will terminate after solving all initial dataMappings
+  terminateAfterInitialDataMappings: Boolean,
+  // maximum time for processing dataMapping
+  dataMappingProcessTimeout: Int = 60 * 60 * 10, // 10 hours
+  // if true loquat will terminate after errorQueue will contain more unique messages then threshold
   errorsThreshold: Option[Int] = None,
-  // if true nisperito will terminate after this timeout reached. Time units are seconds.
+  // if true loquat will terminate after this timeout reached. Time units are seconds.
   timeout: Option[Int] = None
 )
 
 /* Configuration of resources */
-case class ResourceNames(nisperitoId: String) {
-  // name of queue with pipas
-  val inputQueue: String = "nisperitoInputQueue" + nisperitoId
-  // name of topic for pipas result notifications
-  val outputQueue: String = "nisperitoOutputQueue" + nisperitoId
-  // name of queue with pipas results notifications (will be subscribed to outputTopic)
-  val outputTopic: String = "nisperitoOutputTopic" + nisperitoId
+case class ResourceNames(loquatId: String) {
+  // name of queue with dataMappings
+  val inputQueue: String = "loquatInputQueue" + loquatId
+  // name of topic for dataMappings result notifications
+  val outputQueue: String = "loquatOutputQueue" + loquatId
+  // name of queue with dataMappings results notifications (will be subscribed to outputTopic)
+  val outputTopic: String = "loquatOutputTopic" + loquatId
   // name of topic for errors
-  val errorTopic: String = "nisperitoErrorQueue" + nisperitoId
+  val errorTopic: String = "loquatErrorQueue" + loquatId
   // name of queue with errors (will be subscribed to errorTopic)
-  val errorQueue: String = "nisperitoErrorTopic" + nisperitoId
+  val errorQueue: String = "loquatErrorTopic" + loquatId
   // name of bucket for logs and console static files
   val bucket: String = "era7nisperos"
 }
 
 
-/* Configuration for nisperito */
-abstract class AnyNisperitoConfig extends LazyLogging {
+/* Configuration for loquat */
+abstract class AnyLoquatConfig extends LazyLogging {
 
   // email address for notifications
   val email: String
 
-  // these are credentials that are used to launch nisperito
+  // these are credentials that are used to launch loquat
   val localCredentials: AWSCredentialsProvider
 
-  // Metadata generated for your nisperito project
+  // Metadata generated for your loquat project
   val metadata: AnyArtifactMetadata
 
-  // keypair name for connecting to the nisperito instances
+  // keypair name for connecting to the loquat instances
   val keypairName: String
   val iamRoleName: String
 
@@ -88,15 +88,15 @@ abstract class AnyNisperitoConfig extends LazyLogging {
   // Termination conditions
   val terminationConfig: TerminationConfig
 
-  // List of tiny or big pipas
-  val pipas: List[AnyPipa]
+  // List of tiny or big dataMappings
+  val dataMappings: List[AnyDataMapping]
 
   // TODO: AWS region should be also configurable
 
   /* Here follow all the values that are dependent on those defined on top */
 
   // FIXME: put this constant somewhere else
-  final val workingDir: File = new File("/media/ephemeral0/applicator/nisperito")
+  final val workingDir: File = new File("/media/ephemeral0/applicator/loquat")
 
   lazy final val fatArtifactS3Object: ObjectAddress = {
     val s3url = """s3://(.+)/(.+)""".r
@@ -106,18 +106,18 @@ abstract class AnyNisperitoConfig extends LazyLogging {
     }
   }
 
-  // Unique id  of the nisperito instance
-  lazy final val nisperitoName: String = metadata.artifact.replace(".", "").toLowerCase
-  lazy final val nisperitoVersion: String = metadata.version.replace(".", "").toLowerCase
-  lazy final val nisperitoId: String = (nisperitoName + nisperitoVersion)
+  // Unique id  of the loquat instance
+  lazy final val loquatName: String = metadata.artifact.replace(".", "").toLowerCase
+  lazy final val loquatVersion: String = metadata.version.replace(".", "").toLowerCase
+  lazy final val loquatId: String = (loquatName + loquatVersion)
 
   lazy final val managerAutoScalingGroup = AutoScalingGroup(
-    name = "nisperitoManagerGroup" + nisperitoVersion,
+    name = "loquatManagerGroup" + loquatVersion,
     minSize = 1,
     maxSize = 1,
     desiredCapacity = 1,
     launchingConfiguration = LaunchConfiguration(
-      name = "nisperitoManagerLaunchConfiguration" + nisperitoVersion,
+      name = "loquatManagerLaunchConfiguration" + loquatVersion,
       instanceSpecs = InstanceSpecs(
         instanceType = managerConfig.instanceType,
         amiId = ami.id,
@@ -129,12 +129,12 @@ abstract class AnyNisperitoConfig extends LazyLogging {
   )
 
   lazy final val workersAutoScalingGroup = AutoScalingGroup(
-    name = "nisperitoWorkersGroup" + nisperitoVersion,
+    name = "loquatWorkersGroup" + loquatVersion,
     minSize = workersConfig.groupSize.min,
     maxSize = workersConfig.groupSize.max,
     desiredCapacity = workersConfig.groupSize.desired,
     launchingConfiguration = LaunchConfiguration(
-      name = "nisperitoWorkersLaunchConfiguration" + nisperitoVersion,
+      name = "loquatWorkersLaunchConfiguration" + loquatVersion,
       instanceSpecs = InstanceSpecs(
         instanceType = workersConfig.instanceType,
         amiId = ami.id,
@@ -147,13 +147,13 @@ abstract class AnyNisperitoConfig extends LazyLogging {
   )
 
   // resources configuration of names for resources: queues, topics, buckets
-  lazy final val resourceNames: ResourceNames = ResourceNames(nisperitoId)
+  lazy final val resourceNames: ResourceNames = ResourceNames(loquatId)
 
-  // FIXME: this is just an empty object in S3 witnessing that the initial pipas were uploaded:
-  lazy final val pipasUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, nisperitoId) / "pipasUploaded"
+  // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
+  lazy final val dataMappingsUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
 
   lazy final val notificationTopic: String =
-    s"""nisperitoNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
+    s"""loquatNotificationTopic${email.replace("@", "").replace("-", "").replace(".", "")}"""
 
 
   /* This performs some runtime checks of the config */
