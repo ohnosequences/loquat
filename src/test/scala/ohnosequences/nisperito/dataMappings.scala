@@ -4,6 +4,7 @@ object dataMappingsExample {
 
   import ohnosequences.awstools.s3.ObjectAddress
   import ohnosequences.loquat._, dataMappings._
+  import ohnosequences.datasets._, s3Locations._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import instructionsExample._
 
