@@ -2,7 +2,8 @@ package ohnosequences.loquat.bundles
 
 case object instructions {
 
-  import ohnosequences.loquat._, dataSets._
+  import ohnosequences.loquat._
+  import ohnosequences.datasets._, dataSets._, fileLocations._
 
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import ops.typeSets._

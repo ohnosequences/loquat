@@ -14,9 +14,10 @@ libraryDependencies ++= Seq(
   // json:
   "com.lihaoyi" %% "upickle" % "0.3.5",
   // internal structure:
-  "ohnosequences" %% "cosas"       % "0.7.0-set-to-map-SNAPSHOT",
+  "ohnosequences" %% "cosas"       % "0.7.0-SNAPSHOT",
   "ohnosequences" %% "statika"     % "2.0.0-SNAPSHOT",
   "ohnosequences" %% "aws-statika" % "2.0.0-SNAPSHOT",
+  "ohnosequences" %% "datasets"    % "0.1.0-SNAPSHOT",
   // amazon:
   "ohnosequences" %% "aws-scala-tools" % "0.13.2"
 )
