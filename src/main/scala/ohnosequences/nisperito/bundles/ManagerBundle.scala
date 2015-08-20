@@ -1,6 +1,6 @@
-package ohnosequences.nisperito.bundles
+package ohnosequences.loquat.bundles
 
-import ohnosequences.nisperito._, pipas._
+import ohnosequences.loquat._, dataMappings._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -14,7 +14,7 @@ import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 
 // We don't want it to be used outside of this project
-protected[nisperito]
+protected[loquat]
 trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   val fullName: String
@@ -38,22 +38,22 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-  def uploadInitialPipas(pipas: List[AnyPipa]) {
+  def uploadInitialDataMappings(dataMappings: List[AnyDataMapping]) {
     try {
-      logger.info("adding initial pipas to SQS")
+      logger.info("adding initial dataMappings to SQS")
       // FIXME: match on Option instead of get
       val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
 
       // logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")
 
       // NOTE: we can send messages in parallel
-      pipas.par.foreach { pipa =>
-        inputQueue.sendMessage(upickle.default.write[SimplePipa](simplify(pipa)))
+      dataMappings.par.foreach { dataMapping =>
+        inputQueue.sendMessage(upickle.default.write[SimpleDataMapping](simplify(dataMapping)))
       }
-      aws.s3.uploadString(config.pipasUploaded, "")
-      logger.info("initial pipas are ready")
+      aws.s3.uploadString(config.dataMappingsUploaded, "")
+      logger.info("initial dataMappings are ready")
     } catch {
-      case t: Throwable => logger.error("error during uploading initial pipas", t)
+      case t: Throwable => logger.error("error during uploading initial dataMappings", t)
     }
   }
 
@@ -63,15 +63,15 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     logger.info("manager is started")
 
     try {
-      logger.info("checking if the initial pipas are uploaded")
-      if (aws.s3.listObjects(config.pipasUploaded.bucket, config.pipasUploaded.key).isEmpty) {
-        logger.warn("uploading initial pipas")
-        uploadInitialPipas(config.pipas)
+      logger.info("checking if the initial dataMappings are uploaded")
+      if (aws.s3.listObjects(config.dataMappingsUploaded.bucket, config.dataMappingsUploaded.key).isEmpty) {
+        logger.warn("uploading initial dataMappings")
+        uploadInitialDataMappings(config.dataMappings)
       } else {
-        logger.warn("skipping uploading pipas")
+        logger.warn("skipping uploading dataMappings")
       }
     } catch {
-      case t: Throwable => logger.error("error during uploading initial pipas", t)
+      case t: Throwable => logger.error("error during uploading initial dataMappings", t)
     }
 
     try {
@@ -115,7 +115,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
   }
 }
 
-protected[nisperito]
+protected[loquat]
 abstract class ManagerBundle[W <: AnyWorkerBundle](val worker: W) extends AnyManagerBundle {
 
   type Worker = W

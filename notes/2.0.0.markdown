@@ -9,12 +9,12 @@
     - changed completely bundles structure (less bundles, less layers)
     - removed CLI
     - removed web-console
-    - removed control queue; added its commands to the nisperito ops
-    - Moved resources creation to the nisperito deploy; removed resources bundle
+    - removed control queue; added its commands to the loquat ops
+    - Moved resources creation to the loquat deploy; removed resources bundle
 
 * Other changes:
     - simplified config, moved there _all_ configurable things
     - moved instructions executor to the worker bundle
     - _some_ changes to the way visibility timeout is extended (has to be reviewed)
     - _common_ typeset inputs/outputs for instructions and tasks
-    - renamed tasks to pipas to avoid names conflict (:trollface::sunflower:)
+    - renamed tasks to dataMappings

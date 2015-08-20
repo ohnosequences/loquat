@@ -1,4 +1,4 @@
-package ohnosequences.nisperito
+package ohnosequences.loquat
 
 case object dataSets {
 

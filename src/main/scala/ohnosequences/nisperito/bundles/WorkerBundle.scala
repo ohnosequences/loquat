@@ -1,6 +1,6 @@
-package ohnosequences.nisperito.bundles
+package ohnosequences.loquat.bundles
 
-import ohnosequences.nisperito._, pipas._, instructions._
+import ohnosequences.loquat._, dataMappings._, instructions._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -23,7 +23,7 @@ trait AnyWorkerBundle extends AnyBundle {
   type Instructions <: AnyInstructionsBundle
   val  instructions: Instructions
 
-  type Config <: AnyNisperitoConfig
+  type Config <: AnyLoquatConfig
   val  config: Config
 
   val bundleDependencies: List[AnyBundle] = List(instructions, LogUploaderBundle(config))
@@ -36,7 +36,7 @@ trait AnyWorkerBundle extends AnyBundle {
 
 abstract class WorkerBundle[
   I <: AnyInstructionsBundle,
-  C <: AnyNisperitoConfig
+  C <: AnyLoquatConfig
 ](val instructions: I,
   val config: C
 ) extends AnyWorkerBundle {
@@ -48,7 +48,7 @@ abstract class WorkerBundle[
 
 // TODO: rewrite all this and make it Worker's install
 case class InstructionsExecutor(
-  val config: AnyNisperitoConfig,
+  val config: AnyLoquatConfig,
   val instructions: AnyInstructionsBundle
 ) extends LazyLogging {
 
@@ -60,12 +60,12 @@ case class InstructionsExecutor(
 
   @volatile var stopped = false
 
-  def waitForPipa(queue: Queue): Message = {
+  def waitForDataMapping(queue: Queue): Message = {
 
     var message: Option[Message] = queue.receiveMessage
 
     while(message.isEmpty) {
-      logger.info("InstructionsExecutor wait for pipa")
+      logger.info("InstructionsExecutor wait for dataMapping")
       instance.foreach(_.createTag(InstanceTags.IDLE))
       Thread.sleep(MESSAGE_TIMEOUT)
       message = queue.receiveMessage
@@ -85,14 +85,14 @@ case class InstructionsExecutor(
 
     var stopWaiting = false
 
-    var pipaResult: Results = failure("internal error during waiting for pipa result")
+    var dataMappingResult: Results = failure("internal error during waiting for dataMapping result")
 
 
     var it = 0
     while(!stopWaiting) {
-      if(timeSpent() > math.min(config.terminationConfig.pipaProcessTimeout, 12 * 60 * 60)) {
+      if(timeSpent() > math.min(config.terminationConfig.dataMappingProcessTimeout, 12 * 60 * 60)) {
         stopWaiting = true
-        pipaResult = failure("Timeout: " + timeSpent + " > pipaProcessTimeout")
+        dataMappingResult = failure("Timeout: " + timeSpent + " > dataMappingProcessTimeout")
         terminateWorker
       } else {
         futureResult.value match {
@@ -104,15 +104,15 @@ case class InstructionsExecutor(
               case e: Throwable => logger.info("Couldn't change the visibility timeout")
             }
             Thread.sleep(step)
-            logger.info("Solving pipa: " + utils.printInterval(timeSpent()))
+            logger.info("Solving dataMapping: " + utils.printInterval(timeSpent()))
             it += 1
           }
-          case Some(scala.util.Success(r)) => stopWaiting = true; pipaResult = r
-          case Some(scala.util.Failure(t)) => stopWaiting = true; pipaResult = failure("future error: " + t.getMessage)
+          case Some(scala.util.Success(r)) => stopWaiting = true; dataMappingResult = r
+          case Some(scala.util.Failure(t)) => stopWaiting = true; dataMappingResult = failure("future error: " + t.getMessage)
         }
       }
     }
-    (pipaResult, timeSpent())
+    (dataMappingResult, timeSpent())
   }
 
   def terminateWorker(): Unit = {
@@ -122,7 +122,7 @@ case class InstructionsExecutor(
     instance.foreach(_.terminate)
   }
 
-  def processPipa(pipa: SimplePipa, workingDir: File): Results = {
+  def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): Results = {
     try {
       logger.info("cleaning working directory: " + workingDir.getAbsolutePath)
       utils.deleteRecursively(workingDir)
@@ -140,9 +140,9 @@ case class InstructionsExecutor(
       outputDir.mkdir
 
 
-      logger.info("downloading pipa input")
+      logger.info("downloading dataMapping input")
       val loadingManager = aws.s3.createLoadingManager
-      pipa.inputs.foreach { case (name, objectAddress) =>
+      dataMapping.inputs.foreach { case (name, objectAddress) =>
         val inputFile = new File(inputDir, name)
         logger.info("trying to create input object: " + name)
         loadingManager.download(objectAddress, inputFile)
@@ -150,21 +150,21 @@ case class InstructionsExecutor(
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val (result, output) = instructions.processPipa(pipa.id, workingDir)
+      val (result, output) = instructions.processDataMapping(dataMapping.id, workingDir)
 
       // FIXME: do it more careful
       val outputMap: Map[File, ObjectAddress] =
         instructions
         .filesMap(output)
         .map { case (name, file) =>
-          file -> pipa.outputs(name)
+          file -> dataMapping.outputs(name)
         }
 
       if (result.hasFailures) {
         logger.error(s"script finished with non zero code: ${result}")
         failure(s"script finished with non zero code: ${result}")
       } else {
-        logger.info("pipa finished, uploading results")
+        logger.info("dataMapping finished, uploading results")
         for ((file, objectAddress) <- outputMap) {
           if (file.exists) {
             logger.info(s"trying to publish output object: ${objectAddress}")
@@ -175,11 +175,11 @@ case class InstructionsExecutor(
             logger.error(s"file [${file.getAbsolutePath}] doesn't exists!")
           }
         }
-        result -&- success(s"pipa [${pipa.id}] successfully finished")
+        result -&- success(s"dataMapping [${dataMapping.id}] successfully finished")
       }
     } catch {
       case t: Throwable => {
-        logger.error("fatal failure during pipa processing", t)
+        logger.error("fatal failure during dataMapping processing", t)
         failure(t.getMessage)
       }
     }
@@ -194,41 +194,41 @@ case class InstructionsExecutor(
     val errorTopic = aws.sns.createTopic(config.resourceNames.errorTopic)
 
     while(!stopped) {
-      var pipaId: String = ""
+      var dataMappingId: String = ""
       var lastTimeSpent = 0
       try {
-        val message = waitForPipa(inputQueue)
+        val message = waitForDataMapping(inputQueue)
 
         instance.foreach(_.createTag(InstanceTags.PROCESSING))
         logger.info("InstructionsExecutor: received message " + message)
-        val pipa = upickle.default.read[SimplePipa](message.body)
-        pipaId = pipa.id
+        val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
+        dataMappingId = dataMapping.id
 
         logger.info("InstructionsExecutor processing message")
 
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
-          processPipa(pipa, config.workingDir)
+          processDataMapping(dataMapping, config.workingDir)
         }
 
-        val (pipaResult, timeSpent) = waitForResult(futureResult, message)
+        val (dataMappingResult, timeSpent) = waitForResult(futureResult, message)
         lastTimeSpent = timeSpent
 
-        logger.info("pipa result: " + pipaResult)
+        logger.info("dataMapping result: " + dataMappingResult)
 
-        val pipaResultDescription = PipaResultDescription(
-          id = pipaId,
-          message = pipaResult.toString,
+        val dataMappingResultDescription = DataMappingResultDescription(
+          id = dataMappingId,
+          message = dataMappingResult.toString,
           instanceId = instance.map(_.getInstanceId()),
           time = timeSpent
         )
 
         logger.info("publishing result to topic")
 
-        if (pipaResult.hasFailures) {
-          errorTopic.publish(upickle.default.write(pipaResultDescription))
+        if (dataMappingResult.hasFailures) {
+          errorTopic.publish(upickle.default.write(dataMappingResultDescription))
         } else {
-          outputTopic.publish(upickle.default.write(pipaResultDescription))
+          outputTopic.publish(upickle.default.write(dataMappingResultDescription))
           logger.info("InstructionsExecutor deleting message with from input queue")
           inputQueue.deleteMessage(message)
         }
@@ -236,13 +236,13 @@ case class InstructionsExecutor(
         case e: Throwable =>  {
           logger.error("fatal error! instance will terminated")
           e.printStackTrace()
-          val pipaResultDescription = PipaResultDescription(
-            id = pipaId,
+          val dataMappingResultDescription = DataMappingResultDescription(
+            id = dataMappingId,
             message = e.getMessage,
             instanceId = instance.map(_.getInstanceId()),
             time = lastTimeSpent
           )
-          errorTopic.publish(upickle.default.write(pipaResultDescription))
+          errorTopic.publish(upickle.default.write(dataMappingResultDescription))
           terminateWorker
         }
       }
