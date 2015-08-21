@@ -1,6 +1,6 @@
-package ohnosequences.loquat.bundles
+package ohnosequences.loquat
 
-import ohnosequences.loquat._, dataMappings._, instructions._
+import dataMappings._, instructions._, daemons._, configs._, utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -71,7 +71,7 @@ case class InstructionsExecutor(
 
     while(message.isEmpty) {
       logger.info("InstructionsExecutor wait for dataMapping")
-      instance.foreach(_.createTag(InstanceTags.IDLE))
+      instance.foreach(_.createTag(utils.InstanceTags.IDLE))
       Thread.sleep(MESSAGE_TIMEOUT)
       message = queue.receiveMessage
     }
@@ -95,9 +95,9 @@ case class InstructionsExecutor(
 
     var it = 0
     while(!stopWaiting) {
-      if(timeSpent() > math.min(config.terminationConfig.dataMappingProcessTimeout, 12 * 60 * 60)) {
+      if(timeSpent() > config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12)).inSeconds) {
         stopWaiting = true
-        dataMappingResult = failure("Timeout: " + timeSpent + " > dataMappingProcessTimeout")
+        dataMappingResult = failure("Timeout: " + timeSpent + " > taskProcessingTimeout")
         terminateWorker
       } else {
         futureResult.value match {
@@ -106,7 +106,7 @@ case class InstructionsExecutor(
               // every 5min we extend it for 6min
               if (it % (5*60) == 0) message.changeVisibilityTimeout(6*60)
             } catch {
-              case e: Throwable => logger.info("Couldn't change the visibility timeout")
+              case e: Throwable => logger.info("Couldn't change the visibility globalTimeout")
             }
             Thread.sleep(step)
             logger.info("Solving dataMapping: " + utils.printInterval(timeSpent()))
@@ -122,7 +122,7 @@ case class InstructionsExecutor(
 
   def terminateWorker(): Unit = {
     stopped = true
-    instance.foreach(_.createTag(InstanceTags.FINISHING))
+    instance.foreach(_.createTag(utils.InstanceTags.FINISHING))
     logger.info("terminating")
     instance.foreach(_.terminate)
   }
@@ -214,7 +214,7 @@ case class InstructionsExecutor(
       try {
         val message = waitForDataMapping(inputQueue)
 
-        instance.foreach(_.createTag(InstanceTags.PROCESSING))
+        instance.foreach(_.createTag(utils.InstanceTags.PROCESSING))
         logger.info("InstructionsExecutor: received message " + message)
         val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
         dataMappingId = dataMapping.id

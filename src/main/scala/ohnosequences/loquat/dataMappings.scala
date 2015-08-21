@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 case object dataMappings {
 
-  import bundles._, instructions._
+  import instructions._
 
   import ohnosequences.datasets._, dataSets._, s3Locations._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
@@ -62,13 +62,14 @@ case object dataMappings {
     )
 
   /* and we can transform any dataMapping to this simple form (but not another way round) */
-  def simplify(dataMapping: AnyDataMapping): SimpleDataMapping =
-    SimpleDataMapping(
-      id = dataMapping.id,
-      inputs = dataMapping.inputsToMap(dataMapping.remoteInput)
-        .map{ case (data, s3loc) => (data.label -> s3loc.location) },
-      outputs = dataMapping.outputsToMap(dataMapping.remoteOutput)
-        .map{ case (data, s3loc) => (data.label -> s3loc.location) }
-    )
+  protected[loquat]
+    def simplify(dataMapping: AnyDataMapping): SimpleDataMapping =
+      SimpleDataMapping(
+        id = dataMapping.id,
+        inputs = dataMapping.inputsToMap(dataMapping.remoteInput)
+          .map{ case (data, s3loc) => (data.label -> s3loc.location) },
+        outputs = dataMapping.outputsToMap(dataMapping.remoteOutput)
+          .map{ case (data, s3loc) => (data.label -> s3loc.location) }
+      )
 
 }

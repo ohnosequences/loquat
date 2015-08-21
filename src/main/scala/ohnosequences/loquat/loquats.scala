@@ -1,7 +1,6 @@
 package ohnosequences.loquat
 
-import ohnosequences.loquat.bundles._, instructions._
-import ohnosequences.loquat.dataMappings._
+import dataMappings._, instructions._, configs._
 
 import ohnosequences.statika.bundles._
 
@@ -11,6 +10,8 @@ import ohnosequences.awstools.autoscaling._
 
 import com.amazonaws.services.autoscaling.model._
 import com.typesafe.scalalogging.LazyLogging
+
+import scala.util._
 
 
 trait AnyLoquat { loquat =>
@@ -49,7 +50,20 @@ abstract class Loquat[
 
 
 
-object LoquatOps extends LazyLogging {
+protected[loquat] case object LoquatOps extends LazyLogging {
+
+  trait AnyStep
+  case class Step[T](msg: String)(action: => Try[T]) extends AnyStep {
+
+    def execute: Try[T] = {
+      logger.debug(msg)
+      action.recoverWith {
+        case e: Throwable =>
+          logger.error(s"Error during ${msg}: \n${e.getMessage}")
+          Failure(e)
+      }
+    }
+  }
 
   def deploy(
     config: AnyLoquatConfig,
@@ -60,43 +74,46 @@ object LoquatOps extends LazyLogging {
     val aws = AWSClients.create(config.localCredentials)
     val names = config.resourceNames
 
-    if(config.check == false)
-      logger.error("something is wrong with the config")
+    if(config.validate.nonEmpty)
+      logger.error("Config validation failed. Fix config and try to deploy again.")
     else {
-      logger.info("the config seems to be fine")
 
-      // FIXME: every action here should be checked before proceeding to the next one
-      logger.info("creating resources...")
-
-      logger.debug(s"creating input queue: ${names.inputQueue}")
-      val inputQueue = aws.sqs.createQueue(names.inputQueue)
-
-      logger.debug(s"creating output queue: ${names.outputQueue}")
-      val outputQueue = aws.sqs.createQueue(names.outputQueue)
-
-      logger.debug(s"creating error queue: ${names.errorQueue}")
-      val errorQueue = aws.sqs.createQueue(names.errorQueue)
-
-      logger.debug(s"creating temporary bucket: ${names.bucket}")
-      aws.s3.createBucket(names.bucket)
-
-      logger.debug(s"creating notification topic: ${config.notificationTopic}")
-      val topic = aws.sns.createTopic(config.notificationTopic)
-
-      if (!topic.isEmailSubscribed(config.email)) {
-        logger.info(s"subscribing [${config.email}] to the notification topic")
-        topic.subscribeEmail(config.email)
-        logger.info("check your email and confirm subscription")
+      Seq(
+        Step( s"Creating input queue: ${names.inputQueue}" )(
+          Try(aws.sqs.createQueue(names.inputQueue))
+        ),
+        Step( s"Creating output queue: ${names.outputQueue}" )(
+          Try(aws.sqs.createQueue(names.outputQueue))
+        ),
+        Step( s"Creating error queue: ${names.errorQueue}" )(
+          Try(aws.sqs.createQueue(names.errorQueue))
+        ),
+        Step( s"Creating temporary bucket: ${names.bucket}" )(
+          Try(aws.s3.createBucket(names.bucket))
+        ),
+        Step( s"Creating notification topic: ${config.notificationTopic}" )(
+          Try(aws.sns.createTopic(config.notificationTopic)).map { topic =>
+            if (!topic.isEmailSubscribed(config.email.toString)) {
+              logger.info(s"subscribing [${config.email}] to the notification topic")
+              topic.subscribeEmail(config.email.toString)
+              logger.info("check your email and confirm subscription")
+            }
+          }
+        ),
+        Step( s"Creating manager group: ${config.managerAutoScalingGroup.name}" )(
+          Try(aws.as.fixAutoScalingGroupUserData(config.managerAutoScalingGroup, managerUserScript))
+            .map { managerGroup =>
+              aws.as.createAutoScalingGroup(managerGroup)
+              utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
+            }
+        ),
+        Step("loquat is running, now go to the amazon console and keep an eye on the progress")(Success(true))
+      ).foldLeft[Try[_]](
+        { logger.info("creating resources..."); Success(true) }
+      ) { (result: Try[_], next: Step[_]) =>
+        result.flatMap(_ => next.execute)
       }
 
-      logger.debug(s"creating manager group: ${config.managerAutoScalingGroup.name}")
-      val managerGroup = aws.as.fixAutoScalingGroupUserData(config.managerAutoScalingGroup, managerUserScript)
-      aws.as.createAutoScalingGroup(managerGroup)
-
-      logger.debug("creating tags for the manager autoscaling group")
-      utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
-
-      logger.info("loquat is running, now go to the amazon console and keep an eye on the progress")
     }
   }
 
@@ -163,6 +180,7 @@ object LoquatOps extends LazyLogging {
 
 
   // These ops are useful for a running loquat. Use them from REPL (sbt console)
+  // TODO: restore this code
 
   // def addDataMappings(loquat: AnyLoquat, dataMappings: List[AnyDataMapping]): Unit = {
   //

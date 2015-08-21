@@ -2,8 +2,8 @@ package ohnosequences.loquat.test
 
 object instructionsExample {
 
+  import ohnosequences.loquat._, dataMappings._, instructions._
   import ohnosequences.statika.instructions._
-  import ohnosequences.loquat._, dataMappings._, bundles._, instructions._
   import ohnosequences.datasets._, dataSets._, fileLocations._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import java.io.File
