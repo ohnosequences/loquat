@@ -9,9 +9,7 @@ object dataMappingsExample {
   import instructionsExample._
 
 
-  val dataMapping = DataMapping(
-    id = "dataMapping3498734",
-    instructions = instructs,
+  val dataMapping = DataMapping(id = "dataMapping3498734", instructions = instructs)(
     remoteInput =
       sample.atS3(ObjectAddress("", "")) :~:
       fastq.atS3(ObjectAddress("", "")) :~:

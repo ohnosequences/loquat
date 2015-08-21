@@ -31,10 +31,10 @@ case object dataMappings {
 
     /* These are records with references to the remote locations of
        where to get inputs and where to put outputs of the dataMapping */
-    type RemoteInput <: RemotesFor[Instructions#Input]
+    type RemoteInput = RemotesFor[Instructions#Input]
     val  remoteInput: RemoteInput
 
-    type RemoteOutput <: RemotesFor[Instructions#Output]
+    type RemoteOutput = RemotesFor[Instructions#Output]
     val  remoteOutput: RemoteOutput
 
     /* These two vals a needed for serialization */
@@ -44,21 +44,19 @@ case object dataMappings {
   }
 
   case class DataMapping[
-    I <: AnyInstructionsBundle,
-    RI <: RemotesFor[I#Input],
-    RO <: RemotesFor[I#Output]
+    I <: AnyInstructionsBundle
   ](val id: String,
-    val instructions: I,
-    val remoteInput: RI,
-    val remoteOutput: RO
+    val instructions: I)
+   (val remoteInput: RemotesFor[I#Input],
+    val remoteOutput: RemotesFor[I#Output]
   )(implicit
-    val inputsToMap:  ToMap[RI, AnyData, S3DataLocation],
-    val outputsToMap: ToMap[RO, AnyData, S3DataLocation]
+    val inputsToMap:  ToMap[RemotesFor[I#Input], AnyData, S3DataLocation],
+    val outputsToMap: ToMap[RemotesFor[I#Output], AnyData, S3DataLocation]
   ) extends AnyDataMapping {
 
     type Instructions = I
-    type RemoteInput = RI
-    type RemoteOutput = RO
+    // type RemoteInput = RemotesFor[I#Input]
+    // type RemoteOutput = RemotesFor[I#Output]
   }
 
 
