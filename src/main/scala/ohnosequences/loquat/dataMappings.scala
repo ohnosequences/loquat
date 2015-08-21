@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 case object dataMappings {
 
-  import bundles._, instructions._
+  import instructions._
 
   import ohnosequences.datasets._, dataSets._, s3Locations._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._

@@ -1,7 +1,6 @@
 package ohnosequences.loquat
 
-import ohnosequences.loquat.bundles._, instructions._
-import ohnosequences.loquat.dataMappings._
+import dataMappings._, instructions._
 
 import ohnosequences.statika.bundles._
 

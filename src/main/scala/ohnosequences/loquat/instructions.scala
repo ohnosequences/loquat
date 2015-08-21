@@ -1,4 +1,4 @@
-package ohnosequences.loquat.bundles
+package ohnosequences.loquat
 
 case object instructions {
 

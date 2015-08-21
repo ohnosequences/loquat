@@ -1,6 +1,6 @@
-package ohnosequences.loquat.bundles
+package ohnosequences.loquat
 
-import ohnosequences.loquat._, dataMappings._, instructions._
+import dataMappings._, instructions._, daemons._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -71,7 +71,7 @@ case class InstructionsExecutor(
 
     while(message.isEmpty) {
       logger.info("InstructionsExecutor wait for dataMapping")
-      instance.foreach(_.createTag(InstanceTags.IDLE))
+      instance.foreach(_.createTag(utils.InstanceTags.IDLE))
       Thread.sleep(MESSAGE_TIMEOUT)
       message = queue.receiveMessage
     }
@@ -122,7 +122,7 @@ case class InstructionsExecutor(
 
   def terminateWorker(): Unit = {
     stopped = true
-    instance.foreach(_.createTag(InstanceTags.FINISHING))
+    instance.foreach(_.createTag(utils.InstanceTags.FINISHING))
     logger.info("terminating")
     instance.foreach(_.terminate)
   }
@@ -214,7 +214,7 @@ case class InstructionsExecutor(
       try {
         val message = waitForDataMapping(inputQueue)
 
-        instance.foreach(_.createTag(InstanceTags.PROCESSING))
+        instance.foreach(_.createTag(utils.InstanceTags.PROCESSING))
         logger.info("InstructionsExecutor: received message " + message)
         val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
         dataMappingId = dataMapping.id

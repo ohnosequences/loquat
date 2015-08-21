@@ -1,27 +1,28 @@
 package ohnosequences.loquat
 
-import java.io.{PrintWriter, File}
-import ohnosequences.awstools.ec2.Tag
-import ohnosequences.awstools.autoscaling.AutoScaling
-
-
-object InstanceTags {
-  val PRODUCT_TAG = Tag("product", "loquat")
-
-  val STATUS_TAG_NAME = "status"
-
-  //for instances
-  val RUNNING = Tag(STATUS_TAG_NAME, "running")
-  val INSTALLING = Tag(STATUS_TAG_NAME, "installing")
-  val IDLE = Tag(STATUS_TAG_NAME, "idle")
-  val PROCESSING = Tag(STATUS_TAG_NAME, "processing")
-  val FINISHING = Tag(STATUS_TAG_NAME, "finishing")
-  val FAILED = Tag(STATUS_TAG_NAME, "failed")
-
-  val AUTO_SCALING_GROUP = "autoScalingGroup"
-}
-
 object utils {
+
+  import java.io.{PrintWriter, File}
+  import ohnosequences.awstools.ec2.Tag
+  import ohnosequences.awstools.autoscaling.AutoScaling
+
+
+  object InstanceTags {
+    val PRODUCT_TAG = Tag("product", "loquat")
+
+    val STATUS_TAG_NAME = "status"
+
+    //for instances
+    val RUNNING = Tag(STATUS_TAG_NAME, "running")
+    val INSTALLING = Tag(STATUS_TAG_NAME, "installing")
+    val IDLE = Tag(STATUS_TAG_NAME, "idle")
+    val PROCESSING = Tag(STATUS_TAG_NAME, "processing")
+    val FINISHING = Tag(STATUS_TAG_NAME, "finishing")
+    val FAILED = Tag(STATUS_TAG_NAME, "failed")
+
+    val AUTO_SCALING_GROUP = "autoScalingGroup"
+  }
+
 
   def tagAutoScalingGroup(as: AutoScaling, groupName: String, status: String) {
     as.createTags(groupName, InstanceTags.PRODUCT_TAG)

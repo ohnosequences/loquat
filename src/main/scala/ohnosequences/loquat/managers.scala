@@ -1,6 +1,6 @@
-package ohnosequences.loquat.bundles
+package ohnosequences.loquat
 
-import ohnosequences.loquat._, dataMappings._
+import dataMappings._, daemons._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -92,7 +92,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       }
 
       logger.info("creating tags")
-      utils.tagAutoScalingGroup(aws.as, groupName, InstanceTags.INSTALLING.value)
+      utils.tagAutoScalingGroup(aws.as, groupName, utils.InstanceTags.INSTALLING.value)
     } catch {
       case t: Throwable => logger.error("error during creating workers autoscaling group", t)
     }
