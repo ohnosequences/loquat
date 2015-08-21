@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, instructions._, daemons._
+import dataMappings._, instructions._, daemons._, configs._, utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -95,9 +95,9 @@ case class InstructionsExecutor(
 
     var it = 0
     while(!stopWaiting) {
-      if(timeSpent() > math.min(config.terminationConfig.dataMappingProcessTimeout, 12 * 60 * 60)) {
+      if(timeSpent() > config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12)).inSeconds) {
         stopWaiting = true
-        dataMappingResult = failure("Timeout: " + timeSpent + " > dataMappingProcessTimeout")
+        dataMappingResult = failure("Timeout: " + timeSpent + " > taskProcessingTimeout")
         terminateWorker
       } else {
         futureResult.value match {
@@ -106,7 +106,7 @@ case class InstructionsExecutor(
               // every 5min we extend it for 6min
               if (it % (5*60) == 0) message.changeVisibilityTimeout(6*60)
             } catch {
-              case e: Throwable => logger.info("Couldn't change the visibility timeout")
+              case e: Throwable => logger.info("Couldn't change the visibility globalTimeout")
             }
             Thread.sleep(step)
             logger.info("Solving dataMapping: " + utils.printInterval(timeSpent()))

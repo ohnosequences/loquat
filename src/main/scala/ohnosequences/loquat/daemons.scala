@@ -1,8 +1,8 @@
 package ohnosequences.loquat
 
-case object daemons {
+protected[loquat] case object daemons {
 
-  import dataMappings._
+  import dataMappings._, configs._
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
@@ -155,9 +155,9 @@ case object daemons {
         Some("terminated due to errorsThreshold: errorsThreshold count: " + terminationConfig.errorsThreshold.get + " current: " + failedResultsCount)
       } else {
         // TODO: check this
-        (startTime, terminationConfig.timeout) match {
-          case (None, _) => Some("start timeout is undefined!")
-          case (Some(timestamp), Some(timeout)) if ((System.currentTimeMillis() - timestamp) > timeout) => {
+        (startTime, terminationConfig.globalTimeout) match {
+          case (None, _) => Some("start globalTimeout is undefined!")
+          case (Some(timestamp), Some(globalTimeout)) if ((System.currentTimeMillis() - timestamp) > globalTimeout.inSeconds) => {
             Some("terminated due to global timeout!")
           }
           case _ => None

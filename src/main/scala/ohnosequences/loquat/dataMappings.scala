@@ -62,13 +62,14 @@ case object dataMappings {
     )
 
   /* and we can transform any dataMapping to this simple form (but not another way round) */
-  def simplify(dataMapping: AnyDataMapping): SimpleDataMapping =
-    SimpleDataMapping(
-      id = dataMapping.id,
-      inputs = dataMapping.inputsToMap(dataMapping.remoteInput)
-        .map{ case (data, s3loc) => (data.label -> s3loc.location) },
-      outputs = dataMapping.outputsToMap(dataMapping.remoteOutput)
-        .map{ case (data, s3loc) => (data.label -> s3loc.location) }
-    )
+  protected[loquat]
+    def simplify(dataMapping: AnyDataMapping): SimpleDataMapping =
+      SimpleDataMapping(
+        id = dataMapping.id,
+        inputs = dataMapping.inputsToMap(dataMapping.remoteInput)
+          .map{ case (data, s3loc) => (data.label -> s3loc.location) },
+        outputs = dataMapping.outputsToMap(dataMapping.remoteOutput)
+          .map{ case (data, s3loc) => (data.label -> s3loc.location) }
+      )
 
 }

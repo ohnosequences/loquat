@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, instructions._
+import dataMappings._, instructions._, configs._
 
 import ohnosequences.statika.bundles._
 
@@ -48,7 +48,7 @@ abstract class Loquat[
 
 
 
-object LoquatOps extends LazyLogging {
+protected[loquat] object LoquatOps extends LazyLogging {
 
   def deploy(
     config: AnyLoquatConfig,
@@ -59,10 +59,9 @@ object LoquatOps extends LazyLogging {
     val aws = AWSClients.create(config.localCredentials)
     val names = config.resourceNames
 
-    if(config.check == false)
-      logger.error("something is wrong with the config")
+    if(config.validate.nonEmpty)
+      logger.error("Config validation failed. Fix config and try to deploy again.")
     else {
-      logger.info("the config seems to be fine")
 
       // FIXME: every action here should be checked before proceeding to the next one
       logger.info("creating resources...")
@@ -82,9 +81,9 @@ object LoquatOps extends LazyLogging {
       logger.debug(s"creating notification topic: ${config.notificationTopic}")
       val topic = aws.sns.createTopic(config.notificationTopic)
 
-      if (!topic.isEmailSubscribed(config.email)) {
+      if (!topic.isEmailSubscribed(config.email.toString)) {
         logger.info(s"subscribing [${config.email}] to the notification topic")
-        topic.subscribeEmail(config.email)
+        topic.subscribeEmail(config.email.toString)
         logger.info("check your email and confirm subscription")
       }
 
@@ -162,6 +161,7 @@ object LoquatOps extends LazyLogging {
 
 
   // These ops are useful for a running loquat. Use them from REPL (sbt console)
+  // TODO: restore this code
 
   // def addDataMappings(loquat: AnyLoquat, dataMappings: List[AnyDataMapping]): Unit = {
   //

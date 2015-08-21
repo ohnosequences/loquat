@@ -1,10 +1,21 @@
 package ohnosequences.loquat
 
-object utils {
+case object utils {
 
   import java.io.{PrintWriter, File}
   import ohnosequences.awstools.ec2.Tag
   import ohnosequences.awstools.autoscaling.AutoScaling
+
+
+  class Time(val inSeconds: Int)
+  case class Seconds(s: Int) extends Time(s)
+  case class Minutes(m: Int) extends Time(m * 60)
+  case class   Hours(h: Int) extends Time(h * 60 * 60)
+
+
+  case class Email(name: String, server: String) {
+    override def toString: String = s"${name}@${server}"
+  }
 
 
   object InstanceTags {
