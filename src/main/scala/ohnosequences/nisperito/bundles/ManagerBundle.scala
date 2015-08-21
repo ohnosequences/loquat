@@ -105,6 +105,8 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     }
 
     success("manager installed")
+
+    // FIXME: catch fatal exceptions and relaunch manager instance
     // } catch {
     //   case t: Throwable => {
     //     t.printStackTrace()

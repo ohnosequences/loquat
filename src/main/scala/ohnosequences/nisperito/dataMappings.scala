@@ -13,12 +13,7 @@ case object dataMappings {
   import upickle.Js
 
 
-  case class DataMappingResultDescription(
-    id: String,
-    message: String,
-    instanceId: Option[String],
-    time: Int
-  )
+  case class ProcessingResult(id: String, message: String)
 
   type RemotesFor[DS <: AnyDataSet] = DS#LocationsAt[S3DataLocation]
 
@@ -55,8 +50,6 @@ case object dataMappings {
   ) extends AnyDataMapping {
 
     type Instructions = I
-    // type RemoteInput = RemotesFor[I#Input]
-    // type RemoteOutput = RemotesFor[I#Output]
   }
 
 

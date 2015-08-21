@@ -54,6 +54,11 @@ case class InstructionsExecutor(
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
+  // FIXME: don't use Option.get
+  val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
+  val errorQueue = aws.sqs.getQueueByName(config.resourceNames.errorQueue).get
+  val outputQueue = aws.sqs.getQueueByName(config.resourceNames.outputQueue).get
+
   val MESSAGE_TIMEOUT = 5000
 
   val instance = aws.ec2.getCurrentInstance
@@ -152,30 +157,44 @@ case class InstructionsExecutor(
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
       val (result, output) = instructions.processDataMapping(dataMapping.id, workingDir)
 
+      val resultDescription = ProcessingResult(dataMapping.id, result.toString)
+
       // FIXME: do it more careful
       val outputMap: Map[File, ObjectAddress] =
-        instructions
-        .filesMap(output)
-        .map { case (name, file) =>
+        instructions.filesMap(output).map { case (name, file) =>
           file -> dataMapping.outputs(name)
         }
 
+      // TODO: simplify this huge if-else statement
       if (result.hasFailures) {
-        logger.error(s"script finished with non zero code: ${result}")
-        failure(s"script finished with non zero code: ${result}")
-      } else {
-        logger.info("dataMapping finished, uploading results")
-        for ((file, objectAddress) <- outputMap) {
-          if (file.exists) {
-            logger.info(s"trying to publish output object: ${objectAddress}")
-            // TODO: publicity should be a configurable option
-            aws.s3.uploadFile(objectAddress / file.getName, file, public = true)
-            logger.info("success")
-          } else {
-            logger.error(s"file [${file.getAbsolutePath}] doesn't exists!")
-          }
+
+        logger.error(s"script finished with non zero code: ${result}. publishing it to the error queue.")
+        errorQueue.sendMessage(upickle.default.write(resultDescription))
+        result -&- failure(s"script finished with non zero code")
+
+      } else if (outputMap.keys.forall(_.exists)) {
+
+        val uploadTries = outputMap map { case (file, objectAddress) =>
+          logger.info(s"publishing output object: ${file} -> ${objectAddress}")
+          // TODO: publicity should be a configurable option
+          aws.s3.uploadFile(objectAddress / file.getName, file, public = true)
         }
-        result -&- success(s"dataMapping [${dataMapping.id}] successfully finished")
+
+        // TODO: check whether we can fold Try's here somehow
+        if (uploadTries.forall(_.isSuccess)) {
+          logger.info("finished uploading output files. publishing message to the output queue.")
+          outputQueue.sendMessage(upickle.default.write(resultDescription))
+          result -&- success(s"task [${dataMapping.id}] is successfully finished")
+        } else {
+          logger.error(s"some uploads failed: ${uploadTries.filter(_.isFailure)}")
+          result -&- failure("failed to upload output files")
+        }
+
+      } else {
+
+        logger.error("some output files don't exist!")
+        result -&- failure("Couldn't upload results, because some output files don't exist")
+
       }
     } catch {
       case t: Throwable => {
@@ -188,10 +207,6 @@ case class InstructionsExecutor(
   def runLoop(): Unit = {
 
     logger.info("InstructionsExecutor started at " + instance.map(_.getInstanceId))
-
-    val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
-    val outputTopic = aws.sns.createTopic(config.resourceNames.outputTopic)
-    val errorTopic = aws.sns.createTopic(config.resourceNames.errorTopic)
 
     while(!stopped) {
       var dataMappingId: String = ""
@@ -212,37 +227,19 @@ case class InstructionsExecutor(
         }
 
         val (dataMappingResult, timeSpent) = waitForResult(futureResult, message)
-        lastTimeSpent = timeSpent
 
-        logger.info("dataMapping result: " + dataMappingResult)
+        logger.info(s"time spent on the task [${dataMapping.id}]: ${timeSpent}")
 
-        val dataMappingResultDescription = DataMappingResultDescription(
-          id = dataMappingId,
-          message = dataMappingResult.toString,
-          instanceId = instance.map(_.getInstanceId()),
-          time = timeSpent
-        )
-
-        logger.info("publishing result to topic")
-
-        if (dataMappingResult.hasFailures) {
-          errorTopic.publish(upickle.default.write(dataMappingResultDescription))
-        } else {
-          outputTopic.publish(upickle.default.write(dataMappingResultDescription))
-          logger.info("InstructionsExecutor deleting message with from input queue")
+        // FIXME: check this. what happens if result has failures?
+        if (dataMappingResult.isSuccessful) {
+          logger.info("result was successful. deleting message from the input queue")
           inputQueue.deleteMessage(message)
         }
+
       } catch {
-        case e: Throwable =>  {
-          logger.error("fatal error! instance will terminated")
-          e.printStackTrace()
-          val dataMappingResultDescription = DataMappingResultDescription(
-            id = dataMappingId,
-            message = e.getMessage,
-            instanceId = instance.map(_.getInstanceId()),
-            time = lastTimeSpent
-          )
-          errorTopic.publish(upickle.default.write(dataMappingResultDescription))
+        case e: Throwable => {
+          logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
+          errorQueue.sendMessage(upickle.default.write(e.getMessage))
           terminateWorker
         }
       }
