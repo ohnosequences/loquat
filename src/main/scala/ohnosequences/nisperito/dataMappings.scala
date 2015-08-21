@@ -13,12 +13,7 @@ case object dataMappings {
   import upickle.Js
 
 
-  case class DataMappingResultDescription(
-    id: String,
-    message: String,
-    instanceId: Option[String],
-    time: Int
-  )
+  case class ProcessingResult(id: String, message: String)
 
   type RemotesFor[DS <: AnyDataSet] = DS#LocationsAt[S3DataLocation]
 
@@ -55,12 +50,10 @@ case object dataMappings {
   ) extends AnyDataMapping {
 
     type Instructions = I
-    // type RemoteInput = RemotesFor[I#Input]
-    // type RemoteOutput = RemotesFor[I#Output]
   }
 
 
-  /* This is easy to parse/serialize */
+  /* This is easy to parse/serialize, but it's only for internal use. */
   protected[loquat]
     case class SimpleDataMapping(
       val id: String,
@@ -68,13 +61,14 @@ case object dataMappings {
       val outputs: Map[String, ObjectAddress]
     )
 
-  /* and we can transfor any dataMapping to this simple form */
-  def simplify(dataMapping: AnyDataMapping): SimpleDataMapping = SimpleDataMapping(
-    id = dataMapping.id,
-    inputs = dataMapping.inputsToMap(dataMapping.remoteInput)
-      .map{ case (data, s3loc) => (data.label -> s3loc.location) },
-    outputs = dataMapping.outputsToMap(dataMapping.remoteOutput)
-      .map{ case (data, s3loc) => (data.label -> s3loc.location) }
-  )
+  /* and we can transform any dataMapping to this simple form (but not another way round) */
+  def simplify(dataMapping: AnyDataMapping): SimpleDataMapping =
+    SimpleDataMapping(
+      id = dataMapping.id,
+      inputs = dataMapping.inputsToMap(dataMapping.remoteInput)
+        .map{ case (data, s3loc) => (data.label -> s3loc.location) },
+      outputs = dataMapping.outputsToMap(dataMapping.remoteOutput)
+        .map{ case (data, s3loc) => (data.label -> s3loc.location) }
+    )
 
 }

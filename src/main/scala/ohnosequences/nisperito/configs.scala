@@ -48,10 +48,6 @@ case class ResourceNames(loquatId: String) {
   val inputQueue: String = "loquatInputQueue" + loquatId
   // name of topic for dataMappings result notifications
   val outputQueue: String = "loquatOutputQueue" + loquatId
-  // name of queue with dataMappings results notifications (will be subscribed to outputTopic)
-  val outputTopic: String = "loquatOutputTopic" + loquatId
-  // name of topic for errors
-  val errorTopic: String = "loquatErrorQueue" + loquatId
   // name of queue with errors (will be subscribed to errorTopic)
   val errorQueue: String = "loquatErrorTopic" + loquatId
   // name of bucket for logs and console static files

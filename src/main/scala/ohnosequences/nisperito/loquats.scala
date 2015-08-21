@@ -68,22 +68,14 @@ object LoquatOps extends LazyLogging {
       // FIXME: every action here should be checked before proceeding to the next one
       logger.info("creating resources...")
 
-      logger.debug(s"creating error topic: ${names.errorTopic}")
-      val errorTopic = aws.sns.createTopic(names.errorTopic)
-      logger.debug(s"creating error queue: ${names.errorQueue}")
-      val errorQueue = aws.sqs.createQueue(names.errorQueue)
-      logger.debug("subscribing error queue to error topic")
-      errorTopic.subscribeQueue(errorQueue)
-
       logger.debug(s"creating input queue: ${names.inputQueue}")
       val inputQueue = aws.sqs.createQueue(names.inputQueue)
 
-      logger.debug(s"creating output topic: ${names.outputTopic}")
-      val outputTopic = aws.sns.createTopic(names.outputTopic)
       logger.debug(s"creating output queue: ${names.outputQueue}")
       val outputQueue = aws.sqs.createQueue(names.outputQueue)
-      logger.debug("subscribing output queue to output topic")
-      outputTopic.subscribeQueue(outputQueue)
+
+      logger.debug(s"creating error queue: ${names.errorQueue}")
+      val errorQueue = aws.sqs.createQueue(names.errorQueue)
 
       logger.debug(s"creating temporary bucket: ${names.bucket}")
       aws.s3.createBucket(names.bucket)
@@ -146,24 +138,10 @@ object LoquatOps extends LazyLogging {
     }
 
     try {
-      logger.info(s"deleting error topic: ${names.errorTopic}")
-      aws.sns.createTopic(names.errorTopic).delete
-    } catch {
-      case t: Throwable => logger.error("error during deleting error topic", t)
-    }
-
-    try {
       logger.info(s"deleting output queue: ${names.outputQueue}")
       aws.sqs.getQueueByName(names.outputQueue).foreach(_.delete)
     } catch {
       case t: Throwable => logger.error("error during deleting output queue", t)
-    }
-
-    try {
-      logger.info(s"deleting output topic: ${names.outputTopic}")
-      aws.sns.createTopic(names.outputTopic).delete
-    } catch {
-      case t: Throwable => logger.error("error during deleting output topic", t)
     }
 
     try {

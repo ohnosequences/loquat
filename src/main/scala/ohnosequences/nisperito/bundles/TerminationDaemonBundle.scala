@@ -12,8 +12,6 @@ import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 
-case class SNSMessage(Message: String)
-
 case class TerminationDaemonBundle(val config: AnyLoquatConfig) extends Bundle() with LazyLogging {
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
@@ -34,6 +32,7 @@ case class TerminationDaemonBundle(val config: AnyLoquatConfig) extends Bundle()
         logger.info("TerminationDeaemon success results: " + successResults.size)
         logger.info("TerminationDeaemon failed results: " + failedResults.size)
 
+        // FIXME: we don't need parsing here, only the numbers of messages
         receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
           successResults.put(result.id, result.message)
         }
@@ -60,17 +59,15 @@ case class TerminationDaemonBundle(val config: AnyLoquatConfig) extends Bundle()
     }
   }
 
-  def receiveDataMappingsResults(queueName: String): List[(String, DataMappingResultDescription)] = {
+  def receiveDataMappingsResults(queueName: String): List[(String, ProcessingResult)] = {
     val rawMessages: List[(String, String)] = getQueueMessagesWithHandles(queueName)
 
-    rawMessages.map {
-      case (handle, rawMessageBody) =>  {
-        val snsMessage: SNSMessage = upickle.default.read[SNSMessage](rawMessageBody)
-        val resultDescription: DataMappingResultDescription =
-          upickle.default.read[DataMappingResultDescription](snsMessage.Message.replace("\\\"", "\""))
-        logger.info(resultDescription.toString)
-        (handle, resultDescription)
-      }
+    rawMessages.map { case (handle, rawMessageBody) =>
+      // TODO: check this:
+      val resultDescription: ProcessingResult = upickle.default.read[ProcessingResult](rawMessageBody)
+        // upickle.default.read[ProcessingResult](snsMessage.Message.replace("\\\"", "\""))
+      logger.info(resultDescription.toString)
+      (handle, resultDescription)
     }
   }
 
