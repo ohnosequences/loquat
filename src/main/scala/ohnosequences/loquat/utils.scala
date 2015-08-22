@@ -5,6 +5,22 @@ case object utils {
   import java.io.{PrintWriter, File}
   import ohnosequences.awstools.ec2.Tag
   import ohnosequences.awstools.autoscaling.AutoScaling
+  import com.typesafe.scalalogging.LazyLogging
+  import scala.util._
+
+
+  trait AnyStep extends LazyLogging
+  case class Step[T](msg: String)(action: => Try[T]) extends AnyStep {
+
+    def execute: Try[T] = {
+      logger.debug(msg)
+      action.recoverWith {
+        case e: Throwable =>
+          logger.error(s"Error during ${msg}: \n${e.getMessage}")
+          Failure(e)
+      }
+    }
+  }
 
 
   class Time(val inSeconds: Int)

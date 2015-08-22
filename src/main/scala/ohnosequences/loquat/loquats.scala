@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, instructions._, configs._
+import dataMappings._, instructions._, configs._, utils._
 
 import ohnosequences.statika.bundles._
 
@@ -52,19 +52,6 @@ abstract class Loquat[
 
 protected[loquat] case object LoquatOps extends LazyLogging {
 
-  trait AnyStep
-  case class Step[T](msg: String)(action: => Try[T]) extends AnyStep {
-
-    def execute: Try[T] = {
-      logger.debug(msg)
-      action.recoverWith {
-        case e: Throwable =>
-          logger.error(s"Error during ${msg}: \n${e.getMessage}")
-          Failure(e)
-      }
-    }
-  }
-
   def deploy(
     config: AnyLoquatConfig,
     managerUserScript: String
@@ -80,28 +67,29 @@ protected[loquat] case object LoquatOps extends LazyLogging {
 
       Seq(
         Step( s"Creating input queue: ${names.inputQueue}" )(
-          Try(aws.sqs.createQueue(names.inputQueue))
+          Try { aws.sqs.createQueue(names.inputQueue) }
         ),
         Step( s"Creating output queue: ${names.outputQueue}" )(
-          Try(aws.sqs.createQueue(names.outputQueue))
+          Try { aws.sqs.createQueue(names.outputQueue) }
         ),
         Step( s"Creating error queue: ${names.errorQueue}" )(
-          Try(aws.sqs.createQueue(names.errorQueue))
+          Try { aws.sqs.createQueue(names.errorQueue) }
         ),
         Step( s"Creating temporary bucket: ${names.bucket}" )(
-          Try(aws.s3.createBucket(names.bucket))
+          Try { aws.s3.createBucket(names.bucket) }
         ),
         Step( s"Creating notification topic: ${config.notificationTopic}" )(
-          Try(aws.sns.createTopic(config.notificationTopic)).map { topic =>
-            if (!topic.isEmailSubscribed(config.email.toString)) {
-              logger.info(s"subscribing [${config.email}] to the notification topic")
-              topic.subscribeEmail(config.email.toString)
-              logger.info("check your email and confirm subscription")
+          Try { aws.sns.createTopic(config.notificationTopic) }
+            .map { topic =>
+              if (!topic.isEmailSubscribed(config.email.toString)) {
+                logger.info(s"subscribing [${config.email}] to the notification topic")
+                topic.subscribeEmail(config.email.toString)
+                logger.info("check your email and confirm subscription")
+              }
             }
-          }
         ),
         Step( s"Creating manager group: ${config.managerAutoScalingGroup.name}" )(
-          Try(aws.as.fixAutoScalingGroupUserData(config.managerAutoScalingGroup, managerUserScript))
+          Try { aws.as.fixAutoScalingGroupUserData(config.managerAutoScalingGroup, managerUserScript) }
             .map { managerGroup =>
               aws.as.createAutoScalingGroup(managerGroup)
               utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
@@ -124,56 +112,37 @@ protected[loquat] case object LoquatOps extends LazyLogging {
     val aws = AWSClients.create(config.localCredentials)
     val names = config.resourceNames
 
-    logger.info("sending notification on your email")
-    try {
-      val subject = "Loquat " + config.loquatId + " terminated"
-      val notificationTopic = aws.sns.createTopic(config.notificationTopic)
-      notificationTopic.publish("manual termination", subject)
-    } catch {
-      case t: Throwable => logger.error("error during sending notification", t)
-    }
+    Step("sending notification on your email")(
+      Try {
+        val subject = "Loquat " + config.loquatId + " is terminated"
+        val notificationTopic = aws.sns.createTopic(config.notificationTopic)
+        notificationTopic.publish("manual termination", subject)
+      }
+    ).execute
 
-    try {
-      logger.info(s"deleting workers group: ${config.workersAutoScalingGroup.name}")
-      aws.as.deleteAutoScalingGroup(config.workersAutoScalingGroup)
-    } catch {
-      case t: Throwable => logger.error("error during deleting workers group", t)
-    }
+    Step(s"deleting workers group: ${config.workersAutoScalingGroup.name}")(
+      Try { aws.as.deleteAutoScalingGroup(config.workersAutoScalingGroup) }
+    ).execute
 
-    try {
-      logger.info(s"deleting temporary bucket: ${names.bucket}")
-      aws.s3.deleteBucket(names.bucket)
-    } catch {
-      case t: Throwable => logger.error("error during deleting temporary bucket", t)
-    }
+    Step(s"deleting temporary bucket: ${names.bucket}")(
+      Try { aws.s3.deleteBucket(names.bucket) }
+    ).execute
 
-    try {
-      logger.info(s"deleting error queue: ${names.errorQueue}")
-      aws.sqs.getQueueByName(names.errorQueue).foreach(_.delete)
-    } catch {
-      case t: Throwable => logger.error("error during deleting error queue", t)
-    }
+    Step(s"deleting error queue: ${names.errorQueue}")(
+      Try { aws.sqs.getQueueByName(names.errorQueue).foreach(_.delete) }
+    ).execute
 
-    try {
-      logger.info(s"deleting output queue: ${names.outputQueue}")
-      aws.sqs.getQueueByName(names.outputQueue).foreach(_.delete)
-    } catch {
-      case t: Throwable => logger.error("error during deleting output queue", t)
-    }
+    Step(s"deleting output queue: ${names.outputQueue}")(
+      Try { aws.sqs.getQueueByName(names.outputQueue).foreach(_.delete) }
+    ).execute
 
-    try {
-      logger.info(s"deleting input queue: ${names.inputQueue}")
-      aws.sqs.getQueueByName(names.inputQueue).foreach(_.delete)
-    } catch {
-      case t: Throwable => logger.error("error during deleting input queue", t)
-    }
+    Step(s"deleting input queue: ${names.inputQueue}")(
+      Try { aws.sqs.getQueueByName(names.inputQueue).foreach(_.delete) }
+    ).execute
 
-    try {
-      logger.info(s"deleting manager group: ${config.managerAutoScalingGroup.name}")
-      aws.as.deleteAutoScalingGroup(config.managerAutoScalingGroup)
-    } catch {
-      case t: Throwable => logger.error("error during deleting manager group", t)
-    }
+    Step(s"deleting manager group: ${config.managerAutoScalingGroup.name}")(
+      Try { aws.as.deleteAutoScalingGroup(config.managerAutoScalingGroup) }
+    ).execute
 
     logger.info("loquat is undeployed")
   }
