@@ -11,7 +11,7 @@ import ohnosequences.awstools.autoscaling._
 
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.auth.AWSCredentialsProvider
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.{ LazyLogging, Logger }
 import java.io.File
 
 case object configs {
@@ -28,15 +28,14 @@ case object configs {
 
     /* This method validates subconfigs and logs validation errors */
     final def validate: Seq[String] = {
-
-      subConfigs.foreach{ _.validate }
+      val subErrors = subConfigs.flatMap{ _.validate }
 
       val errors = validationErrors
-      errors.foreach{ logger.error(_) }
+      errors.foreach{ msg => logger.error(msg) }
 
       if (errors.isEmpty) logger.debug(s"Validated [${label}] config")
 
-      errors
+      subErrors ++ errors
     }
   }
 
@@ -236,7 +235,7 @@ case object configs {
       s"""loquatNotificationTopic${email.toString.replace("@", "").replace("-", "").replace(".", "")}"""
 
 
-    val subConfigs: List[AnyConfig] = List(
+    lazy final val subConfigs: List[AnyConfig] = List(
       managerConfig,
       workersConfig
     )

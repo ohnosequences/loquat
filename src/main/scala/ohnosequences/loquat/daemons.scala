@@ -6,6 +6,7 @@ protected[loquat] case object daemons {
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
+  import ohnosequences.statika.results._
 
   import com.typesafe.scalalogging.LazyLogging
   import scala.collection.mutable.ListBuffer
@@ -20,7 +21,7 @@ protected[loquat] case object daemons {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-    val instructions: AnyInstructions = {
+    def instructions: AnyInstructions = TryHard[Unit]{ _ =>
       val logFile = new File("/root/log.txt")
 
       val bucket = config.resourceNames.bucket
@@ -46,9 +47,9 @@ protected[loquat] case object daemons {
           }, "logUploader")
           logUploader.setDaemon(true)
           logUploader.start()
-          say("logUploader started")
+          Success("logUploader started", ())
         }
-        case None => failure("can't obtain instanceId")
+        case None => Failure("can't obtain instanceId")
       }
     }
   }
@@ -165,9 +166,7 @@ protected[loquat] case object daemons {
       }
     }
 
-    val instructions: AnyInstructions = {
-      say("TerminationDaemonBundle installed")
-    }
+    def instructions: AnyInstructions = say("TerminationDaemonBundle installed")
 
   }
 

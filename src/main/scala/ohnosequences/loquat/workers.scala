@@ -30,9 +30,10 @@ trait AnyWorkerBundle extends AnyBundle {
 
   val bundleDependencies: List[AnyBundle] = List(instructionsBundle, LogUploaderBundle(config))
 
-  val instructions: AnyInstructions = {
-    InstructionsExecutor(config, instructionsBundle).runLoop
-    say("worker installed")
+  def instructions: AnyInstructions = {
+    Try {
+      new InstructionsExecutor(config, instructionsBundle).runLoop 
+    } -&- say("worker installed")
   }
 }
 
@@ -49,7 +50,7 @@ abstract class WorkerBundle[
 
 
 // TODO: rewrite all this and make it Worker's install
-case class InstructionsExecutor(
+class InstructionsExecutor(
   val config: AnyLoquatConfig,
   val instructionsBundle: AnyInstructionsBundle
 ) extends LazyLogging {

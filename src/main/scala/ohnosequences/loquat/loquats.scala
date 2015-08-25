@@ -19,13 +19,13 @@ trait AnyLoquat { loquat =>
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  type Instructions <: AnyInstructionsBundle
-  val  instructions: Instructions
+  type InstructionsBundle <: AnyInstructionsBundle
+  val  instructionsBundle: InstructionsBundle
 
   lazy val fullName: String = this.getClass.getName.split("\\$").mkString(".")
 
   // Bundles hierarchy:
-  case object worker extends WorkerBundle(instructions, config)
+  case object worker extends WorkerBundle(instructionsBundle, config)
 
   case object manager extends ManagerBundle(worker) {
     override lazy val fullName: String = s"${loquat.fullName}.${this.toString}"
@@ -40,10 +40,10 @@ trait AnyLoquat { loquat =>
 abstract class Loquat[
   C <: AnyLoquatConfig,
   I <: AnyInstructionsBundle
-](val config: C, val instructions: I) extends AnyLoquat {
+](val config: C, val instructionsBundle: I) extends AnyLoquat {
 
   type Config = C
-  type Instructions = I
+  type InstructionsBundle = I
 }
 
 
