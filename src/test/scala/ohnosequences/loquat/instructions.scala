@@ -24,14 +24,14 @@ object instructionsExample {
     output = stats :^: results :^: DNil
   ) {
 
-    def install: Results = success("horay!")
+    def install: Results = say("horay!")
 
     def processDataMapping(dataMappingId: String, workingDir: File): (Results, OutputFiles) = {
       val files =
         stats.inFile(new File(dataMappingId)) :~:
         results.inFile(new File("")) :~:
         ∅
-      (success("foo"), files)
+      (say("foo"), files)
     }
   }
 

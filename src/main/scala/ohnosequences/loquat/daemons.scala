@@ -20,7 +20,7 @@ protected[loquat] case object daemons {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-    def install: Results = {
+    val instructions: AnyInstructions = {
       val logFile = new File("/root/log.txt")
 
       val bucket = config.resourceNames.bucket
@@ -46,7 +46,7 @@ protected[loquat] case object daemons {
           }, "logUploader")
           logUploader.setDaemon(true)
           logUploader.start()
-          success("logUploader started")
+          say("logUploader started")
         }
         case None => failure("can't obtain instanceId")
       }
@@ -71,7 +71,7 @@ protected[loquat] case object daemons {
 
         while(true) {
           logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
-          logger.info("TerminationDeaemon success results: " + successResults.size)
+          logger.info("TerminationDeaemon say results: " + successResults.size)
           logger.info("TerminationDeaemon failed results: " + failedResults.size)
 
           // FIXME: we don't need parsing here, only the numbers of messages
@@ -165,8 +165,8 @@ protected[loquat] case object daemons {
       }
     }
 
-    def install: Results = {
-      success("TerminationDaemonBundle installed")
+    val instructions: AnyInstructions = {
+      say("TerminationDaemonBundle installed")
     }
 
   }

@@ -10,6 +10,7 @@ case object instructions {
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
+  import ohnosequences.statika.results._
 
   import ohnosequences.awstools.s3.ObjectAddress
   import java.io.File
@@ -37,7 +38,13 @@ case object instructions {
     /* this is where user describes instructions how to process each dataMapping:
        - it can assume that the input files are in place (`inputKey.file`)
        - it must produce output files declared in the dataMapping */
-    def processDataMapping(dataMappingId: String, workingDir: File): (Results, OutputFiles)
+    def processData(dataMappingId: String, workingDir: File): Result[OutputFiles]
+
+    final def processDataToMap(dataMappingId: String, workingDir: File): Result[Map[String, File]] =
+      processData(dataMappingId, workingDir) match {
+        case Failure(tr) => Failure(tr)
+        case Success(tr, of) => Success(tr, filesMap(of))
+      }
   }
 
   abstract class InstructionsBundle[

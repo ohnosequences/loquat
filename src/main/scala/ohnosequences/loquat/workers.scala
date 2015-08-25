@@ -4,6 +4,7 @@ import dataMappings._, instructions._, daemons._, configs._, utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
+import ohnosequences.statika.results._
 
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
@@ -12,6 +13,7 @@ import ohnosequences.awstools.AWSClients
 import com.typesafe.scalalogging.LazyLogging
 import java.io.File
 import scala.concurrent.Future
+import scala.util.Try
 import upickle.Js
 
 import ohnosequences.awstools.AWSClients
@@ -20,28 +22,28 @@ import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 trait AnyWorkerBundle extends AnyBundle {
 
-  type Instructions <: AnyInstructionsBundle
-  val  instructions: Instructions
+  type InstructionsBundle <: AnyInstructionsBundle
+  val  instructionsBundle: InstructionsBundle
 
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  val bundleDependencies: List[AnyBundle] = List(instructions, LogUploaderBundle(config))
+  val bundleDependencies: List[AnyBundle] = List(instructionsBundle, LogUploaderBundle(config))
 
-  def install: Results = {
-    InstructionsExecutor(config, instructions).runLoop
-    success("worker installed")
+  val instructions: AnyInstructions = {
+    InstructionsExecutor(config, instructionsBundle).runLoop
+    say("worker installed")
   }
 }
 
 abstract class WorkerBundle[
   I <: AnyInstructionsBundle,
   C <: AnyLoquatConfig
-](val instructions: I,
+](val instructionsBundle: I,
   val config: C
 ) extends AnyWorkerBundle {
 
-  type Instructions = I
+  type InstructionsBundle = I
   type Config = C
 }
 
@@ -49,7 +51,7 @@ abstract class WorkerBundle[
 // TODO: rewrite all this and make it Worker's install
 case class InstructionsExecutor(
   val config: AnyLoquatConfig,
-  val instructions: AnyInstructionsBundle
+  val instructionsBundle: AnyInstructionsBundle
 ) extends LazyLogging {
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
@@ -79,7 +81,7 @@ case class InstructionsExecutor(
     message.get
   }
 
-  def waitForResult(futureResult: Future[Results], message: Message): (Results, Int) = {
+  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[Int] = {
     val startTime = System.currentTimeMillis()
     val step = 1000 // 1s
 
@@ -88,36 +90,34 @@ case class InstructionsExecutor(
       ((currentTime - startTime) / 1000).toInt
     }
 
-    var stopWaiting = false
-
-    var dataMappingResult: Results = failure("internal error during waiting for dataMapping result")
-
-
-    var it = 0
-    while(!stopWaiting) {
-      if(timeSpent() > config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12)).inSeconds) {
-        stopWaiting = true
-        dataMappingResult = failure("Timeout: " + timeSpent + " > taskProcessingTimeout")
+    @scala.annotation.tailrec
+    def waitMore(tries: Int): AnyResult = {
+      if(timeSpent > config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12)).inSeconds) {
         terminateWorker
+        Failure(Seq(s"Timeout: ${timeSpent} > taskProcessingTimeout"))
       } else {
         futureResult.value match {
           case None => {
-            try {
-              // every 5min we extend it for 6min
-              if (it % (5*60) == 0) message.changeVisibilityTimeout(6*60)
-            } catch {
-              case e: Throwable => logger.info("Couldn't change the visibility globalTimeout")
+            // every 5min we extend it for 6min
+            if (tries % (5*60) == 0) {
+              if (Try(message.changeVisibilityTimeout(6*60)).isFailure)
+                logger.warn("Couldn't change the visibility globalTimeout")
+              // FIXME: something weird is happening here
             }
             Thread.sleep(step)
             logger.info("Solving dataMapping: " + utils.printInterval(timeSpent()))
-            it += 1
+            waitMore(tries + 1)
           }
-          case Some(scala.util.Success(r)) => stopWaiting = true; dataMappingResult = r
-          case Some(scala.util.Failure(t)) => stopWaiting = true; dataMappingResult = failure("future error: " + t.getMessage)
+          case Some(scala.util.Success(r)) => r
+          case Some(scala.util.Failure(t)) => Failure(Seq(s"future error: ${t.getMessage}"))
         }
       }
     }
-    (dataMappingResult, timeSpent())
+
+    waitMore(tries = 0) match {
+      case Failure(tr) => Failure(tr)
+      case Success(tr, _) => Success(tr, timeSpent)
+    }
   }
 
   def terminateWorker(): Unit = {
@@ -127,7 +127,7 @@ case class InstructionsExecutor(
     instance.foreach(_.terminate)
   }
 
-  def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): Results = {
+  def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
     try {
       logger.info("cleaning working directory: " + workingDir.getAbsolutePath)
       utils.deleteRecursively(workingDir)
@@ -155,51 +155,53 @@ case class InstructionsExecutor(
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val (result, output) = instructions.processDataMapping(dataMapping.id, workingDir)
+      val result = instructionsBundle.processDataToMap(dataMapping.id, workingDir)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
 
-      // FIXME: do it more careful
-      val outputMap: Map[File, ObjectAddress] =
-        instructions.filesMap(output).map { case (name, file) =>
-          file -> dataMapping.outputs(name)
+      result match {
+        case Failure(tr) => {
+          logger.error(s"script finished with non zero code: ${result}. publishing it to the error queue.")
+          errorQueue.sendMessage(upickle.default.write(resultDescription))
+          result
         }
+        case Success(tr, outputFileMap) => {
+          // FIXME: do it more careful
+          val outputMap: Map[File, ObjectAddress] =
+            outputFileMap.map { case (name, file) =>
+              file -> dataMapping.outputs(name)
+            }
+          // TODO: simplify this huge if-else statement
+          if (outputMap.keys.forall(_.exists)) {
 
-      // TODO: simplify this huge if-else statement
-      if (result.hasFailures) {
+            val uploadTries = outputMap map { case (file, objectAddress) =>
+              logger.info(s"publishing output object: ${file} -> ${objectAddress}")
+              // TODO: publicity should be a configurable option
+              aws.s3.uploadFile(objectAddress / file.getName, file, public = true)
+            }
 
-        logger.error(s"script finished with non zero code: ${result}. publishing it to the error queue.")
-        errorQueue.sendMessage(upickle.default.write(resultDescription))
-        result -&- failure(s"script finished with non zero code")
+            // TODO: check whether we can fold Try's here somehow
+            if (uploadTries.forall(_.isSuccess)) {
+              logger.info("finished uploading output files. publishing message to the output queue.")
+              outputQueue.sendMessage(upickle.default.write(resultDescription))
+              result //-&- success(s"task [${dataMapping.id}] is successfully finished", ())
+            } else {
+              logger.error(s"some uploads failed: ${uploadTries.filter(_.isFailure)}")
+              tr +: Failure(Seq("failed to upload output files"))
+            }
 
-      } else if (outputMap.keys.forall(_.exists)) {
+          } else {
 
-        val uploadTries = outputMap map { case (file, objectAddress) =>
-          logger.info(s"publishing output object: ${file} -> ${objectAddress}")
-          // TODO: publicity should be a configurable option
-          aws.s3.uploadFile(objectAddress / file.getName, file, public = true)
+            logger.error("some output files don't exist!")
+            tr +: Failure(Seq("Couldn't upload results, because some output files don't exist"))
+
+          }
         }
-
-        // TODO: check whether we can fold Try's here somehow
-        if (uploadTries.forall(_.isSuccess)) {
-          logger.info("finished uploading output files. publishing message to the output queue.")
-          outputQueue.sendMessage(upickle.default.write(resultDescription))
-          result -&- success(s"task [${dataMapping.id}] is successfully finished")
-        } else {
-          logger.error(s"some uploads failed: ${uploadTries.filter(_.isFailure)}")
-          result -&- failure("failed to upload output files")
-        }
-
-      } else {
-
-        logger.error("some output files don't exist!")
-        result -&- failure("Couldn't upload results, because some output files don't exist")
-
       }
     } catch {
       case t: Throwable => {
         logger.error("fatal failure during dataMapping processing", t)
-        failure(t.getMessage)
+        Failure(Seq(t.getMessage))
       }
     }
   }
@@ -226,9 +228,9 @@ case class InstructionsExecutor(
           processDataMapping(dataMapping, config.workingDir)
         }
 
-        val (dataMappingResult, timeSpent) = waitForResult(futureResult, message)
+        val dataMappingResult = waitForResult(futureResult, message)
 
-        logger.info(s"time spent on the task [${dataMapping.id}]: ${timeSpent}")
+        // logger.info(s"time spent on the task [${dataMapping.id}]: ${timeSpent}")
 
         // FIXME: check this. what happens if result has failures?
         if (dataMappingResult.isSuccessful) {

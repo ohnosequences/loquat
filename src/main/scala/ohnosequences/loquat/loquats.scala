@@ -31,9 +31,7 @@ trait AnyLoquat { loquat =>
     override lazy val fullName: String = s"${loquat.fullName}.${this.toString}"
   }
 
-  case object managerCompat extends Compatible(config.ami, manager, config.metadata) {
-    override lazy val fullName: String = s"${loquat.fullName}.${this.toString}"
-  }
+  case object managerCompat extends CompatibleWithPrefix(fullName)(config.ami, manager, config.metadata)
 
   final def deploy(): Unit = LoquatOps.deploy(config, managerCompat.userScript)
   final def undeploy(): Unit = LoquatOps.undeploy(config)

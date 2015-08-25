@@ -24,7 +24,7 @@ protected[loquat]
 
     val config = worker.config
 
-    case object workerCompat extends Compatible[Worker#Config#AMI, Worker](
+    case object workerCompat extends CompatibleWithPrefix(fullName)(
       environment = config.ami,
       bundle = worker,
       metadata = config.metadata
@@ -58,7 +58,7 @@ protected[loquat]
     }
 
 
-    def install: Results = {
+    val instructions: AnyInstructions = {
 
       logger.info("manager is started")
 
@@ -104,7 +104,7 @@ protected[loquat]
         case t: Throwable => logger.error("error during starting termination daemon", t)
       }
 
-      success("manager installed")
+      say("manager installed")
 
       // FIXME: catch fatal exceptions and relaunch manager instance
       // } catch {
