@@ -32,7 +32,7 @@ trait AnyWorkerBundle extends AnyBundle {
 
   def instructions: AnyInstructions = {
     Try {
-      new InstructionsExecutor(config, instructionsBundle).runLoop 
+      new InstructionsExecutor(config, instructionsBundle).runLoop
     } -&- say("worker installed")
   }
 }
@@ -95,7 +95,7 @@ class InstructionsExecutor(
     def waitMore(tries: Int): AnyResult = {
       if(timeSpent > config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12)).inSeconds) {
         terminateWorker
-        Failure(Seq(s"Timeout: ${timeSpent} > taskProcessingTimeout"))
+        Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
       } else {
         futureResult.value match {
           case None => {
@@ -109,8 +109,11 @@ class InstructionsExecutor(
             logger.info("Solving dataMapping: " + utils.printInterval(timeSpent()))
             waitMore(tries + 1)
           }
-          case Some(scala.util.Success(r)) => r
-          case Some(scala.util.Failure(t)) => Failure(Seq(s"future error: ${t.getMessage}"))
+          case Some(scala.util.Success(r)) => {
+            logger.info("Got a result: " + r.trace.toString)
+            r
+          }
+          case Some(scala.util.Failure(t)) => Failure(s"future error: ${t.getMessage}")
         }
       }
     }
@@ -156,7 +159,7 @@ class InstructionsExecutor(
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val result = instructionsBundle.processDataToMap(dataMapping.id, workingDir)
+      val result = instructionsBundle.processFiles(dataMapping.id, workingDir)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
 

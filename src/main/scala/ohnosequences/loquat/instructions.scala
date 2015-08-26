@@ -25,26 +25,39 @@ case object instructions {
     type Output <: AnyDataSet
     val  output: Output
 
+    type InputFiles  = Input#LocationsAt[FileDataLocation]
     type OutputFiles = Output#LocationsAt[FileDataLocation]
 
     // should be provided implicitly:
     val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
 
+    /* This method serialises OutputFiles data mapping to a normal Map */
     def filesMap(filesSet: OutputFiles): Map[String, File] =
       outputFilesToMap(filesSet).map { case (data, loc) =>
         data.label -> loc.location
       }
 
     /* this is where user describes instructions how to process each dataMapping:
-       - it can assume that the input files are in place (`inputKey.file`)
-       - it must produce output files declared in the dataMapping */
-    def processData(dataMappingId: String, workingDir: File): Result[OutputFiles]
+       - it takes input data file locations
+       - it must produce same for the output files */
+    def processData(
+      dataMappingId: String
+      // inputFiles: InputFiles
+    ): AnyInstructions.withOut[OutputFiles]
 
-    final def processDataToMap(dataMappingId: String, workingDir: File): Result[Map[String, File]] =
-      processData(dataMappingId, workingDir) match {
+    /* This is a cover-method, which will be used in the worker run-loop */
+    final def processFiles(
+      dataMappingId: String,
+      workingDir: File
+      // inputFiles: Map[String, File]
+    ): Result[Map[String, File]] = {
+      // TODO: inputFiles parsing
+
+      processData(dataMappingId).run(workingDir) match {
         case Failure(tr) => Failure(tr)
         case Success(tr, of) => Success(tr, filesMap(of))
       }
+    }
   }
 
   abstract class InstructionsBundle[
