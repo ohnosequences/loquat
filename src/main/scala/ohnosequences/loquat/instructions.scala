@@ -38,6 +38,11 @@ case object instructions {
         data.label -> loc.location
       }
 
+    def getFile[K <: AnyData](inputFiles: InputFiles, key: K)
+      (implicit
+        lookup: InputFiles Lookup (K := FileDataLocation)
+      ): File = lookup(inputFiles).value.location
+
     /* this is where user describes instructions how to process each dataMapping:
        - it takes input data file locations
        - it must produce same for the output files */
