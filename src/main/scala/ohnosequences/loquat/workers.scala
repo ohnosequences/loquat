@@ -151,15 +151,17 @@ class InstructionsExecutor(
 
       logger.info("downloading dataMapping input")
       val loadingManager = aws.s3.createLoadingManager
-      dataMapping.inputs.foreach { case (name, objectAddress) =>
-        val inputFile = new File(inputDir, name)
-        logger.info("trying to create input object: " + name)
-        loadingManager.download(objectAddress, inputFile)
-        // (name -> inputFile)
+
+      val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
+        case (name, objectAddress) =>
+          val inputFile = new File(inputDir, name)
+          logger.info("trying to create input object: " + name)
+          loadingManager.download(objectAddress, inputFile)
+          (name -> inputFile)
       }
 
       logger.info("running instructions script in " + workingDir.getAbsolutePath)
-      val result = instructionsBundle.processFiles(dataMapping.id, workingDir)
+      val result = instructionsBundle.processFiles(dataMapping.id, inputFilesMap, workingDir)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
 
