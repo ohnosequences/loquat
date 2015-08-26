@@ -12,7 +12,10 @@ import ohnosequences.awstools.autoscaling._
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.typesafe.scalalogging.{ LazyLogging, Logger }
+
 import java.io.File
+import scala.util.Try
+
 
 case object configs {
 
@@ -242,18 +245,23 @@ case object configs {
 
     def validationErrors: Seq[String] = {
 
-      val ec2 = EC2.create(localCredentials)
-      val keypairErr =
-        if(ec2.isKeyPairExists(keypairName)) Seq()
-        else Seq(s"key pair: ${keypairName} doesn't exists")
+      if (Try( localCredentials.getCredentials ).isFailure)
+        Seq(s"Couldn't load your local credentials: ${localCredentials}")
+      else {
+        val ec2 = EC2.create(localCredentials)
+        val keypairErr =
+          if(ec2.isKeyPairExists(keypairName)) Seq()
+          else Seq(s"key pair: ${keypairName} doesn't exists")
 
-      val s3  = S3.create(localCredentials)
-      val artifactErr =
-        if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
-        else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+        val s3  = S3.create(localCredentials)
+        val artifactErr =
+          if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
+          else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
 
-      // TODO: moar checks!
-      keypairErr ++ artifactErr
+        // TODO: moar checks!
+        // TODO: add account permissions validation
+        keypairErr ++ artifactErr
+      }
     }
   }
 
