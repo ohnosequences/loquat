@@ -142,7 +142,7 @@ case object configs {
   abstract class AnyLoquatConfig extends AnyConfig {
 
     /* email address for notifications */
-    val email: Email
+    val email: String
 
     /* these are credentials that are used to launch loquat */
     val localCredentials: AWSCredentialsProvider

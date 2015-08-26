@@ -29,10 +29,6 @@ case object utils {
   case class   Hours(h: Int) extends Time(h * 60 * 60)
 
 
-  case class Email(name: String, server: String) {
-    override def toString: String = s"${name}@${server}"
-  }
-
 
   object InstanceTags {
     val PRODUCT_TAG = Tag("product", "loquat")
