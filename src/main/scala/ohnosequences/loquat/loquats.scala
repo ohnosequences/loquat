@@ -34,7 +34,7 @@ trait AnyLoquat { loquat =>
   case object managerCompat extends CompatibleWithPrefix(fullName)(config.ami, manager, config.metadata)
 
   final def deploy(): Unit = LoquatOps.deploy(config, managerCompat.userScript)
-  final def undeploy(): Unit = LoquatOps.undeploy(config)
+  final def undeploy(): Unit = LoquatOps.undeploy(AWSClients.create(config.localCredentials), config)
 }
 
 abstract class Loquat[
@@ -82,7 +82,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
               if (!topic.isEmailSubscribed(config.email.toString)) {
                 logger.info(s"subscribing [${config.email}] to the notification topic")
                 topic.subscribeEmail(config.email.toString)
-                logger.info("check your email and confirm subscription")
+                logger.info("Check your email and confirm subscription")
               }
             }
         ),
@@ -93,7 +93,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
               utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
             }
         ),
-        Step("loquat is running, now go to the amazon console and keep an eye on the progress")(Success(true))
+        Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(Success(true))
       ).foldLeft[Try[_]](
         { logger.info("creating resources..."); Success(true) }
       ) { (result: Try[_], next: Step[_]) =>
@@ -104,13 +104,12 @@ protected[loquat] case object LoquatOps extends LazyLogging {
   }
 
 
-  def undeploy(config: AnyLoquatConfig): Unit = {
+  def undeploy(aws: AWSClients, config: AnyLoquatConfig): Unit = {
     logger.info(s"undeploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
-    val aws = AWSClients.create(config.localCredentials)
     val names = config.resourceNames
 
-    Step("sending notification on your email")(
+    Step("Sending notification on your email")(
       Try {
         val subject = "Loquat " + config.loquatId + " is terminated"
         val notificationTopic = aws.sns.createTopic(config.notificationTopic)
@@ -142,7 +141,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
       Try { aws.as.deleteAutoScalingGroup(config.managerAutoScalingGroup) }
     ).execute
 
-    logger.info("loquat is undeployed")
+    logger.info("Loquat is undeployed")
   }
 
 

@@ -92,7 +92,7 @@ protected[loquat] case object daemons {
           )
 
           reason match {
-            case Some(r) => LoquatOps.undeploy(config)
+            case Some(r) => LoquatOps.undeploy(aws, config)
             case None => ()
           }
 
