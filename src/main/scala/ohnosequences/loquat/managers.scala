@@ -63,7 +63,6 @@ protected[loquat]
 
       Try {
         logger.info("manager is started")
-      } -&- { Try {
         logger.info("checking if the initial dataMappings are uploaded")
         if (aws.s3.listObjects(config.dataMappingsUploaded.bucket, config.dataMappingsUploaded.key).isEmpty) {
           logger.warn("uploading initial dataMappings")
@@ -71,9 +70,7 @@ protected[loquat]
         } else {
           logger.warn("skipping uploading dataMappings")
         }
-      } recover {
-        case t: Throwable => logger.error("error during uploading initial dataMappings", t)
-      }} -&- { Try {
+      } -&- { Try {
         logger.info("generating workers userScript")
         val workersGroup = aws.as.fixAutoScalingGroupUserData(
           config.workersAutoScalingGroup,

@@ -34,7 +34,7 @@ trait AnyLoquat { loquat =>
   case object managerCompat extends CompatibleWithPrefix(fullName)(config.ami, manager, config.metadata)
 
   final def deploy(): Unit = LoquatOps.deploy(config, managerCompat.userScript)
-  final def undeploy(): Unit = LoquatOps.undeploy(AWSClients.create(config.localCredentials), config)
+  final def undeploy(): Unit = LoquatOps.undeploy(AWSClients.create(config.loquatUser.localCredentials), config)
 }
 
 abstract class Loquat[
@@ -56,7 +56,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
   ): Unit = {
     logger.info(s"deploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
-    val aws = AWSClients.create(config.localCredentials)
+    val aws = AWSClients.create(config.loquatUser.localCredentials)
     val names = config.resourceNames
 
     if(config.validate.nonEmpty)
@@ -76,12 +76,12 @@ protected[loquat] case object LoquatOps extends LazyLogging {
         Step( s"Creating temporary bucket: ${names.bucket}" )(
           Try { aws.s3.createBucket(names.bucket) }
         ),
-        Step( s"Creating notification topic: ${config.notificationTopic}" )(
-          Try { aws.sns.createTopic(config.notificationTopic) }
+        Step( s"Creating notification topic: ${names.notificationTopic}" )(
+          Try { aws.sns.createTopic(names.notificationTopic) }
             .map { topic =>
-              if (!topic.isEmailSubscribed(config.email.toString)) {
-                logger.info(s"subscribing [${config.email}] to the notification topic")
-                topic.subscribeEmail(config.email.toString)
+              if (!topic.isEmailSubscribed(config.loquatUser.email.toString)) {
+                logger.info(s"subscribing [${config.loquatUser.email}] to the notification topic")
+                topic.subscribeEmail(config.loquatUser.email.toString)
                 logger.info("Check your email and confirm subscription")
               }
             }
@@ -112,7 +112,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
     Step("Sending notification on your email")(
       Try {
         val subject = "Loquat " + config.loquatId + " is terminated"
-        val notificationTopic = aws.sns.createTopic(config.notificationTopic)
+        val notificationTopic = aws.sns.createTopic(names.notificationTopic)
         notificationTopic.publish("manual termination", subject)
       }
     ).execute
