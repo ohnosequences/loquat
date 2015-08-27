@@ -57,7 +57,9 @@ protected[loquat] case object LoquatOps extends LazyLogging {
   ): Unit = {
     logger.info(s"deploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
-    if(config.validate.nonEmpty)
+    if(user.validate.nonEmpty)
+      logger.error("User validation failed. Fix it and try to deploy again.")
+    else if (config.validate.nonEmpty)
       logger.error("Config validation failed. Fix config and try to deploy again.")
     else {
       val aws = AWSClients.create(user.localCredentials)

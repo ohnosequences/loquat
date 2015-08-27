@@ -157,13 +157,19 @@ case object configs {
   ) extends Config() {
 
     def validationErrors: Seq[String] = {
-      if (Try( localCredentials.getCredentials ).isFailure)
-        Seq(s"Couldn't load your local credentials: ${localCredentials}")
-        // TODO: add account permissions validation
-      else {
-        val ec2 = EC2.create(localCredentials)
-        if(ec2.isKeyPairExists(keypairName)) Seq()
-        else Seq(s"key pair: ${keypairName} doesn't exists")
+      val emailErr =
+        if (email.contains('@')) Seq()
+        else Seq(s"User email [${email}] has invalid format")
+
+      emailErr ++ {
+        if (Try( localCredentials.getCredentials ).isFailure)
+          Seq(s"Couldn't load your local credentials: ${localCredentials}")
+          // TODO: add account permissions validation
+        else {
+          val ec2 = EC2.create(localCredentials)
+          if(ec2.isKeyPairExists(keypairName)) Seq()
+          else Seq(s"key pair: ${keypairName} doesn't exists")
+        }
       }
     }
   }
@@ -265,7 +271,8 @@ case object configs {
       workersConfig
     )
 
-    // def validationErrors: Seq[String] = {
+    // TODO: add the artifact check somewhere else
+    def validationErrors: Seq[String] = Seq()
     //   val s3  = S3.create(creds)
     //   val artifactErr =
     //     if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
