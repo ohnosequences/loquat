@@ -61,51 +61,53 @@ protected[loquat]
 
     def instructions: AnyInstructions = {
 
-      Try {
-        logger.info("manager is started")
-        logger.info("checking if the initial dataMappings are uploaded")
-        if (aws.s3.listObjects(config.dataMappingsUploaded.bucket, config.dataMappingsUploaded.key).isEmpty) {
-          logger.warn("uploading initial dataMappings")
-          uploadInitialDataMappings(config.dataMappings)
-        } else {
-          logger.warn("skipping uploading dataMappings")
-        }
-      } -&- { Try {
-        logger.info("generating workers userScript")
-        val workersGroup = aws.as.fixAutoScalingGroupUserData(
-          config.workersAutoScalingGroup,
-          workerCompat.userScript
-        )
+      lazy val normalScenario: Instructions[Unit] = {
+        Try {
+          logger.info("manager is started")
+          logger.info("checking if the initial dataMappings are uploaded")
+          if (aws.s3.listObjects(config.dataMappingsUploaded.bucket, config.dataMappingsUploaded.key).isEmpty) {
+            logger.warn("uploading initial dataMappings")
+            uploadInitialDataMappings(config.dataMappings)
+          } else {
+            logger.warn("skipping uploading dataMappings")
+          }
+        } -&- {
+          Try {
+            aws.as.getAutoScalingGroupByName(config.resourceNames.managerGroup).get
+          } map { group =>
+            group.launchingConfiguration.instanceSpecs.keyName
+          } map { keypairName =>
 
-        logger.info("running workers auto scaling group")
-        aws.as.createAutoScalingGroup(workersGroup)
+            val workersGroup = config.workersAutoScalingGroup(keypairName)
 
-        val groupName = config.workersAutoScalingGroup.name
+            logger.info("Setting up workers userScript")
+            aws.as.fixAutoScalingGroupUserData(
+              workersGroup,
+              workerCompat.userScript
+            )
 
-        utils.waitForResource[AutoScalingGroup] {
-          println("waiting for manager autoscalling")
-          aws.as.getAutoScalingGroupByName(groupName)
-        }
+            logger.info("Creating workers autoscaling group")
+            aws.as.createAutoScalingGroup(workersGroup)
 
-        logger.info("creating tags")
-        utils.tagAutoScalingGroup(aws.as, groupName, utils.InstanceTags.INSTALLING.value)
-      } recover {
-        case t: Throwable => logger.error("error during creating workers autoscaling group", t)
-      }} -&- { Try {
-        logger.info("starting termination daemon")
-        terminationDaemon.TerminationDaemonThread.start()
-      } recover {
-        case t: Throwable => logger.error("error during starting termination daemon", t)
-      }} -&- say("manager installed")
+            logger.info("Creating tags for workers autoscaling group")
+            utils.tagAutoScalingGroup(aws.as, config.resourceNames.workersGroup, utils.InstanceTags.INSTALLING.value)
+          }
+        } -&-
+        Try {
+          logger.info("starting termination daemon")
+          terminationDaemon.TerminationDaemonThread.start()
+        } -&-
+        say("manager installed")
+      }
 
-      // FIXME: catch fatal exceptions and relaunch manager instance
-      // } catch {
-      //   case t: Throwable => {
-      //     t.printStackTrace()
-      //     aws.ec2.getCurrentInstance.foreach(_.terminate)
-      //     failure("manager fails")
-      //   }
-      // }
+      normalScenario -|- {
+        Try {
+          logger.error("Manager failed, trying to restart it")
+          aws.ec2.getCurrentInstance.foreach(_.terminate)
+        } ->-
+        failure[Unit]("Manager failed during installation")
+      }
+
     }
   }
 

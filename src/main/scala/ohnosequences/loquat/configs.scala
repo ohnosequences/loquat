@@ -128,17 +128,21 @@ case object configs {
 
   /* Configuration of resources */
   protected[loquat]
-    case class ResourceNames(loquatId: String) {
+    case class ResourceNames(suffix: String) {
       /* name of queue with dataMappings */
-      val inputQueue: String = "loquatInputQueue" + loquatId
+      val inputQueue: String = "loquatInputQueue" + suffix
       /* name of topic for dataMappings result notifications */
-      val outputQueue: String = "loquatOutputQueue" + loquatId
+      val outputQueue: String = "loquatOutputQueue" + suffix
       /* name of queue with errors (will be subscribed to errorTopic) */
-      val errorQueue: String = "loquatErrorTopic" + loquatId
+      val errorQueue: String = "loquatErrorTopic" + suffix
       /* name of bucket for logs files */
       val bucket: String = "era7nisperos"
       /* topic name to notificate user about termination of loquat */
-      val notificationTopic: String = "loquatNotificationTopic" + loquatId
+      val notificationTopic: String = "loquatNotificationTopic" + suffix
+
+      val managerGroup: String = "loquatManagerGroup" + suffix
+
+      val workersGroup: String = "loquatWorkersGroup" + suffix
     }
 
 
@@ -206,42 +210,44 @@ case object configs {
     lazy final val loquatVersion: String = metadata.version.replace(".", "").toLowerCase
     lazy final val loquatId: String = (loquatName + loquatVersion)
 
-    lazy final val managerAutoScalingGroup = AutoScalingGroup(
-      name = "loquatManagerGroup" + loquatVersion,
-      minSize = 1,
-      maxSize = 1,
-      desiredCapacity = 1,
-      launchingConfiguration = LaunchConfiguration(
-        name = "loquatManagerLaunchConfiguration" + loquatVersion,
-        instanceSpecs = InstanceSpecs(
-          instanceType = managerConfig.instanceType,
-          amiId = ami.id,
-          keyName = loquatUser.keypairName,
-          instanceProfile = Some(iamRoleName)
-        ),
-        purchaseModel = managerConfig.purchaseModel
-      )
-    )
+    lazy final val resourceNames: ResourceNames = ResourceNames(loquatVersion)
 
-    lazy final val workersAutoScalingGroup = AutoScalingGroup(
-      name = "loquatWorkersGroup" + loquatVersion,
-      minSize = workersConfig.groupSize.min,
-      maxSize = workersConfig.groupSize.max,
-      desiredCapacity = workersConfig.groupSize.desired,
-      launchingConfiguration = LaunchConfiguration(
-        name = "loquatWorkersLaunchConfiguration" + loquatVersion,
-        instanceSpecs = InstanceSpecs(
-          instanceType = workersConfig.instanceType,
-          amiId = ami.id,
-          keyName = loquatUser.keypairName,
-          instanceProfile = Some(iamRoleName),
-          deviceMapping = Map("/dev/sdb" -> "ephemeral0")
-        ),
-        purchaseModel = workersConfig.purchaseModel
+    def managerAutoScalingGroup(keypairName: String): AutoScalingGroup =
+      AutoScalingGroup(
+        name = resourceNames.managerGroup,
+        minSize = 1,
+        maxSize = 1,
+        desiredCapacity = 1,
+        launchingConfiguration = LaunchConfiguration(
+          name = "loquatManagerLaunchConfiguration" + loquatVersion,
+          instanceSpecs = InstanceSpecs(
+            instanceType = managerConfig.instanceType,
+            amiId = ami.id,
+            keyName = keypairName,
+            instanceProfile = Some(iamRoleName)
+          ),
+          purchaseModel = managerConfig.purchaseModel
+        )
       )
-    )
 
-    lazy final val resourceNames: ResourceNames = ResourceNames(loquatId)
+    def workersAutoScalingGroup(keypairName: String): AutoScalingGroup =
+      AutoScalingGroup(
+        name = resourceNames.workersGroup,
+        minSize = workersConfig.groupSize.min,
+        maxSize = workersConfig.groupSize.max,
+        desiredCapacity = workersConfig.groupSize.desired,
+        launchingConfiguration = LaunchConfiguration(
+          name = "loquatWorkersLaunchConfiguration" + loquatVersion,
+          instanceSpecs = InstanceSpecs(
+            instanceType = workersConfig.instanceType,
+            amiId = ami.id,
+            keyName = keypairName,
+            instanceProfile = Some(iamRoleName),
+            deviceMapping = Map("/dev/sdb" -> "ephemeral0")
+          ),
+          purchaseModel = workersConfig.purchaseModel
+        )
+      )
 
     // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
     lazy final val dataMappingsUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, loquatId) / "dataMappingsUploaded"

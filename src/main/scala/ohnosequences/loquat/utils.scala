@@ -4,7 +4,8 @@ case object utils {
 
   import java.io.{PrintWriter, File}
   import ohnosequences.awstools.ec2.Tag
-  import ohnosequences.awstools.autoscaling.AutoScaling
+  import ohnosequences.awstools.autoscaling.{ AutoScaling, AutoScalingGroup }
+  import com.amazonaws.services.autoscaling.model._
   import com.typesafe.scalalogging.LazyLogging
   import scala.util._
 
@@ -78,18 +79,31 @@ case object utils {
     (intervalSecs / 60) + " min " + (intervalSecs % 60) + " sec"
   }
 
-  def waitForResource[A](resource: => Option[A]) : Option[A] = {
-    var iteration = 1
-    var current: Option[A] = None
-    val limit = 50
+  // def waitForResource[A](resource: => Option[A]) : Option[A] = {
+  //   var iteration = 1
+  //   var current: Option[A] = None
+  //   val limit = 50
+  //
+  //   do {
+  //     current = resource
+  //     iteration += 1
+  //     Thread.sleep(1000)
+  //   } while (current.isEmpty && iteration < limit)
+  //
+  //   current
+  // }
 
-    do {
-      current = resource
-      iteration += 1
-      Thread.sleep(1000)
-    } while (current.isEmpty && iteration < limit)
-
-    current
-  }
+  // def deleteAutoScalingGroup(as: AutoScaling, groupName: String): Try[Unit] = {
+  //   Try {
+  //     as.getAutoScalingGroupByName(groupName).get
+  //   } map { group =>
+  //     as.as.deleteAutoScalingGroup(
+  //       new DeleteAutoScalingGroupRequest()
+  //         .withAutoScalingGroupName(groupName)
+  //         .withForceDelete(true)
+  //     )
+  //     deleteLaunchConfiguration(group.launchingConfiguration.name)
+  //   }
+  // }
 
 }

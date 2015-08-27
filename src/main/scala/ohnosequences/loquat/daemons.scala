@@ -143,7 +143,7 @@ protected[loquat] case object daemons {
       initialDataMappingsCount: Int
     ): Option[String] = {
 
-      val startTime = aws.as.getCreatedTime(config.managerAutoScalingGroup.name).map(_.getTime)
+      val startTime = aws.as.getCreatedTime(config.resourceNames.managerGroup).map(_.getTime)
 
       if (
         terminationConfig.terminateAfterInitialDataMappings &&
