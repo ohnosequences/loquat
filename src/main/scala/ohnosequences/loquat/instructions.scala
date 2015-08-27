@@ -6,10 +6,11 @@ case object instructions {
   import ohnosequences.datasets._, dataSets._, fileLocations._
 
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
-  import ops.typeSets._
+  import ops.typeSets._, ops.types._
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
+  import ohnosequences.statika.results._
 
   import ohnosequences.awstools.s3.ObjectAddress
   import java.io.File
@@ -24,20 +25,50 @@ case object instructions {
     type Output <: AnyDataSet
     val  output: Output
 
+    type InputFiles  = Input#LocationsAt[FileDataLocation]
     type OutputFiles = Output#LocationsAt[FileDataLocation]
 
     // should be provided implicitly:
+    val parseInputFiles: ParseDenotations[InputFiles, File]
     val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
 
+    /* This method serialises OutputFiles data mapping to a normal Map */
     def filesMap(filesSet: OutputFiles): Map[String, File] =
       outputFilesToMap(filesSet).map { case (data, loc) =>
         data.label -> loc.location
       }
 
+    def getFile[K <: AnyData](inputFiles: InputFiles, key: K)
+      (implicit
+        lookup: InputFiles Lookup (K := FileDataLocation)
+      ): File = lookup(inputFiles).value.location
+
     /* this is where user describes instructions how to process each dataMapping:
-       - it can assume that the input files are in place (`inputKey.file`)
-       - it must produce output files declared in the dataMapping */
-    def processDataMapping(dataMappingId: String, workingDir: File): (Results, OutputFiles)
+       - it takes input data file locations
+       - it must produce same for the output files */
+    def processData(
+      dataMappingId: String,
+      inputFiles: InputFiles
+    ): AnyInstructions.withOut[OutputFiles]
+
+    /* This is a cover-method, which will be used in the worker run-loop */
+    final def processFiles(
+      dataMappingId: String,
+      inputFilesMap: Map[String, File],
+      workingDir: File
+    ): Result[Map[String, File]] = {
+
+      parseInputFiles(inputFilesMap) match {
+        case (Left(err), _) => Failure(err.toString)
+        case (Right(inputFiles), _) => {
+          processData(dataMappingId, inputFiles).run(workingDir) match {
+            case Failure(tr) => Failure(tr)
+            case Success(tr, of) => Success(tr, filesMap(of))
+          }
+        }
+      }
+
+    }
   }
 
   abstract class InstructionsBundle[
@@ -47,6 +78,7 @@ case object instructions {
     val input: I,
     val output: O
   )(implicit
+    val parseInputFiles: ParseDenotations[I#LocationsAt[FileDataLocation], File],
     val outputFilesToMap: ToMap[O#LocationsAt[FileDataLocation], AnyData, FileDataLocation]
   ) extends Bundle(deps: _*) with AnyInstructionsBundle {
 

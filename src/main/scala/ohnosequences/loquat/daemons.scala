@@ -6,6 +6,7 @@ protected[loquat] case object daemons {
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
+  import ohnosequences.statika.results._
 
   import com.typesafe.scalalogging.LazyLogging
   import scala.collection.mutable.ListBuffer
@@ -20,7 +21,7 @@ protected[loquat] case object daemons {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-    def install: Results = {
+    def instructions: AnyInstructions = TryHard[Unit]{ _ =>
       val logFile = new File("/root/log.txt")
 
       val bucket = config.resourceNames.bucket
@@ -46,9 +47,9 @@ protected[loquat] case object daemons {
           }, "logUploader")
           logUploader.setDaemon(true)
           logUploader.start()
-          success("logUploader started")
+          Success("logUploader started", ())
         }
-        case None => failure("can't obtain instanceId")
+        case None => Failure("can't obtain instanceId")
       }
     }
   }
@@ -71,7 +72,7 @@ protected[loquat] case object daemons {
 
         while(true) {
           logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
-          logger.info("TerminationDeaemon success results: " + successResults.size)
+          logger.info("TerminationDeaemon say results: " + successResults.size)
           logger.info("TerminationDeaemon failed results: " + failedResults.size)
 
           // FIXME: we don't need parsing here, only the numbers of messages
@@ -91,7 +92,7 @@ protected[loquat] case object daemons {
           )
 
           reason match {
-            case Some(r) => LoquatOps.undeploy(config)
+            case Some(r) => LoquatOps.undeploy(aws, config)
             case None => ()
           }
 
@@ -165,9 +166,7 @@ protected[loquat] case object daemons {
       }
     }
 
-    def install: Results = {
-      success("TerminationDaemonBundle installed")
-    }
+    def instructions: AnyInstructions = say("TerminationDaemonBundle installed")
 
   }
 

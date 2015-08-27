@@ -11,6 +11,7 @@ import ohnosequences.awstools.autoscaling.AutoScalingGroup
 import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
+import scala.util.Try
 
 
 // We don't want it to be used outside of this project
@@ -24,7 +25,7 @@ protected[loquat]
 
     val config = worker.config
 
-    case object workerCompat extends Compatible[Worker#Config#AMI, Worker](
+    case object workerCompat extends CompatibleWithPrefix(fullName)(
       environment = config.ami,
       bundle = worker,
       metadata = config.metadata
@@ -58,11 +59,10 @@ protected[loquat]
     }
 
 
-    def install: Results = {
+    def instructions: AnyInstructions = {
 
-      logger.info("manager is started")
-
-      try {
+      Try {
+        logger.info("manager is started")
         logger.info("checking if the initial dataMappings are uploaded")
         if (aws.s3.listObjects(config.dataMappingsUploaded.bucket, config.dataMappingsUploaded.key).isEmpty) {
           logger.warn("uploading initial dataMappings")
@@ -70,11 +70,7 @@ protected[loquat]
         } else {
           logger.warn("skipping uploading dataMappings")
         }
-      } catch {
-        case t: Throwable => logger.error("error during uploading initial dataMappings", t)
-      }
-
-      try {
+      } -&- { Try {
         logger.info("generating workers userScript")
         val workersGroup = aws.as.fixAutoScalingGroupUserData(
           config.workersAutoScalingGroup,
@@ -93,18 +89,14 @@ protected[loquat]
 
         logger.info("creating tags")
         utils.tagAutoScalingGroup(aws.as, groupName, utils.InstanceTags.INSTALLING.value)
-      } catch {
+      } recover {
         case t: Throwable => logger.error("error during creating workers autoscaling group", t)
-      }
-
-      try {
+      }} -&- { Try {
         logger.info("starting termination daemon")
         terminationDaemon.TerminationDaemonThread.start()
-      } catch {
+      } recover {
         case t: Throwable => logger.error("error during starting termination daemon", t)
-      }
-
-      success("manager installed")
+      }} -&- say("manager installed")
 
       // FIXME: catch fatal exceptions and relaunch manager instance
       // } catch {

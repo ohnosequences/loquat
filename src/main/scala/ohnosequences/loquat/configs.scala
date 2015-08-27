@@ -11,8 +11,11 @@ import ohnosequences.awstools.autoscaling._
 
 import com.amazonaws.AmazonServiceException
 import com.amazonaws.auth.AWSCredentialsProvider
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.{ LazyLogging, Logger }
+
 import java.io.File
+import scala.util.Try
+
 
 case object configs {
 
@@ -28,15 +31,14 @@ case object configs {
 
     /* This method validates subconfigs and logs validation errors */
     final def validate: Seq[String] = {
-
-      subConfigs.foreach{ _.validate }
+      val subErrors = subConfigs.flatMap{ _.validate }
 
       val errors = validationErrors
-      errors.foreach{ logger.error(_) }
+      errors.foreach{ msg => logger.error(msg) }
 
       if (errors.isEmpty) logger.debug(s"Validated [${label}] config")
 
-      errors
+      subErrors ++ errors
     }
   }
 
@@ -133,31 +135,43 @@ case object configs {
       val outputQueue: String = "loquatOutputQueue" + loquatId
       /* name of queue with errors (will be subscribed to errorTopic) */
       val errorQueue: String = "loquatErrorTopic" + loquatId
-      /* name of bucket for logs and console static files */
+      /* name of bucket for logs files */
       val bucket: String = "era7nisperos"
+      /* topic name to notificate user about termination of loquat */
+      val notificationTopic: String = "loquatNotificationTopic" + loquatId
     }
 
+
+  /* Simple type to separate user-related data from the config */
+  case class LoquatUser(
+    /* email address for notifications */
+    val email: String,
+    /* these are credentials that are used to launch loquat */
+    val localCredentials: AWSCredentialsProvider,
+    /* keypair name for connecting to the loquat instances */
+    val keypairName: String
+  )
 
 
   /* Configuration for loquat */
   abstract class AnyLoquatConfig extends AnyConfig {
 
-    /* email address for notifications */
-    val email: Email
+    val loquatUser: LoquatUser
 
-    /* these are credentials that are used to launch loquat */
-    val localCredentials: AWSCredentialsProvider
+    // val email: String
+    // val localCredentials: AWSCredentialsProvider
+    // val keypairName: String
 
     /* Metadata generated for your loquat project */
     val metadata: AnyArtifactMetadata
 
-    /* keypair name for connecting to the loquat instances */
-    val keypairName: String
-    val iamRoleName: String
-
     /* AMI that will be used for manager and worker instances */
+    // NOTE: we need the AMI type here for the manager/worker compats
     type AMI <: AmazonLinuxAMI
     val  ami: AMI
+
+    /* IAM rolse that will be used by the autoscaling groups */
+    val iamRoleName: String
 
     /* Configuration for Manager autoscaling group */
     val managerConfig: ManagerConfig
@@ -202,7 +216,7 @@ case object configs {
         instanceSpecs = InstanceSpecs(
           instanceType = managerConfig.instanceType,
           amiId = ami.id,
-          keyName = keypairName,
+          keyName = loquatUser.keypairName,
           instanceProfile = Some(iamRoleName)
         ),
         purchaseModel = managerConfig.purchaseModel
@@ -219,7 +233,7 @@ case object configs {
         instanceSpecs = InstanceSpecs(
           instanceType = workersConfig.instanceType,
           amiId = ami.id,
-          keyName = keypairName,
+          keyName = loquatUser.keypairName,
           instanceProfile = Some(iamRoleName),
           deviceMapping = Map("/dev/sdb" -> "ephemeral0")
         ),
@@ -232,29 +246,35 @@ case object configs {
     // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
     lazy final val dataMappingsUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
 
-    lazy final val notificationTopic: String =
-      s"""loquatNotificationTopic${email.toString.replace("@", "").replace("-", "").replace(".", "")}"""
 
 
-    val subConfigs: List[AnyConfig] = List(
+    lazy final val subConfigs: List[AnyConfig] = List(
       managerConfig,
       workersConfig
     )
 
     def validationErrors: Seq[String] = {
 
-      val ec2 = EC2.create(localCredentials)
-      val keypairErr =
-        if(ec2.isKeyPairExists(keypairName)) Seq()
-        else Seq(s"key pair: ${keypairName} doesn't exists")
+      // TODO: move credentials check to the user-config
+      val creds = loquatUser.localCredentials
 
-      val s3  = S3.create(localCredentials)
-      val artifactErr =
-        if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
-        else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+      if (Try( creds.getCredentials ).isFailure)
+        Seq(s"Couldn't load your local credentials: ${creds}")
+      else {
+        val ec2 = EC2.create(creds)
+        val keypairErr =
+          if(ec2.isKeyPairExists(loquatUser.keypairName)) Seq()
+          else Seq(s"key pair: ${loquatUser.keypairName} doesn't exists")
 
-      // TODO: moar checks!
-      keypairErr ++ artifactErr
+        val s3  = S3.create(creds)
+        val artifactErr =
+          if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
+          else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+
+        // TODO: moar checks!
+        // TODO: add account permissions validation
+        keypairErr ++ artifactErr
+      }
     }
   }
 
