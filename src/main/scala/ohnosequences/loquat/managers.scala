@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, daemons._
+import dataMappings._, daemons._, utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -89,8 +89,15 @@ protected[loquat]
             logger.info("Creating workers autoscaling group")
             aws.as.createAutoScalingGroup(workersGroup)
 
+            logger.info("Waiting for the workers autoscaling group creation")
+            utils.waitForResource(
+              getResource = aws.as.getAutoScalingGroupByName(workersGroup.name),
+              tries = 30,
+              timeStep = Seconds(5)
+            )
+
             logger.info("Creating tags for workers autoscaling group")
-            utils.tagAutoScalingGroup(aws.as, config.resourceNames.workersGroup, utils.InstanceTags.INSTALLING.value)
+            utils.tagAutoScalingGroup(aws.as, workersGroup.name, utils.InstanceTags.INSTALLING.value)
           }
         } -&-
         Try {
@@ -100,14 +107,16 @@ protected[loquat]
         say("manager installed")
       }
 
-      normalScenario -|- {
-        Try {
-          logger.error("Manager failed, trying to restart it")
-          aws.ec2.getCurrentInstance.foreach(_.terminate)
-        } ->-
-        failure[Unit]("Manager failed during installation")
-      }
-
+      normalScenario
+      // FIXME: this should happen only if the normal scenario fails!
+      // -|- {
+      //   Try {
+      //     logger.error("Manager failed, trying to restart it")
+      //     aws.ec2.getCurrentInstance.foreach(_.terminate)
+      //   } -&-
+      //   failure[Unit]("Manager failed during installation")
+      // }
+      //
     }
   }
 

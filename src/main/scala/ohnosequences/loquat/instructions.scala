@@ -6,7 +6,7 @@ case object instructions {
   import ohnosequences.datasets._, dataSets._, fileLocations._
 
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
-  import ops.typeSets._, ops.types._
+  import ops.typeSets._
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
@@ -59,8 +59,8 @@ case object instructions {
     ): Result[Map[String, File]] = {
 
       parseInputFiles(inputFilesMap) match {
-        case (Left(err), _) => Failure(err.toString)
-        case (Right(inputFiles), _) => {
+        case Left(err) => Failure(err.toString)
+        case Right(inputFiles) => {
           processData(dataMappingId, inputFiles).run(workingDir) match {
             case Failure(tr) => Failure(tr)
             case Success(tr, of) => Success(tr, filesMap(of))

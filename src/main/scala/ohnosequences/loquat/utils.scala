@@ -79,31 +79,14 @@ case object utils {
     (intervalSecs / 60) + " min " + (intervalSecs % 60) + " sec"
   }
 
-  // def waitForResource[A](resource: => Option[A]) : Option[A] = {
-  //   var iteration = 1
-  //   var current: Option[A] = None
-  //   val limit = 50
-  //
-  //   do {
-  //     current = resource
-  //     iteration += 1
-  //     Thread.sleep(1000)
-  //   } while (current.isEmpty && iteration < limit)
-  //
-  //   current
-  // }
+  @scala.annotation.tailrec
+  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: Time) : Option[R] = {
+    val resource = getResource
 
-  // def deleteAutoScalingGroup(as: AutoScaling, groupName: String): Try[Unit] = {
-  //   Try {
-  //     as.getAutoScalingGroupByName(groupName).get
-  //   } map { group =>
-  //     as.as.deleteAutoScalingGroup(
-  //       new DeleteAutoScalingGroupRequest()
-  //         .withAutoScalingGroupName(groupName)
-  //         .withForceDelete(true)
-  //     )
-  //     deleteLaunchConfiguration(group.launchingConfiguration.name)
-  //   }
-  // }
+    if (resource.isEmpty && tries <= 0) {
+      Thread.sleep(timeStep.inSeconds * 1000)
+      waitForResource(getResource, tries - 1, timeStep)
+    } else resource
+  }
 
 }
