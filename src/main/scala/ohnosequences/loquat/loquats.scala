@@ -33,8 +33,8 @@ trait AnyLoquat { loquat =>
 
   case object managerCompat extends CompatibleWithPrefix(fullName)(config.ami, manager, config.metadata)
 
-  final def deploy(): Unit = LoquatOps.deploy(config, managerCompat.userScript)
-  final def undeploy(): Unit = LoquatOps.undeploy(AWSClients.create(config.loquatUser.localCredentials), config)
+  final def deploy(user: LoquatUser): Unit = LoquatOps.deploy(config, user, managerCompat.userScript)
+  final def undeploy(user: LoquatUser): Unit = LoquatOps.undeploy(config, AWSClients.create(user.localCredentials))
 }
 
 abstract class Loquat[
@@ -52,16 +52,18 @@ protected[loquat] case object LoquatOps extends LazyLogging {
 
   def deploy(
     config: AnyLoquatConfig,
+    user: LoquatUser,
     managerUserScript: String
   ): Unit = {
     logger.info(s"deploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
-    val aws = AWSClients.create(config.loquatUser.localCredentials)
-    val names = config.resourceNames
-
     if(config.validate.nonEmpty)
       logger.error("Config validation failed. Fix config and try to deploy again.")
     else {
+      val aws = AWSClients.create(user.localCredentials)
+      val names = config.resourceNames
+
+      val managerGroup = config.managerAutoScalingGroup(user.keypairName)
 
       Seq(
         Step( s"Creating input queue: ${names.inputQueue}" )(
@@ -79,23 +81,24 @@ protected[loquat] case object LoquatOps extends LazyLogging {
         Step( s"Creating notification topic: ${names.notificationTopic}" )(
           Try { aws.sns.createTopic(names.notificationTopic) }
             .map { topic =>
-              if (!topic.isEmailSubscribed(config.loquatUser.email.toString)) {
-                logger.info(s"subscribing [${config.loquatUser.email}] to the notification topic")
-                topic.subscribeEmail(config.loquatUser.email.toString)
+              if (!topic.isEmailSubscribed(user.email.toString)) {
+                logger.info(s"Subscribing [${user.email}] to the notification topic")
+                topic.subscribeEmail(user.email.toString)
                 logger.info("Check your email and confirm subscription")
               }
             }
         ),
-        Step( s"Creating manager group: ${config.managerAutoScalingGroup.name}" )(
-          Try { aws.as.fixAutoScalingGroupUserData(config.managerAutoScalingGroup, managerUserScript) }
-            .map { managerGroup =>
-              aws.as.createAutoScalingGroup(managerGroup)
-              utils.tagAutoScalingGroup(aws.as, managerGroup.name, "manager")
+        Step( s"Creating manager group: ${managerGroup.name}" )(
+          Try { aws.as.fixAutoScalingGroupUserData(managerGroup, managerUserScript) }
+            .map { asGroup =>
+              aws.as.createAutoScalingGroup(asGroup)
+              // TODO: make use of the managerGroup status tag
+              utils.tagAutoScalingGroup(aws.as, asGroup.name, "manager")
             }
         ),
         Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(Success(true))
       ).foldLeft[Try[_]](
-        { logger.info("creating resources..."); Success(true) }
+        { logger.info("Creating resources..."); Success(true) }
       ) { (result: Try[_], next: Step[_]) =>
         result.flatMap(_ => next.execute)
       }
@@ -104,7 +107,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
   }
 
 
-  def undeploy(aws: AWSClients, config: AnyLoquatConfig): Unit = {
+  def undeploy(config: AnyLoquatConfig, aws: AWSClients): Unit = {
     logger.info(s"undeploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
     val names = config.resourceNames
@@ -117,8 +120,8 @@ protected[loquat] case object LoquatOps extends LazyLogging {
       }
     ).execute
 
-    Step(s"deleting workers group: ${config.workersAutoScalingGroup.name}")(
-      Try { aws.as.deleteAutoScalingGroup(config.workersAutoScalingGroup) }
+    Step(s"deleting workers group: ${names.workersGroup}")(
+      Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
     ).execute
 
     Step(s"deleting temporary bucket: ${names.bucket}")(
@@ -137,8 +140,8 @@ protected[loquat] case object LoquatOps extends LazyLogging {
       Try { aws.sqs.getQueueByName(names.inputQueue).foreach(_.delete) }
     ).execute
 
-    Step(s"deleting manager group: ${config.managerAutoScalingGroup.name}")(
-      Try { aws.as.deleteAutoScalingGroup(config.managerAutoScalingGroup) }
+    Step(s"deleting manager group: ${names.managerGroup}")(
+      Try { aws.as.deleteAutoScalingGroup(names.managerGroup) }
     ).execute
 
     logger.info("Loquat is undeployed")

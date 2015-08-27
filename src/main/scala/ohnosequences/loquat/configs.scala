@@ -128,17 +128,21 @@ case object configs {
 
   /* Configuration of resources */
   protected[loquat]
-    case class ResourceNames(loquatId: String) {
+    case class ResourceNames(suffix: String) {
       /* name of queue with dataMappings */
-      val inputQueue: String = "loquatInputQueue" + loquatId
+      val inputQueue: String = "loquatInputQueue" + suffix
       /* name of topic for dataMappings result notifications */
-      val outputQueue: String = "loquatOutputQueue" + loquatId
+      val outputQueue: String = "loquatOutputQueue" + suffix
       /* name of queue with errors (will be subscribed to errorTopic) */
-      val errorQueue: String = "loquatErrorTopic" + loquatId
+      val errorQueue: String = "loquatErrorTopic" + suffix
       /* name of bucket for logs files */
       val bucket: String = "era7nisperos"
       /* topic name to notificate user about termination of loquat */
-      val notificationTopic: String = "loquatNotificationTopic" + loquatId
+      val notificationTopic: String = "loquatNotificationTopic" + suffix
+      /* name of the manager autoscaling group */
+      val managerGroup: String = "loquatManagerGroup" + suffix
+      /* name of the workers autoscaling group */
+      val workersGroup: String = "loquatWorkersGroup" + suffix
     }
 
 
@@ -150,17 +154,23 @@ case object configs {
     val localCredentials: AWSCredentialsProvider,
     /* keypair name for connecting to the loquat instances */
     val keypairName: String
-  )
+  ) extends Config() {
+
+    def validationErrors: Seq[String] = {
+      if (Try( localCredentials.getCredentials ).isFailure)
+        Seq(s"Couldn't load your local credentials: ${localCredentials}")
+        // TODO: add account permissions validation
+      else {
+        val ec2 = EC2.create(localCredentials)
+        if(ec2.isKeyPairExists(keypairName)) Seq()
+        else Seq(s"key pair: ${keypairName} doesn't exists")
+      }
+    }
+  }
 
 
   /* Configuration for loquat */
   abstract class AnyLoquatConfig extends AnyConfig {
-
-    val loquatUser: LoquatUser
-
-    // val email: String
-    // val localCredentials: AWSCredentialsProvider
-    // val keypairName: String
 
     /* Metadata generated for your loquat project */
     val metadata: AnyArtifactMetadata
@@ -185,14 +195,15 @@ case object configs {
     /* List of tiny or big dataMappings */
     val dataMappings: List[AnyDataMapping]
 
-
     // TODO: AWS region should be also configurable
+
 
     /* Here follow all the values that are dependent on those defined on top */
 
     // FIXME: put this constant somewhere else
     final val workingDir: File = new File("/media/ephemeral0/applicator/loquat")
 
+    // FIXME: should check that the url string parses to an object address
     lazy final val fatArtifactS3Object: ObjectAddress = {
       val s3url = """s3://(.+)/(.+)""".r
       metadata.artifactUrl match {
@@ -206,46 +217,47 @@ case object configs {
     lazy final val loquatVersion: String = metadata.version.replace(".", "").toLowerCase
     lazy final val loquatId: String = (loquatName + loquatVersion)
 
-    lazy final val managerAutoScalingGroup = AutoScalingGroup(
-      name = "loquatManagerGroup" + loquatVersion,
-      minSize = 1,
-      maxSize = 1,
-      desiredCapacity = 1,
-      launchingConfiguration = LaunchConfiguration(
-        name = "loquatManagerLaunchConfiguration" + loquatVersion,
-        instanceSpecs = InstanceSpecs(
-          instanceType = managerConfig.instanceType,
-          amiId = ami.id,
-          keyName = loquatUser.keypairName,
-          instanceProfile = Some(iamRoleName)
-        ),
-        purchaseModel = managerConfig.purchaseModel
-      )
-    )
+    lazy final val resourceNames: ResourceNames = ResourceNames(loquatVersion)
 
-    lazy final val workersAutoScalingGroup = AutoScalingGroup(
-      name = "loquatWorkersGroup" + loquatVersion,
-      minSize = workersConfig.groupSize.min,
-      maxSize = workersConfig.groupSize.max,
-      desiredCapacity = workersConfig.groupSize.desired,
-      launchingConfiguration = LaunchConfiguration(
-        name = "loquatWorkersLaunchConfiguration" + loquatVersion,
-        instanceSpecs = InstanceSpecs(
-          instanceType = workersConfig.instanceType,
-          amiId = ami.id,
-          keyName = loquatUser.keypairName,
-          instanceProfile = Some(iamRoleName),
-          deviceMapping = Map("/dev/sdb" -> "ephemeral0")
-        ),
-        purchaseModel = workersConfig.purchaseModel
+    def managerAutoScalingGroup(keypairName: String): AutoScalingGroup =
+      AutoScalingGroup(
+        name = resourceNames.managerGroup,
+        minSize = 1,
+        maxSize = 1,
+        desiredCapacity = 1,
+        launchingConfiguration = LaunchConfiguration(
+          name = "loquatManagerLaunchConfiguration" + loquatVersion,
+          instanceSpecs = InstanceSpecs(
+            instanceType = managerConfig.instanceType,
+            amiId = ami.id,
+            keyName = keypairName,
+            instanceProfile = Some(iamRoleName)
+          ),
+          purchaseModel = managerConfig.purchaseModel
+        )
       )
-    )
 
-    lazy final val resourceNames: ResourceNames = ResourceNames(loquatId)
+    def workersAutoScalingGroup(keypairName: String): AutoScalingGroup =
+      AutoScalingGroup(
+        name = resourceNames.workersGroup,
+        minSize = workersConfig.groupSize.min,
+        maxSize = workersConfig.groupSize.max,
+        desiredCapacity = workersConfig.groupSize.desired,
+        launchingConfiguration = LaunchConfiguration(
+          name = "loquatWorkersLaunchConfiguration" + loquatVersion,
+          instanceSpecs = InstanceSpecs(
+            instanceType = workersConfig.instanceType,
+            amiId = ami.id,
+            keyName = keypairName,
+            instanceProfile = Some(iamRoleName),
+            deviceMapping = Map("/dev/sdb" -> "ephemeral0")
+          ),
+          purchaseModel = workersConfig.purchaseModel
+        )
+      )
 
     // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
     lazy final val dataMappingsUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
-
 
 
     lazy final val subConfigs: List[AnyConfig] = List(
@@ -253,29 +265,12 @@ case object configs {
       workersConfig
     )
 
-    def validationErrors: Seq[String] = {
-
-      // TODO: move credentials check to the user-config
-      val creds = loquatUser.localCredentials
-
-      if (Try( creds.getCredentials ).isFailure)
-        Seq(s"Couldn't load your local credentials: ${creds}")
-      else {
-        val ec2 = EC2.create(creds)
-        val keypairErr =
-          if(ec2.isKeyPairExists(loquatUser.keypairName)) Seq()
-          else Seq(s"key pair: ${loquatUser.keypairName} doesn't exists")
-
-        val s3  = S3.create(creds)
-        val artifactErr =
-          if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
-          else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
-
-        // TODO: moar checks!
-        // TODO: add account permissions validation
-        keypairErr ++ artifactErr
-      }
-    }
+    // def validationErrors: Seq[String] = {
+    //   val s3  = S3.create(creds)
+    //   val artifactErr =
+    //     if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
+    //     else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+    // }
   }
 
 }
