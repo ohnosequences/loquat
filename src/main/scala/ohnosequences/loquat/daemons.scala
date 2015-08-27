@@ -72,8 +72,8 @@ protected[loquat] case object daemons {
 
         while(true) {
           logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
-          logger.info("TerminationDeaemon say results: " + successResults.size)
-          logger.info("TerminationDeaemon failed results: " + failedResults.size)
+          logger.info("TerminationDeaemon success results: " + successResults.size)
+          logger.info("TerminationDeaemon failure results: " + failedResults.size)
 
           // FIXME: we don't need parsing here, only the numbers of messages
           receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
@@ -92,7 +92,7 @@ protected[loquat] case object daemons {
           )
 
           reason match {
-            case Some(r) => LoquatOps.undeploy(aws, config)
+            case Some(r) => LoquatOps.undeploy(config, aws)
             case None => ()
           }
 

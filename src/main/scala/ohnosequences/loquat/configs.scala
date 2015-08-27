@@ -139,9 +139,9 @@ case object configs {
       val bucket: String = "era7nisperos"
       /* topic name to notificate user about termination of loquat */
       val notificationTopic: String = "loquatNotificationTopic" + suffix
-
+      /* name of the manager autoscaling group */
       val managerGroup: String = "loquatManagerGroup" + suffix
-
+      /* name of the workers autoscaling group */
       val workersGroup: String = "loquatWorkersGroup" + suffix
     }
 
@@ -154,17 +154,23 @@ case object configs {
     val localCredentials: AWSCredentialsProvider,
     /* keypair name for connecting to the loquat instances */
     val keypairName: String
-  )
+  ) extends Config() {
+
+    def validationErrors: Seq[String] = {
+      if (Try( localCredentials.getCredentials ).isFailure)
+        Seq(s"Couldn't load your local credentials: ${localCredentials}")
+        // TODO: add account permissions validation
+      else {
+        val ec2 = EC2.create(localCredentials)
+        if(ec2.isKeyPairExists(keypairName)) Seq()
+        else Seq(s"key pair: ${keypairName} doesn't exists")
+      }
+    }
+  }
 
 
   /* Configuration for loquat */
   abstract class AnyLoquatConfig extends AnyConfig {
-
-    val loquatUser: LoquatUser
-
-    // val email: String
-    // val localCredentials: AWSCredentialsProvider
-    // val keypairName: String
 
     /* Metadata generated for your loquat project */
     val metadata: AnyArtifactMetadata
@@ -189,14 +195,15 @@ case object configs {
     /* List of tiny or big dataMappings */
     val dataMappings: List[AnyDataMapping]
 
-
     // TODO: AWS region should be also configurable
+
 
     /* Here follow all the values that are dependent on those defined on top */
 
     // FIXME: put this constant somewhere else
     final val workingDir: File = new File("/media/ephemeral0/applicator/loquat")
 
+    // FIXME: should check that the url string parses to an object address
     lazy final val fatArtifactS3Object: ObjectAddress = {
       val s3url = """s3://(.+)/(.+)""".r
       metadata.artifactUrl match {
@@ -253,35 +260,17 @@ case object configs {
     lazy final val dataMappingsUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
 
 
-
     lazy final val subConfigs: List[AnyConfig] = List(
       managerConfig,
       workersConfig
     )
 
-    def validationErrors: Seq[String] = {
-
-      // TODO: move credentials check to the user-config
-      val creds = loquatUser.localCredentials
-
-      if (Try( creds.getCredentials ).isFailure)
-        Seq(s"Couldn't load your local credentials: ${creds}")
-      else {
-        val ec2 = EC2.create(creds)
-        val keypairErr =
-          if(ec2.isKeyPairExists(loquatUser.keypairName)) Seq()
-          else Seq(s"key pair: ${loquatUser.keypairName} doesn't exists")
-
-        val s3  = S3.create(creds)
-        val artifactErr =
-          if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
-          else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
-
-        // TODO: moar checks!
-        // TODO: add account permissions validation
-        keypairErr ++ artifactErr
-      }
-    }
+    // def validationErrors: Seq[String] = {
+    //   val s3  = S3.create(creds)
+    //   val artifactErr =
+    //     if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
+    //     else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+    // }
   }
 
 }

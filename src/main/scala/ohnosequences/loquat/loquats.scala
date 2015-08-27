@@ -34,7 +34,7 @@ trait AnyLoquat { loquat =>
   case object managerCompat extends CompatibleWithPrefix(fullName)(config.ami, manager, config.metadata)
 
   final def deploy(user: LoquatUser): Unit = LoquatOps.deploy(config, user, managerCompat.userScript)
-  final def undeploy(): Unit = LoquatOps.undeploy(AWSClients.create(config.loquatUser.localCredentials), config)
+  final def undeploy(user: LoquatUser): Unit = LoquatOps.undeploy(config, AWSClients.create(user.localCredentials))
 }
 
 abstract class Loquat[
@@ -60,7 +60,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
     if(config.validate.nonEmpty)
       logger.error("Config validation failed. Fix config and try to deploy again.")
     else {
-      val aws = AWSClients.create(config.loquatUser.localCredentials)
+      val aws = AWSClients.create(user.localCredentials)
       val names = config.resourceNames
 
       val managerGroup = config.managerAutoScalingGroup(user.keypairName)
@@ -81,9 +81,9 @@ protected[loquat] case object LoquatOps extends LazyLogging {
         Step( s"Creating notification topic: ${names.notificationTopic}" )(
           Try { aws.sns.createTopic(names.notificationTopic) }
             .map { topic =>
-              if (!topic.isEmailSubscribed(config.loquatUser.email.toString)) {
-                logger.info(s"subscribing [${config.loquatUser.email}] to the notification topic")
-                topic.subscribeEmail(config.loquatUser.email.toString)
+              if (!topic.isEmailSubscribed(user.email.toString)) {
+                logger.info(s"Subscribing [${user.email}] to the notification topic")
+                topic.subscribeEmail(user.email.toString)
                 logger.info("Check your email and confirm subscription")
               }
             }
@@ -98,7 +98,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
         ),
         Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(Success(true))
       ).foldLeft[Try[_]](
-        { logger.info("creating resources..."); Success(true) }
+        { logger.info("Creating resources..."); Success(true) }
       ) { (result: Try[_], next: Step[_]) =>
         result.flatMap(_ => next.execute)
       }
@@ -107,7 +107,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
   }
 
 
-  def undeploy(aws: AWSClients, config: AnyLoquatConfig): Unit = {
+  def undeploy(config: AnyLoquatConfig, aws: AWSClients): Unit = {
     logger.info(s"undeploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
     val names = config.resourceNames
