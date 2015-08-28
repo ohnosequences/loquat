@@ -21,7 +21,7 @@ protected[loquat] case object daemons {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-    def instructions: AnyInstructions = TryHard[Unit]{ _ =>
+    def instructions: AnyInstructions = LazyTry[Unit] {
       val logFile = new File("/root/log.txt")
 
       val bucket = config.resourceNames.bucket

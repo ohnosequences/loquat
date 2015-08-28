@@ -62,7 +62,7 @@ protected[loquat]
     def instructions: AnyInstructions = {
 
       lazy val normalScenario: Instructions[Unit] = {
-        Try {
+        LazyTry {
           logger.info("manager is started")
           logger.info("checking if the initial dataMappings are uploaded")
           if (aws.s3.listObjects(config.dataMappingsUploaded.bucket, config.dataMappingsUploaded.key).isEmpty) {
@@ -71,18 +71,15 @@ protected[loquat]
           } else {
             logger.warn("skipping uploading dataMappings")
           }
-        } -&- {
-          Try {
-            aws.as.getAutoScalingGroupByName(config.resourceNames.managerGroup).get
-          } map { group =>
+        } -&-
+        LazyTry {
+          aws.as.getAutoScalingGroupByName(config.resourceNames.managerGroup) map { group =>
             group.launchingConfiguration.instanceSpecs.keyName
           } map { keypairName =>
 
-            val workersGroup = config.workersAutoScalingGroup(keypairName)
-
             logger.info("Setting up workers userScript")
-            aws.as.fixAutoScalingGroupUserData(
-              workersGroup,
+            val workersGroup = aws.as.fixAutoScalingGroupUserData(
+              config.workersAutoScalingGroup(keypairName),
               workerCompat.userScript
             )
 
@@ -100,23 +97,23 @@ protected[loquat]
             utils.tagAutoScalingGroup(aws.as, workersGroup.name, utils.InstanceTags.INSTALLING.value)
           }
         } -&-
-        Try {
+        LazyTry {
           logger.info("starting termination daemon")
           terminationDaemon.TerminationDaemonThread.start()
         } -&-
         say("manager installed")
       }
 
-      normalScenario
+      lazy val failScenario = {
+        LazyTry {
+          logger.error("Manager failed, trying to restart it")
+          aws.ec2.getCurrentInstance.foreach(_.terminate)
+        } -&-
+        failure[Unit]("Manager failed during installation")
+      }
+
       // FIXME: this should happen only if the normal scenario fails!
-      // -|- {
-      //   Try {
-      //     logger.error("Manager failed, trying to restart it")
-      //     aws.ec2.getCurrentInstance.foreach(_.terminate)
-      //   } -&-
-      //   failure[Unit]("Manager failed during installation")
-      // }
-      //
+      normalScenario -|- failScenario
     }
   }
 

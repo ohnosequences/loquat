@@ -31,7 +31,7 @@ trait AnyWorkerBundle extends AnyBundle {
   val bundleDependencies: List[AnyBundle] = List(instructionsBundle, LogUploaderBundle(config))
 
   def instructions: AnyInstructions = {
-    Try {
+    LazyTry {
       new InstructionsExecutor(config, instructionsBundle).runLoop
     } -&- say("worker installed")
   }
