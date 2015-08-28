@@ -183,7 +183,7 @@ class InstructionsExecutor(
             val uploadTries = outputMap map { case (file, objectAddress) =>
               logger.info(s"publishing output object: ${file} -> ${objectAddress}")
               // TODO: publicity should be a configurable option
-              aws.s3.uploadFile(objectAddress / file.getName, file, public = true)
+              aws.s3.uploadFile(objectAddress, file, public = true)
             }
 
             // TODO: check whether we can fold Try's here somehow
