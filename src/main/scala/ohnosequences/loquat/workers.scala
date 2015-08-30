@@ -32,7 +32,7 @@ trait AnyWorkerBundle extends AnyBundle {
 
   def instructions: AnyInstructions = {
     LazyTry {
-      new InstructionsExecutor(config, instructionsBundle).runLoop
+      new DataProcessor(config, instructionsBundle).runLoop
     } -&- say("worker installed")
   }
 }
@@ -50,7 +50,7 @@ abstract class WorkerBundle[
 
 
 // TODO: rewrite all this and make it Worker's install
-class InstructionsExecutor(
+class DataProcessor(
   val config: AnyLoquatConfig,
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
@@ -73,7 +73,7 @@ class InstructionsExecutor(
     var message: Option[Message] = queue.receiveMessage
 
     while(message.isEmpty) {
-      logger.info("InstructionsExecutor wait for dataMapping")
+      logger.info("DataProcessor wait for dataMapping")
       instance.foreach(_.createTag(utils.InstanceTags.IDLE))
       Thread.sleep(MESSAGE_TIMEOUT)
       message = queue.receiveMessage
@@ -160,7 +160,7 @@ class InstructionsExecutor(
           (name -> inputFile)
       }
 
-      logger.info("running instructions script in " + workingDir.getAbsolutePath)
+      logger.info("processing data in: " + workingDir.getAbsolutePath)
       val result = instructionsBundle.processFiles(dataMapping.id, inputFilesMap, workingDir)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
@@ -215,7 +215,7 @@ class InstructionsExecutor(
 
   def runLoop(): Unit = {
 
-    logger.info("InstructionsExecutor started at " + instance.map(_.getInstanceId))
+    logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
 
     while(!stopped) {
       var dataMappingId: String = ""
@@ -224,11 +224,11 @@ class InstructionsExecutor(
         val message = waitForDataMapping(inputQueue)
 
         instance.foreach(_.createTag(utils.InstanceTags.PROCESSING))
-        logger.info("InstructionsExecutor: received message " + message)
+        logger.info("DataProcessor: received message " + message)
         val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
         dataMappingId = dataMapping.id
 
-        logger.info("InstructionsExecutor processing message")
+        logger.info("DataProcessor processing message")
 
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {

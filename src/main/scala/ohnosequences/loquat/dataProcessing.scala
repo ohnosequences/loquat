@@ -61,7 +61,7 @@ case object dataProcessing {
 
     type Context = ProcessingContext[Input]
 
-    /* this is where user describes instructions how to process each dataMapping:
+    /* this is where user describes how to process each dataMapping:
        - it takes input data file locations
        - it must produce same for the output files */
     def processData(
