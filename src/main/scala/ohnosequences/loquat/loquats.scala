@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, instructions._, configs._, utils._
+import dataMappings._, dataProcessing._, configs._, utils._
 
 import ohnosequences.statika.bundles._
 
@@ -19,8 +19,8 @@ trait AnyLoquat { loquat =>
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  type InstructionsBundle <: AnyInstructionsBundle
-  val  instructionsBundle: InstructionsBundle
+  type DataProcessingBundle <: AnyDataProcessingBundle
+  val  instructionsBundle: DataProcessingBundle
 
   lazy val fullName: String = this.getClass.getName.split("\\$").mkString(".")
 
@@ -39,11 +39,11 @@ trait AnyLoquat { loquat =>
 
 abstract class Loquat[
   C <: AnyLoquatConfig,
-  I <: AnyInstructionsBundle
+  I <: AnyDataProcessingBundle
 ](val config: C, val instructionsBundle: I) extends AnyLoquat {
 
   type Config = C
-  type InstructionsBundle = I
+  type DataProcessingBundle = I
 }
 
 

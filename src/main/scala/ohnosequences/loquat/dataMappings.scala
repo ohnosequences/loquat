@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 case object dataMappings {
 
-  import instructions._
+  import dataProcessing._
 
   import ohnosequences.datasets._, dataSets._, s3Locations._
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
@@ -21,7 +21,7 @@ case object dataMappings {
 
     val id: String
 
-    type Instructions <: AnyInstructionsBundle
+    type Instructions <: AnyDataProcessingBundle
     val  instructions: Instructions
 
     /* These are records with references to the remote locations of
@@ -39,7 +39,7 @@ case object dataMappings {
   }
 
   case class DataMapping[
-    I <: AnyInstructionsBundle
+    I <: AnyDataProcessingBundle
   ](val id: String,
     val instructions: I)
    (val remoteInput: RemotesFor[I#Input],

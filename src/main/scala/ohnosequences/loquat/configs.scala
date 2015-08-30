@@ -156,6 +156,9 @@ case object configs {
     val keypairName: String
   ) extends Config() {
 
+    def   deploy[L <: AnyLoquat](l: L): Unit = l.deploy(this)
+    def undeploy[L <: AnyLoquat](l: L): Unit = l.undeploy(this)
+
     def validationErrors: Seq[String] = {
       val emailErr =
         if (email.contains('@')) Seq()

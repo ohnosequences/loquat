@@ -1,8 +1,8 @@
 package ohnosequences.loquat
 
-case object instructions {
+case object dataProcessing {
 
-  import ohnosequences.loquat._
+  import utils._
   import ohnosequences.datasets._, dataSets._, fileLocations._
 
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
@@ -13,11 +13,38 @@ case object instructions {
   import ohnosequences.statika.results._
 
   import ohnosequences.awstools.s3.ObjectAddress
-  import java.io.File
   import upickle.Js
+  import java.io.File
 
 
-  trait AnyInstructionsBundle extends AnyBundle {
+  trait AnyProcessingContext {
+
+    val  workingDir: file
+
+    type DataSet <: AnyDataSet
+    val  dataSet: DataSet
+
+    type DataFiles  = DataSet#LocationsAt[FileDataLocation]
+    val  dataFiles: DataFiles
+
+    /* user can get the file corresponding to the given data key */
+    def file[K <: AnyData](key: K)(implicit
+        lookup: DataFiles Lookup (K := FileDataLocation)
+      ): file = lookup(dataFiles).value.location
+
+    /* or create a file instance in the orking directory */
+    def /(name: String): file = workingDir / name
+  }
+
+  case class ProcessingContext[D <: AnyDataSet](
+    val dataSet: D,
+    val dataFiles: D#LocationsAt[FileDataLocation],
+    val workingDir: file
+  ) extends AnyProcessingContext { type DataSet = D }
+
+
+
+  trait AnyDataProcessingBundle extends AnyBundle {
 
     type Input <: AnyDataSet
     val  input: Input
@@ -32,24 +59,16 @@ case object instructions {
     val parseInputFiles: ParseDenotations[InputFiles, File]
     val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
 
-    /* This method serialises OutputFiles data mapping to a normal Map */
-    def filesMap(filesSet: OutputFiles): Map[String, File] =
-      outputFilesToMap(filesSet).map { case (data, loc) =>
-        data.label -> loc.location
-      }
-
-    def getFile[K <: AnyData](inputFiles: InputFiles, key: K)
-      (implicit
-        lookup: InputFiles Lookup (K := FileDataLocation)
-      ): File = lookup(inputFiles).value.location
+    type Context = ProcessingContext[Input]
 
     /* this is where user describes instructions how to process each dataMapping:
        - it takes input data file locations
        - it must produce same for the output files */
     def processData(
       dataMappingId: String,
-      inputFiles: InputFiles
-    ): AnyInstructions.withOut[OutputFiles]
+      context: Context
+    ): Instructions[OutputFiles]
+
 
     /* This is a cover-method, which will be used in the worker run-loop */
     final def processFiles(
@@ -58,10 +77,19 @@ case object instructions {
       workingDir: File
     ): Result[Map[String, File]] = {
 
+      /* This method serialises OutputFiles data mapping to a normal Map */
+      def filesMap(filesSet: OutputFiles): Map[String, File] =
+        outputFilesToMap(filesSet).map { case (data, loc) =>
+          data.label -> loc.location
+        }
+
       parseInputFiles(inputFilesMap) match {
         case Left(err) => Failure(err.toString)
         case Right(inputFiles) => {
-          processData(dataMappingId, inputFiles).run(workingDir) match {
+          processData(
+            dataMappingId,
+            ProcessingContext(input, inputFiles, workingDir)
+          ).run(workingDir) match {
             case Failure(tr) => Failure(tr)
             case Success(tr, of) => Success(tr, filesMap(of))
           }
@@ -71,7 +99,7 @@ case object instructions {
     }
   }
 
-  abstract class InstructionsBundle[
+  abstract class DataProcessingBundle[
     I <: AnyDataSet,
     O <: AnyDataSet
   ](deps: AnyBundle*)(
@@ -80,7 +108,7 @@ case object instructions {
   )(implicit
     val parseInputFiles: ParseDenotations[I#LocationsAt[FileDataLocation], File],
     val outputFilesToMap: ToMap[O#LocationsAt[FileDataLocation], AnyData, FileDataLocation]
-  ) extends Bundle(deps: _*) with AnyInstructionsBundle {
+  ) extends Bundle(deps: _*) with AnyDataProcessingBundle {
 
     type Input = I
     type Output = O

@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, instructions._, daemons._, configs._, utils._
+import dataMappings._, dataProcessing._, daemons._, configs._, utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -22,8 +22,8 @@ import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 trait AnyWorkerBundle extends AnyBundle {
 
-  type InstructionsBundle <: AnyInstructionsBundle
-  val  instructionsBundle: InstructionsBundle
+  type DataProcessingBundle <: AnyDataProcessingBundle
+  val  instructionsBundle: DataProcessingBundle
 
   type Config <: AnyLoquatConfig
   val  config: Config
@@ -38,13 +38,13 @@ trait AnyWorkerBundle extends AnyBundle {
 }
 
 abstract class WorkerBundle[
-  I <: AnyInstructionsBundle,
+  I <: AnyDataProcessingBundle,
   C <: AnyLoquatConfig
 ](val instructionsBundle: I,
   val config: C
 ) extends AnyWorkerBundle {
 
-  type InstructionsBundle = I
+  type DataProcessingBundle = I
   type Config = C
 }
 
@@ -52,7 +52,7 @@ abstract class WorkerBundle[
 // TODO: rewrite all this and make it Worker's install
 class InstructionsExecutor(
   val config: AnyLoquatConfig,
-  val instructionsBundle: AnyInstructionsBundle
+  val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
@@ -198,8 +198,9 @@ class InstructionsExecutor(
 
           } else {
 
-            logger.error("some output files don't exist!")
-            tr +: Failure(Seq("Couldn't upload results, because some output files don't exist"))
+            val missingFiles = outputMap.keys.filterNot(_.exists).map(_.getCanonicalPath)
+            logger.error(s"some output files don't exist: ${missingFiles}")
+            tr +: Failure(Seq(s"Couldn't upload results, because some output files don't exist: ${missingFiles}"))
 
           }
         }

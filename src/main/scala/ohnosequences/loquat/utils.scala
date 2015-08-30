@@ -89,4 +89,31 @@ case object utils {
     } else resource
   }
 
+
+  /* File utils */
+  // type File = java.io.File
+
+  // def file(name: String): FileOps = FileOps(new File(name))
+
+  case class file(javaFile: File) extends AnyVal {
+
+    def /(suffix: String): file = file(new File(javaFile, suffix))
+
+    def parent: file = file(javaFile.getParent)
+
+    def name: String = javaFile.getName
+    def path: String = javaFile.getCanonicalPath
+
+    def rename(change: String => String): file = parent / change(name)
+  }
+
+  object file {
+
+    def apply(name: String): file = file(new File(name))
+  }
+
+  implicit def fromJavaFile(f: File): file = file(f)
+  implicit def   toJavaFile(f: file): File = f.javaFile
+  implicit def fileToString(f: file): String = f.path
+
 }
