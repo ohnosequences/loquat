@@ -18,6 +18,7 @@ import upickle.Js
 
 import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
+import com.amazonaws.services.s3.transfer._
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -149,15 +150,34 @@ class DataProcessor(
       outputDir.mkdir
 
 
-      logger.info("downloading dataMapping input")
-      val loadingManager = aws.s3.createLoadingManager
+      val transferManager = new TransferManager(aws.s3.s3)
 
+      logger.info("downloading dataMapping input")
       val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
         case (name, objectAddress) =>
-          val inputFile = new File(inputDir, name)
+          val destination = new File(inputDir, name)
           logger.info("trying to create input object: " + name)
-          loadingManager.download(objectAddress, inputFile)
-          (name -> inputFile)
+          println(s"""Dowloading
+            |from: ${objectAddress.url}
+            |to: ${destination.getCanonicalPath}
+            |""".stripMargin)
+          // first we try to download it as a normal object:
+          Try{
+            transferManager.download(
+              objectAddress.bucket,
+              objectAddress.key,
+              destination
+            ).waitForCompletion
+          }.recover{
+            // if it fails, we try to download it as a directory
+            case e: com.amazonaws.AmazonServiceException =>
+              transferManager.downloadDirectory(
+                objectAddress.bucket,
+                objectAddress.key,
+                destination
+              ).waitForCompletion
+          }.get // is this the right way to fail if it's an exception?
+          (name -> destination)
       }
 
       logger.info("processing data in: " + workingDir.getAbsolutePath)
@@ -182,8 +202,22 @@ class DataProcessor(
 
             val uploadTries = outputMap map { case (file, objectAddress) =>
               logger.info(s"publishing output object: ${file} -> ${objectAddress}")
-              // TODO: publicity should be a configurable option
-              aws.s3.uploadFile(objectAddress, file, public = true)
+
+              if (file.isDirectory) Try {
+                transferManager.uploadDirectory(
+                  objectAddress.bucket,
+                  objectAddress.key,
+                  file,
+                  true // includeSubdirectories
+                ).waitForCompletion
+              }
+              else Try {
+                transferManager.upload(
+                  objectAddress.bucket,
+                  objectAddress.key,
+                  file
+                ).waitForCompletion
+              }
             }
 
             // TODO: check whether we can fold Try's here somehow
