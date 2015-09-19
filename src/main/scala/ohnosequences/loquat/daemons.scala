@@ -12,7 +12,7 @@ protected[loquat] case object daemons {
   import scala.collection.mutable.ListBuffer
 
   import ohnosequences.awstools.AWSClients
-  import ohnosequences.awstools.s3.ObjectAddress
+  import ohnosequences.awstools.s3._
   import com.amazonaws.auth.InstanceProfileCredentialsProvider
   import java.io.File
 
@@ -32,10 +32,10 @@ protected[loquat] case object daemons {
             def run() {
               while(true) {
                 try {
-                  if(aws.s3.getBucket(bucket).isEmpty) {
+                  if(aws.s3.bucketExists(bucket)) {
                       logger.warn("bucket " + bucket + " doesn't exist")
                     } else {
-                      aws.s3.uploadFile(ObjectAddress(bucket, config.loquatId) / id, logFile)
+                      aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile)
                     }
 
                   Thread.sleep(1000 * 30)

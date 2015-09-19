@@ -8,7 +8,7 @@ import ohnosequences.statika.results._
 
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
-import ohnosequences.awstools.s3.ObjectAddress
+import ohnosequences.awstools.s3._
 import ohnosequences.awstools.AWSClients
 import com.typesafe.scalalogging.LazyLogging
 import java.io.File
@@ -193,7 +193,7 @@ class DataProcessor(
         }
         case Success(tr, outputFileMap) => {
           // FIXME: do it more careful
-          val outputMap: Map[File, ObjectAddress] =
+          val outputMap: Map[File, AnyS3Address] =
             outputFileMap.map { case (name, file) =>
               file -> dataMapping.outputs(name)
             }

@@ -19,7 +19,7 @@ libraryDependencies ++= Seq(
   "ohnosequences" %% "aws-statika" % "2.0.0-new-instructions-SNAPSHOT",
   "ohnosequences" %% "datasets"    % "0.2.0-SNAPSHOT",
   // amazon:
-  "ohnosequences" %% "aws-scala-tools" % "0.13.2"
+  "ohnosequences" %% "aws-scala-tools" % "0.14.0-SNAPSHOT"
 )
 
 dependencyOverrides += "jline" % "jline" % "2.12.1"

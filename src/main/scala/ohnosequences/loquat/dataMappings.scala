@@ -8,7 +8,7 @@ case object dataMappings {
   import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import ohnosequences.cosas.ops.typeSets._
 
-  import ohnosequences.awstools.s3.ObjectAddress
+  import ohnosequences.awstools.s3._
   import java.io.File
   import upickle.Js
 
@@ -57,8 +57,8 @@ case object dataMappings {
   protected[loquat]
     case class SimpleDataMapping(
       val id: String,
-      val inputs: Map[String, ObjectAddress],
-      val outputs: Map[String, ObjectAddress]
+      val inputs: Map[String, AnyS3Address],
+      val outputs: Map[String, AnyS3Address]
     )
 
   /* and we can transform any dataMapping to this simple form (but not another way round) */

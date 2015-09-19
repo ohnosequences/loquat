@@ -12,7 +12,6 @@ case object dataProcessing {
   import ohnosequences.statika.instructions._
   import ohnosequences.statika.results._
 
-  import ohnosequences.awstools.s3.ObjectAddress
   import upickle.Js
   import java.io.File
 

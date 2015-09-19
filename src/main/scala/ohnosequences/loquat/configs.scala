@@ -6,7 +6,7 @@ import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
 
 import ohnosequences.awstools.ec2.{EC2, Tag, InstanceType, InstanceSpecs }
-import ohnosequences.awstools.s3.{ S3, ObjectAddress }
+import ohnosequences.awstools.s3._
 import ohnosequences.awstools.autoscaling._
 
 import com.amazonaws.AmazonServiceException
@@ -213,10 +213,10 @@ case object configs {
     final val workingDir: File = new File("/media/ephemeral0/applicator/loquat")
 
     // FIXME: should check that the url string parses to an object address
-    lazy final val fatArtifactS3Object: ObjectAddress = {
+    lazy final val fatArtifactS3Object: S3Object = {
       val s3url = """s3://(.+)/(.+)""".r
       metadata.artifactUrl match {
-        case s3url(bucket, key) => ObjectAddress(bucket, key)
+        case s3url(bucket, key) => S3Object(bucket, key)
         case _ => throw new Error("Wrong fat jar url, it should be published to S3")
       }
     }
@@ -266,7 +266,7 @@ case object configs {
       )
 
     // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
-    lazy final val dataMappingsUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
+    lazy final val dataMappingsUploaded: S3Object = S3Object(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
 
 
     lazy final val subConfigs: List[AnyConfig] = List(

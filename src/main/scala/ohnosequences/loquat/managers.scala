@@ -8,7 +8,6 @@ import ohnosequences.statika.instructions._
 import com.typesafe.scalalogging.LazyLogging
 
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
-import ohnosequences.awstools.s3.ObjectAddress
 import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import scala.util.Try
