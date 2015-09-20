@@ -154,29 +154,20 @@ class DataProcessor(
 
       logger.info("downloading dataMapping input")
       val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
-        case (name, objectAddress) =>
+        case (name, s3Address) =>
           val destination = new File(inputDir, name)
           logger.info("trying to create input object: " + name)
           println(s"""Dowloading
-            |from: ${objectAddress.url}
+            |from: ${s3Address.url}
             |to: ${destination.getCanonicalPath}
             |""".stripMargin)
           // first we try to download it as a normal object:
-          Try{
-            transferManager.download(
-              objectAddress.bucket,
-              objectAddress.key,
-              destination
-            ).waitForCompletion
-          }.recover{
-            // if it fails, we try to download it as a directory
-            case e: com.amazonaws.AmazonServiceException =>
-              transferManager.downloadDirectory(
-                objectAddress.bucket,
-                objectAddress.key,
-                destination
-              ).waitForCompletion
-          }.get // is this the right way to fail if it's an exception?
+          s3Address match {
+            case S3Object(bucket, key) =>
+              transferManager.download(bucket, key, destination).waitForCompletion
+            case S3Folder(bucket, key) =>
+              transferManager.downloadDirectory(bucket, key, destination).waitForCompletion
+          }
           (name -> destination)
       }
 
