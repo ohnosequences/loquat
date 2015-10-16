@@ -136,7 +136,7 @@ case object configs {
       /* name of queue with errors (will be subscribed to errorTopic) */
       val errorQueue: String = "loquatErrorTopic" + suffix
       /* name of bucket for logs files */
-      val bucket: String = "era7nisperos"
+      val bucket: String = "era7loquats"
       /* topic name to notificate user about termination of loquat */
       val notificationTopic: String = "loquatNotificationTopic" + suffix
       /* name of the manager autoscaling group */
