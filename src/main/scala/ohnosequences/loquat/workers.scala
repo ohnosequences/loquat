@@ -155,20 +155,28 @@ class DataProcessor(
       logger.info("downloading dataMapping input")
       val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
         case (name, s3Address) =>
-          val destination = new File(inputDir, name)
+          val destination = inputDir / name
           logger.info("trying to create input object: " + name)
-          println(s"""Dowloading
-            |from: ${s3Address.url}
-            |to: ${destination.getCanonicalPath}
-            |""".stripMargin)
           // first we try to download it as a normal object:
           s3Address match {
-            case S3Object(bucket, key) =>
+            case S3Object(bucket, key) => {
+              println(s"""Dowloading object
+                |from: ${s3Address.url}
+                |to: ${destination.path}
+                |""".stripMargin)
               transferManager.download(bucket, key, destination).waitForCompletion
-            case S3Folder(bucket, key) =>
+              (name -> destination.javaFile)
+            }
+            case S3Folder(bucket, key) => {
+              val fullDestination = destination / key
+              println(s"""Dowloading folder
+                |from: ${s3Address.url}
+                |to: ${fullDestination.path}
+                |""".stripMargin)
               transferManager.downloadDirectory(bucket, key, destination).waitForCompletion
+              (name -> fullDestination.javaFile)
+            }
           }
-          (name -> destination)
       }
 
       logger.info("processing data in: " + workingDir.getAbsolutePath)
