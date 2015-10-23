@@ -79,7 +79,9 @@ case object configs {
   case class WorkersConfig(
     instanceType: InstanceType,
     purchaseModel: PurchaseModel,
-    groupSize: WorkersGroupSize
+    groupSize: WorkersGroupSize,
+    // TODO: use some better type for this
+    deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
   ) extends Config(groupSize) {
 
     def validationErrors: Seq[String] = {
@@ -259,7 +261,7 @@ case object configs {
             amiId = ami.id,
             keyName = keypairName,
             instanceProfile = Some(iamRoleName),
-            deviceMapping = Map("/dev/sdb" -> "ephemeral0")
+            deviceMapping = workersConfig.deviceMapping
           ),
           purchaseModel = workersConfig.purchaseModel
         )
