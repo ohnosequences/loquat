@@ -228,7 +228,7 @@ case object configs {
     lazy final val loquatVersion: String = metadata.version.replace(".", "").toLowerCase
     lazy final val loquatId: String = (loquatName + loquatVersion)
 
-    lazy final val resourceNames: ResourceNames = ResourceNames(loquatVersion)
+    lazy final val resourceNames: ResourceNames = ResourceNames(loquatId)
 
     def managerAutoScalingGroup(keypairName: String): AutoScalingGroup =
       AutoScalingGroup(
@@ -237,7 +237,7 @@ case object configs {
         maxSize = 1,
         desiredCapacity = 1,
         launchingConfiguration = LaunchConfiguration(
-          name = "loquatManagerLaunchConfiguration" + loquatVersion,
+          name = "loquatManagerLaunchConfiguration" + loquatId,
           instanceSpecs = InstanceSpecs(
             instanceType = managerConfig.instanceType,
             amiId = ami.id,
@@ -255,7 +255,7 @@ case object configs {
         maxSize = workersConfig.groupSize.max,
         desiredCapacity = workersConfig.groupSize.desired,
         launchingConfiguration = LaunchConfiguration(
-          name = "loquatWorkersLaunchConfiguration" + loquatVersion,
+          name = "loquatWorkersLaunchConfiguration" + loquatId,
           instanceSpecs = InstanceSpecs(
             instanceType = workersConfig.instanceType,
             amiId = ami.id,
