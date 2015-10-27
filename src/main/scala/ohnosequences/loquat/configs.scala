@@ -6,7 +6,7 @@ import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
 
 import ohnosequences.awstools.ec2.{EC2, Tag, InstanceType, InstanceSpecs }
-import ohnosequences.awstools.s3.{ S3, ObjectAddress }
+import ohnosequences.awstools.s3._
 import ohnosequences.awstools.autoscaling._
 
 import com.amazonaws.AmazonServiceException
@@ -79,7 +79,9 @@ case object configs {
   case class WorkersConfig(
     instanceType: InstanceType,
     purchaseModel: PurchaseModel,
-    groupSize: WorkersGroupSize
+    groupSize: WorkersGroupSize,
+    // TODO: use some better type for this
+    deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
   ) extends Config(groupSize) {
 
     def validationErrors: Seq[String] = {
@@ -213,10 +215,10 @@ case object configs {
     final val workingDir: File = new File("/media/ephemeral0/applicator/loquat")
 
     // FIXME: should check that the url string parses to an object address
-    lazy final val fatArtifactS3Object: ObjectAddress = {
+    lazy final val fatArtifactS3Object: S3Object = {
       val s3url = """s3://(.+)/(.+)""".r
       metadata.artifactUrl match {
-        case s3url(bucket, key) => ObjectAddress(bucket, key)
+        case s3url(bucket, key) => S3Object(bucket, key)
         case _ => throw new Error("Wrong fat jar url, it should be published to S3")
       }
     }
@@ -226,7 +228,7 @@ case object configs {
     lazy final val loquatVersion: String = metadata.version.replace(".", "").toLowerCase
     lazy final val loquatId: String = (loquatName + loquatVersion)
 
-    lazy final val resourceNames: ResourceNames = ResourceNames(loquatVersion)
+    lazy final val resourceNames: ResourceNames = ResourceNames(loquatId)
 
     def managerAutoScalingGroup(keypairName: String): AutoScalingGroup =
       AutoScalingGroup(
@@ -235,7 +237,7 @@ case object configs {
         maxSize = 1,
         desiredCapacity = 1,
         launchingConfiguration = LaunchConfiguration(
-          name = "loquatManagerLaunchConfiguration" + loquatVersion,
+          name = "loquatManagerLaunchConfiguration" + loquatId,
           instanceSpecs = InstanceSpecs(
             instanceType = managerConfig.instanceType,
             amiId = ami.id,
@@ -253,20 +255,20 @@ case object configs {
         maxSize = workersConfig.groupSize.max,
         desiredCapacity = workersConfig.groupSize.desired,
         launchingConfiguration = LaunchConfiguration(
-          name = "loquatWorkersLaunchConfiguration" + loquatVersion,
+          name = "loquatWorkersLaunchConfiguration" + loquatId,
           instanceSpecs = InstanceSpecs(
             instanceType = workersConfig.instanceType,
             amiId = ami.id,
             keyName = keypairName,
             instanceProfile = Some(iamRoleName),
-            deviceMapping = Map("/dev/sdb" -> "ephemeral0")
+            deviceMapping = workersConfig.deviceMapping
           ),
           purchaseModel = workersConfig.purchaseModel
         )
       )
 
     // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
-    lazy final val dataMappingsUploaded: ObjectAddress = ObjectAddress(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
+    lazy final val dataMappingsUploaded: S3Object = S3Object(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
 
 
     lazy final val subConfigs: List[AnyConfig] = List(

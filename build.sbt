@@ -14,15 +14,20 @@ libraryDependencies ++= Seq(
   // json:
   "com.lihaoyi" %% "upickle" % "0.3.5",
   // internal structure:
-  "ohnosequences" %% "cosas"       % "0.7.0",
-  "ohnosequences" %% "statika"     % "2.0.0-new-instructions-SNAPSHOT",
-  "ohnosequences" %% "aws-statika" % "2.0.0-new-instructions-SNAPSHOT",
+  "ohnosequences" %% "cosas"       % "0.7.1",
+  "ohnosequences" %% "statika"     % "2.0.0-M4",
+  "ohnosequences" %% "aws-statika" % "2.0.0-SNAPSHOT",
   "ohnosequences" %% "datasets"    % "0.2.0-SNAPSHOT",
   // amazon:
-  "ohnosequences" %% "aws-scala-tools" % "0.13.2"
+  "ohnosequences" %% "aws-scala-tools" % "0.15.0-SNAPSHOT"
 )
 
-dependencyOverrides += "jline" % "jline" % "2.12.1"
+dependencyOverrides ++= Set(
+  "ohnosequences" %% "aws-statika" % "2.0.0-SNAPSHOT",
+  "ohnosequences" %% "aws-scala-tools" % "0.15.0-SNAPSHOT",
+  // "ohnosequences" %% "aws-scala-tools" % "0.14.0",
+  "jline" % "jline" % "2.12.1"
+)
 
 // FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()

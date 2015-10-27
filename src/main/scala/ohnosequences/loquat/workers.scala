@@ -8,7 +8,7 @@ import ohnosequences.statika.results._
 
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
-import ohnosequences.awstools.s3.ObjectAddress
+import ohnosequences.awstools.s3._
 import ohnosequences.awstools.AWSClients
 import com.typesafe.scalalogging.LazyLogging
 import java.io.File
@@ -18,6 +18,7 @@ import upickle.Js
 
 import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
+import com.amazonaws.services.s3.transfer._
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -149,15 +150,33 @@ class DataProcessor(
       outputDir.mkdir
 
 
-      logger.info("downloading dataMapping input")
-      val loadingManager = aws.s3.createLoadingManager
+      val transferManager = new TransferManager(aws.s3.s3)
 
+      logger.info("downloading dataMapping input")
       val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
-        case (name, objectAddress) =>
-          val inputFile = new File(inputDir, name)
+        case (name, s3Address) =>
+          val destination = inputDir / name
           logger.info("trying to create input object: " + name)
-          loadingManager.download(objectAddress, inputFile)
-          (name -> inputFile)
+          // first we try to download it as a normal object:
+          s3Address match {
+            case S3Object(bucket, key) => {
+              println(s"""Dowloading object
+                |from: ${s3Address.url}
+                |to: ${destination.path}
+                |""".stripMargin)
+              transferManager.download(bucket, key, destination).waitForCompletion
+              (name -> destination.javaFile)
+            }
+            case S3Folder(bucket, key) => {
+              val fullDestination = destination / key
+              println(s"""Dowloading folder
+                |from: ${s3Address.url}
+                |to: ${fullDestination.path}
+                |""".stripMargin)
+              transferManager.downloadDirectory(bucket, key, destination).waitForCompletion
+              (name -> fullDestination.javaFile)
+            }
+          }
       }
 
       logger.info("processing data in: " + workingDir.getAbsolutePath)
@@ -173,7 +192,7 @@ class DataProcessor(
         }
         case Success(tr, outputFileMap) => {
           // FIXME: do it more careful
-          val outputMap: Map[File, ObjectAddress] =
+          val outputMap: Map[File, AnyS3Address] =
             outputFileMap.map { case (name, file) =>
               file -> dataMapping.outputs(name)
             }
@@ -182,8 +201,22 @@ class DataProcessor(
 
             val uploadTries = outputMap map { case (file, objectAddress) =>
               logger.info(s"publishing output object: ${file} -> ${objectAddress}")
-              // TODO: publicity should be a configurable option
-              aws.s3.uploadFile(objectAddress, file, public = true)
+
+              if (file.isDirectory) Try {
+                transferManager.uploadDirectory(
+                  objectAddress.bucket,
+                  objectAddress.key,
+                  file,
+                  true // includeSubdirectories
+                ).waitForCompletion
+              }
+              else Try {
+                transferManager.upload(
+                  objectAddress.bucket,
+                  objectAddress.key,
+                  file
+                ).waitForCompletion
+              }
             }
 
             // TODO: check whether we can fold Try's here somehow
