@@ -92,7 +92,7 @@ protected[loquat] case object daemons {
           )
 
           reason match {
-            case Some(r) => LoquatOps.undeploy(config, aws)
+            case Some(r) => LoquatOps.undeploy(config, aws, r)
             case None => ()
           }
 
@@ -149,7 +149,8 @@ protected[loquat] case object daemons {
         terminationConfig.terminateAfterInitialDataMappings &&
         (successResultsCount >= initialDataMappingsCount)
       ) {
-        Some("terminated due to terminateAfterInitialDataMappings: initialDataMappings count: " + initialDataMappingsCount + " current: " + successResultsCount)
+        Some(s"""|Terminated due to terminateAfterInitialDataMappings: initialDataMappings count: " + initialDataMappingsCount + " current: " + successResultsCount
+        """)
       } else if (
         terminationConfig.errorsThreshold.map{ failedResultsCount >= _ }.getOrElse(false)
       ) {
