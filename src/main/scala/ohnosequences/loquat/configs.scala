@@ -90,6 +90,59 @@ case object configs {
     }
   }
 
+
+  trait AnyTerminationReason {
+    def check: Boolean
+    def msg: String
+  }
+
+  case class TerminateAfterInitialDataMappings(
+    val isOn: Boolean,
+    val initialCount: Int,
+    val successfulCount: Int
+  ) extends AnyTerminationReason {
+
+    def check: Boolean = isOn && (successfulCount >= initialCount)
+
+    def msg: String = s"""|Terminated after successfully processing all the initial data mappings.
+      |  Initial data mappings count: ${initialCount}
+      |  Successful results: ${successfulCount}
+      |""".stripMargin
+  }
+
+  case class TerminateWithTooManyErrors(
+    val errorsThreshold: Option[Int],
+    val failedCount: Int
+  ) extends AnyTerminationReason {
+
+    def check: Boolean = errorsThreshold.map{ failedCount >= _ }.getOrElse(false)
+
+    def msg: String = s"""|Terminated due to too many errors.
+      |  Errors threshold: ${errorsThreshold}
+      |  Failed results count: ${failedCount}
+      |""".stripMargin
+  }
+
+  case class TerminateAfterGlobalTimeout(
+    val globalTimeout: Option[Time],
+    val startTime: Option[Time]
+  ) extends AnyTerminationReason {
+
+    def check: Boolean = (startTime, globalTimeout) match {
+      case (Some(timestamp), Some(globalTimeout)) =>
+        (System.currentTimeMillis - timestamp.inSeconds) > globalTimeout.inSeconds
+      case _ => false
+    }
+
+    def msg: String = s"Terminated due to the global timeout: ${globalTimeout.getOrElse(Seconds(0))}"
+  }
+
+  case object TerminateManually extends AnyTerminationReason {
+    def check: Boolean = true
+    def msg: String = "Terminated manually"
+  }
+
+
   /* Configuration of termination conditions */
   case class TerminationConfig(
     // if true loquat will terminate after solving all initial tasks
@@ -127,6 +180,7 @@ case object configs {
       treshholdErr ++ localTimeoutErr ++ globalTimeoutErr
     }
   }
+
 
   /* Configuration of resources */
   protected[loquat]

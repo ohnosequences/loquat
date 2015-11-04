@@ -24,10 +24,25 @@ case object utils {
   }
 
 
-  class Time(val inSeconds: Int)
-  case class Seconds(s: Int) extends Time(s)
-  case class Minutes(m: Int) extends Time(m * 60)
-  case class   Hours(h: Int) extends Time(h * 60 * 60)
+  class Time(val inSeconds: Long) {
+    val millis: Long = inSeconds * 1000
+    val seconds: Long = inSeconds
+    val minutes: Long = inSeconds / 60
+    val hours: Long = inSeconds / (60 * 60)
+
+    def prettyPrint: String = List(
+      (hours, "hours"),
+      (minutes, "min"),
+      (seconds, "sec")
+    ).map{ case (value, label) =>
+      (if (value > 0) s"${value} ${label}" else "")
+    }.mkString
+  }
+
+  case class Millis(ms: Long) extends Time(ms / 1000)
+  case class Seconds(s: Long) extends Time(s)
+  case class Minutes(m: Long) extends Time(m * 60)
+  case class   Hours(h: Long) extends Time(h * 60 * 60)
 
 
 
@@ -73,10 +88,6 @@ case object utils {
     listRecursively(file).foreach{ f =>
       if (!f.delete) throw new RuntimeException("Failed to delete " + f.getAbsolutePath)
     }
-  }
-
-  def printInterval(intervalSecs: Long): String = {
-    (intervalSecs / 60) + " min " + (intervalSecs % 60) + " sec"
   }
 
   @scala.annotation.tailrec

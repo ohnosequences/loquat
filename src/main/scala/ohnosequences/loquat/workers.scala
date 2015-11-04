@@ -63,7 +63,7 @@ class DataProcessor(
   val errorQueue = aws.sqs.getQueueByName(config.resourceNames.errorQueue).get
   val outputQueue = aws.sqs.getQueueByName(config.resourceNames.outputQueue).get
 
-  val MESSAGE_TIMEOUT = 5000
+  val MESSAGE_TIMEOUT = Seconds(5)
 
   val instance = aws.ec2.getCurrentInstance
 
@@ -76,25 +76,28 @@ class DataProcessor(
     while(message.isEmpty) {
       logger.info("DataProcessor wait for dataMapping")
       instance.foreach(_.createTag(utils.InstanceTags.IDLE))
-      Thread.sleep(MESSAGE_TIMEOUT)
+      Thread.sleep(MESSAGE_TIMEOUT.millis)
       message = queue.receiveMessage
     }
 
     message.get
   }
 
-  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[Int] = {
-    val startTime = System.currentTimeMillis()
-    val step = 1000 // 1s
+  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[Time] = {
+    val startTime: Time = Millis(System.currentTimeMillis)
+    val step: Time = Seconds(5)
 
-    def timeSpent(): Int = {
-      val currentTime = System.currentTimeMillis()
-      ((currentTime - startTime) / 1000).toInt
+    def timeSpent: Time = {
+      val currentTime = Millis(System.currentTimeMillis)
+      Seconds(currentTime.inSeconds - startTime.inSeconds)
     }
+
+    val taskProcessingTimeout: Time =
+      config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12))
 
     @scala.annotation.tailrec
     def waitMore(tries: Int): AnyResult = {
-      if(timeSpent > config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12)).inSeconds) {
+      if(timeSpent.inSeconds > taskProcessingTimeout.inSeconds) {
         terminateWorker
         Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
       } else {
@@ -106,8 +109,8 @@ class DataProcessor(
                 logger.warn("Couldn't change the visibility globalTimeout")
               // FIXME: something weird is happening here
             }
-            Thread.sleep(step)
-            logger.info("Solving dataMapping: " + utils.printInterval(timeSpent()))
+            Thread.sleep(step.millis)
+            logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
             waitMore(tries + 1)
           }
           case Some(scala.util.Success(r)) => {
