@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 protected[loquat] case object daemons {
 
-  import dataMappings._, configs._
+  import dataMappings._, configs._, utils._
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
@@ -91,10 +91,7 @@ protected[loquat] case object daemons {
             initialDataMappingsCount = config.dataMappings.length
           )
 
-          reason match {
-            case Some(r) => LoquatOps.undeploy(config, aws, r)
-            case None => ()
-          }
+          reason.foreach{ LoquatOps.undeploy(config, aws, _) }
 
           Thread.sleep(TIMEOUT * 1000)
         }
@@ -141,30 +138,26 @@ protected[loquat] case object daemons {
       successResultsCount: Int,
       failedResultsCount: Int,
       initialDataMappingsCount: Int
-    ): Option[String] = {
+    ): Option[AnyTerminationReason] = {
 
-      val startTime = aws.as.getCreatedTime(config.resourceNames.managerGroup).map(_.getTime)
+      lazy val afterInitial = TerminateAfterInitialDataMappings(
+        terminationConfig.terminateAfterInitialDataMappings,
+        initialDataMappingsCount,
+        successResultsCount
+      )
+      lazy val tooManyErrors = TerminateWithTooManyErrors(
+        terminationConfig.errorsThreshold,
+        failedResultsCount
+      )
+      lazy val globalTimeout = TerminateAfterGlobalTimeout(
+        terminationConfig.globalTimeout,
+        aws.as.getCreatedTime(config.resourceNames.managerGroup).map{ x => Seconds(x.getTime) }
+      )
 
-      if (
-        terminationConfig.terminateAfterInitialDataMappings &&
-        (successResultsCount >= initialDataMappingsCount)
-      ) {
-        Some(s"""|Terminated due to terminateAfterInitialDataMappings: initialDataMappings count: " + initialDataMappingsCount + " current: " + successResultsCount
-        """)
-      } else if (
-        terminationConfig.errorsThreshold.map{ failedResultsCount >= _ }.getOrElse(false)
-      ) {
-        Some("terminated due to errorsThreshold: errorsThreshold count: " + terminationConfig.errorsThreshold.get + " current: " + failedResultsCount)
-      } else {
-        // TODO: check this
-        (startTime, terminationConfig.globalTimeout) match {
-          case (None, _) => Some("start globalTimeout is undefined!")
-          case (Some(timestamp), Some(globalTimeout)) if ((System.currentTimeMillis() - timestamp) > globalTimeout.inSeconds) => {
-            Some("terminated due to global timeout!")
-          }
-          case _ => None
-        }
-      }
+           if (afterInitial.check) Some(afterInitial)
+      else if (tooManyErrors.check) Some(tooManyErrors)
+      else if (globalTimeout.check) Some(globalTimeout)
+      else None
     }
 
     def instructions: AnyInstructions = say("TerminationDaemonBundle installed")

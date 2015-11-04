@@ -24,10 +24,10 @@ case object utils {
   }
 
 
-  class Time(val inSeconds: Int)
-  case class Seconds(s: Int) extends Time(s)
-  case class Minutes(m: Int) extends Time(m * 60)
-  case class   Hours(h: Int) extends Time(h * 60 * 60)
+  class Time(val inSeconds: Long)
+  case class Seconds(s: Long) extends Time(s)
+  case class Minutes(m: Long) extends Time(m * 60)
+  case class   Hours(h: Long) extends Time(h * 60 * 60)
 
 
 

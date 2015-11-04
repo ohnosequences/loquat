@@ -38,7 +38,7 @@ trait AnyLoquat { loquat =>
     LoquatOps.undeploy(
       config,
       AWSClients.create(user.localCredentials),
-      "Manual termination"
+      TerminateManually
     )
 }
 
@@ -117,8 +117,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
   def undeploy(
     config: AnyLoquatConfig,
     aws: AWSClients,
-    // TODO: a better type here:
-    reason: String
+    reason: AnyTerminationReason
   ): Unit = {
     logger.info(s"undeploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
@@ -128,7 +127,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
       Try {
         val subject = "Loquat " + config.loquatId + " is terminated"
         val notificationTopic = aws.sns.createTopic(names.notificationTopic)
-        notificationTopic.publish(reason, subject)
+        notificationTopic.publish(reason.msg, subject)
       }
     ).execute
 
