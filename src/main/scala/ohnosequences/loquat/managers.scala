@@ -38,7 +38,8 @@ protected[loquat]
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-    def uploadInitialDataMappings(dataMappings: List[AnyDataMapping]) {
+    // FIXME: rewrite this method
+    def uploadInitialDataMappings(dataMappings: List[AnyDataMapping]): Unit = {
       try {
         logger.info("adding initial dataMappings to SQS")
         // FIXME: match on Option instead of get

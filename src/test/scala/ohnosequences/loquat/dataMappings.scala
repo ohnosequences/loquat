@@ -2,13 +2,13 @@ package ohnosequences.loquat.test
 
 object dataMappingsExample {
 
-  import ohnosequences.awstools.s3._
-  import ohnosequences.loquat._, dataMappings._
-  import ohnosequences.datasets._, s3Locations._
-  import ohnosequences.cosas._, types._, typeSets._, properties._, records._
-  import instructionsExample._
-
-
+  // import ohnosequences.awstools.s3._
+  // import ohnosequences.loquat._, dataMappings._
+  // import ohnosequences.datasets._, s3Locations._
+  // import ohnosequences.cosas._, types._, typeSets._, properties._, records._
+  // import instructionsExample._
+  //
+  // 
   // val dataMapping = DataMapping(id = "dataMapping3498734", instructions = instructs)(
   //   remoteInput =
   //     sample.atS3(ObjectAddress("", "")) :~:

@@ -29,7 +29,7 @@ protected[loquat] case object daemons {
       aws.ec2.getCurrentInstanceId match {
         case Some(id) => {
           val logUploader = new Thread(new Runnable {
-            def run() {
+            def run(): Unit = {
               while(true) {
                 try {
                   if(aws.s3.bucketExists(bucket)) {
@@ -66,8 +66,7 @@ protected[loquat] case object daemons {
 
     object TerminationDaemonThread extends Thread("TerminationDaemonBundle") {
 
-
-      override def run() {
+      override def run(): Unit = {
         logger.info("TerminationDaemonBundle started")
 
         while(true) {

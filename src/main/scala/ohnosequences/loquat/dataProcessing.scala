@@ -5,7 +5,7 @@ case object dataProcessing {
   import utils._
   import ohnosequences.datasets._, dataSets._, fileLocations._
 
-  import ohnosequences.cosas._, types._, typeSets._, properties._, records._
+  import ohnosequences.cosas._, types._
   import ops.typeSets._
 
   import ohnosequences.statika.bundles._

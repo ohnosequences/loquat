@@ -1,14 +1,11 @@
 package ohnosequences.loquat
 
-import dataMappings._, dataProcessing._, configs._, utils._
+import dataProcessing._, configs._, utils._
 
 import ohnosequences.statika.bundles._
 
 import ohnosequences.awstools.AWSClients
-import ohnosequences.awstools.sqs._
-import ohnosequences.awstools.autoscaling._
 
-import com.amazonaws.services.autoscaling.model._
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.util._

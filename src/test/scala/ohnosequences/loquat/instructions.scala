@@ -2,22 +2,22 @@ package ohnosequences.loquat.test
 
 object instructionsExample {
 
-  import ohnosequences.loquat._, dataMappings._, dataProcessing._
-  import ohnosequences.statika.instructions._
-  import ohnosequences.datasets._, dataSets._, fileLocations._
-  import ohnosequences.cosas._, types._, typeSets._, properties._, records._
-  import java.io.File
-
-
-  // inputs:
-  case object SomeData extends AnyDataType { val label = "someLabel" }
-  case object sample extends Data(SomeData, "sample")
-  case object fastq extends Data(SomeData, "fastq")
-
-  // outputs:
-  case object stats extends Data(SomeData, "stats")
-  case object results extends Data(SomeData, "results")
-
+  // import ohnosequences.loquat._, dataMappings._, dataProcessing._
+  // import ohnosequences.statika.instructions._
+  // import ohnosequences.datasets._, dataSets._, fileLocations._
+  // import ohnosequences.cosas._, types._, typeSets._, properties._, records._
+  // import java.io.File
+  //
+  //
+  // // inputs:
+  // case object SomeData extends AnyDataType { val label = "someLabel" }
+  // case object sample extends Data(SomeData, "sample")
+  // case object fastq extends Data(SomeData, "fastq")
+  //
+  // // outputs:
+  // case object stats extends Data(SomeData, "stats")
+  // case object results extends Data(SomeData, "results")
+  // 
   // FIXME: denotation parsers
 
   // instructions:
