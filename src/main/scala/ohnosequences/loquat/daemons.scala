@@ -27,18 +27,19 @@ protected[loquat] case object daemons {
       val bucket = config.resourceNames.bucket
 
       aws.ec2.getCurrentInstanceId match {
+        case None => Failure("can't obtain instanceId")
         case Some(id) => {
           val logUploader = new Thread(new Runnable {
             def run(): Unit = {
               while(true) {
                 try {
                   if(aws.s3.bucketExists(bucket)) {
-                      logger.warn("bucket " + bucket + " doesn't exist")
-                    } else {
-                      aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile)
-                    }
+                    aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile)
+                  } else {
+                    logger.warn(s"Bucket [${bucket}] doesn't exist")
+                  }
 
-                  Thread.sleep(1000 * 30)
+                  Thread.sleep(Seconds(30).millis)
                 } catch {
                   case t: Throwable => logger.error("log upload fails", t);
                 }
@@ -46,10 +47,9 @@ protected[loquat] case object daemons {
             }
           }, "logUploader")
           logUploader.setDaemon(true)
-          logUploader.start()
+          logUploader.start
           Success("logUploader started", ())
         }
-        case None => Failure("can't obtain instanceId")
       }
     }
   }
