@@ -5,7 +5,6 @@ case object dataMappings {
   import dataProcessing._
 
   import ohnosequences.datasets._, dataSets._, s3Locations._
-  import ohnosequences.cosas._, types._, typeSets._, properties._, records._
   import ohnosequences.cosas.ops.typeSets._
 
   import ohnosequences.awstools.s3._

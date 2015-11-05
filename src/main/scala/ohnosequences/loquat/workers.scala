@@ -13,6 +13,7 @@ import ohnosequences.awstools.AWSClients
 import com.typesafe.scalalogging.LazyLogging
 import java.io.File
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.Try
 import upickle.Js
 
@@ -63,7 +64,7 @@ class DataProcessor(
   val errorQueue = aws.sqs.getQueueByName(config.resourceNames.errorQueue).get
   val outputQueue = aws.sqs.getQueueByName(config.resourceNames.outputQueue).get
 
-  val MESSAGE_TIMEOUT = Seconds(5)
+  val MESSAGE_TIMEOUT = 5.seconds
 
   val instance = aws.ec2.getCurrentInstance
 
@@ -76,28 +77,28 @@ class DataProcessor(
     while(message.isEmpty) {
       logger.info("DataProcessor wait for dataMapping")
       instance.foreach(_.createTag(utils.InstanceTags.IDLE))
-      Thread.sleep(MESSAGE_TIMEOUT.millis)
+      Thread.sleep(MESSAGE_TIMEOUT.toMillis)
       message = queue.receiveMessage
     }
 
     message.get
   }
 
-  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[Time] = {
-    val startTime: Time = Millis(System.currentTimeMillis)
-    val step: Time = Seconds(5)
+  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
+    val startTime = System.currentTimeMillis.millis
+    val step = 5.seconds
 
-    def timeSpent: Time = {
-      val currentTime = Millis(System.currentTimeMillis)
-      Seconds(currentTime.inSeconds - startTime.inSeconds)
+    def timeSpent: FiniteDuration = {
+      val currentTime = System.currentTimeMillis.millis
+      (currentTime - startTime).toSeconds.seconds
     }
 
-    val taskProcessingTimeout: Time =
-      config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12))
+    val taskProcessingTimeout: FiniteDuration =
+      config.terminationConfig.taskProcessingTimeout.getOrElse(12.hours)
 
     @scala.annotation.tailrec
     def waitMore(tries: Int): AnyResult = {
-      if(timeSpent.inSeconds > taskProcessingTimeout.inSeconds) {
+      if(timeSpent > taskProcessingTimeout) {
         terminateWorker
         Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
       } else {
@@ -109,8 +110,8 @@ class DataProcessor(
                 logger.warn("Couldn't change the visibility globalTimeout")
               // FIXME: something weird is happening here
             }
-            Thread.sleep(step.millis)
-            logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
+            Thread.sleep(step.toMillis)
+            // logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
             waitMore(tries + 1)
           }
           case Some(scala.util.Success(r)) => {

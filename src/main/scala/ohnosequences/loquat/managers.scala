@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, daemons._, utils._
+import dataMappings._, daemons._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -10,6 +10,8 @@ import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
+
+import scala.concurrent.duration._
 import scala.util.Try
 
 
@@ -90,7 +92,7 @@ protected[loquat]
             utils.waitForResource(
               getResource = aws.as.getAutoScalingGroupByName(workersGroup.name),
               tries = 30,
-              timeStep = Seconds(5)
+              timeStep = 5.seconds
             )
 
             logger.info("Creating tags for workers autoscaling group")

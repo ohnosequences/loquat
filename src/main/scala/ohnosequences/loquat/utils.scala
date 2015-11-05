@@ -8,6 +8,7 @@ case object utils {
   import com.amazonaws.services.autoscaling.model._
   import com.typesafe.scalalogging.LazyLogging
   import scala.util._
+  import scala.concurrent.duration._
 
 
   trait AnyStep extends LazyLogging
@@ -22,28 +23,6 @@ case object utils {
       }
     }
   }
-
-
-  class Time(val inSeconds: Long) {
-    val millis: Long = inSeconds * 1000
-    val seconds: Long = inSeconds
-    val minutes: Long = inSeconds / 60
-    val hours: Long = inSeconds / (60 * 60)
-
-    def prettyPrint: String = List(
-      (hours, "hours"),
-      (minutes, "min"),
-      (seconds, "sec")
-    ).map{ case (value, label) =>
-      (if (value > 0) s"${value} ${label}" else "")
-    }.mkString
-  }
-
-  case class Millis(ms: Long) extends Time(ms / 1000)
-  case class Seconds(s: Long) extends Time(s)
-  case class Minutes(m: Long) extends Time(m * 60)
-  case class   Hours(h: Long) extends Time(h * 60 * 60)
-
 
 
   object InstanceTags {
@@ -63,7 +42,7 @@ case object utils {
   }
 
 
-  def tagAutoScalingGroup(as: AutoScaling, groupName: String, status: String) {
+  def tagAutoScalingGroup(as: AutoScaling, groupName: String, status: String): Unit = {
     as.createTags(groupName, InstanceTags.PRODUCT_TAG)
     as.createTags(groupName, Tag(InstanceTags.AUTO_SCALING_GROUP, groupName))
     as.createTags(groupName, Tag(InstanceTags.STATUS_TAG_NAME, status))
@@ -71,7 +50,7 @@ case object utils {
   }
 
   /* Some file and pretty printing utils */
-  def writeStringToFile(s: String, file: File) {
+  def writeStringToFile(s: String, file: File): Unit = {
     val writer = new PrintWriter(file)
     writer.print(s)
     writer.close()
@@ -90,12 +69,13 @@ case object utils {
     }
   }
 
+  // FIXME: use futures here:
   @scala.annotation.tailrec
-  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: Time) : Option[R] = {
+  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: FiniteDuration) : Option[R] = {
     val resource = getResource
 
     if (resource.isEmpty && tries <= 0) {
-      Thread.sleep(timeStep.inSeconds * 1000)
+      Thread.sleep(timeStep.toMillis)
       waitForResource(getResource, tries - 1, timeStep)
     } else resource
   }

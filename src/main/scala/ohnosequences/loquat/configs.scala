@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, utils._
+import dataMappings._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._, amazonLinuxAMIs._
@@ -15,6 +15,7 @@ import com.typesafe.scalalogging.{ LazyLogging, Logger }
 
 import java.io.File
 import scala.util.Try
+import scala.concurrent.duration._
 
 
 case object configs {
@@ -124,17 +125,17 @@ case object configs {
   }
 
   case class TerminateAfterGlobalTimeout(
-    val globalTimeout: Option[Time],
-    val startTime: Option[Time]
+    val globalTimeout: Option[FiniteDuration],
+    val startTime: Option[FiniteDuration]
   ) extends AnyTerminationReason {
 
     def check: Boolean = (startTime, globalTimeout) match {
       case (Some(timestamp), Some(globalTimeout)) =>
-        (System.currentTimeMillis - timestamp.inSeconds) > globalTimeout.inSeconds
+        (System.currentTimeMillis - timestamp.toMillis) > globalTimeout.toMillis
       case _ => false
     }
 
-    def msg: String = s"Terminated due to the global timeout: ${globalTimeout.getOrElse(Seconds(0))}"
+    def msg: String = s"Terminated due to the global timeout: ${globalTimeout.getOrElse(0.seconds)}"
   }
 
   case object TerminateManually extends AnyTerminationReason {
@@ -150,9 +151,9 @@ case object configs {
     // if true loquat will terminate after errorQueue will contain more unique messages then threshold
     errorsThreshold: Option[Int] = None,
     // maximum time for processing one task
-    taskProcessingTimeout: Option[Time] = None,
+    taskProcessingTimeout: Option[FiniteDuration] = None,
     // maximum time for everything
-    globalTimeout: Option[Time] = None
+    globalTimeout: Option[FiniteDuration] = None
   ) extends Config() {
 
     def validationErrors: Seq[String] = {
@@ -163,16 +164,16 @@ case object configs {
 
       val localTimeoutErr = taskProcessingTimeout match {
         case Some(time) if (
-            time.inSeconds < 0 ||
-            time.inSeconds > Hours(12).inSeconds
+            time <= 0.seconds ||
+            time > 12.hours
           ) => Seq(s"Task processing timeout [${time}] has to be between 0 seconds and 12 hours")
         case _ => Seq()
       }
 
       val globalTimeoutErr = globalTimeout match {
         case Some(time) if (
-            time.inSeconds < 0 ||
-            time.inSeconds > Hours(12).inSeconds
+            time <= 0.seconds ||
+            time > 12.hours
           ) => Seq(s"Global timeout [${time}] has to be between 0 seconds and 12 hours")
         case _ => Seq()
       }

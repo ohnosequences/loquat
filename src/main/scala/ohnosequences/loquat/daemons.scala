@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 protected[loquat] case object daemons {
 
-  import dataMappings._, configs._, utils._
+  import dataMappings._, configs._
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
@@ -10,6 +10,7 @@ protected[loquat] case object daemons {
 
   import com.typesafe.scalalogging.LazyLogging
   import scala.collection.mutable.ListBuffer
+  import scala.concurrent.duration._
 
   import ohnosequences.awstools.AWSClients
   import ohnosequences.awstools.s3._
@@ -39,7 +40,7 @@ protected[loquat] case object daemons {
                     logger.warn(s"Bucket [${bucket}] doesn't exist")
                   }
 
-                  Thread.sleep(Seconds(30).millis)
+                  Thread.sleep(30.seconds.toMillis)
                 } catch {
                   case t: Throwable => logger.error("log upload fails", t);
                 }
@@ -58,8 +59,6 @@ protected[loquat] case object daemons {
   case class TerminationDaemonBundle(val config: AnyLoquatConfig) extends Bundle() with LazyLogging {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
-
-    val TIMEOUT = 300 //5 min
 
     val successResults = scala.collection.mutable.HashMap[String, String]()
     val failedResults = scala.collection.mutable.HashMap[String, String]()
@@ -92,7 +91,7 @@ protected[loquat] case object daemons {
 
           reason.foreach{ LoquatOps.undeploy(config, aws, _) }
 
-          Thread.sleep(TIMEOUT * 1000)
+          Thread.sleep(5.minutes.toMillis)
         }
 
       }
@@ -150,7 +149,7 @@ protected[loquat] case object daemons {
       )
       lazy val globalTimeout = TerminateAfterGlobalTimeout(
         terminationConfig.globalTimeout,
-        aws.as.getCreatedTime(config.resourceNames.managerGroup).map{ x => Seconds(x.getTime) }
+        aws.as.getCreatedTime(config.resourceNames.managerGroup).map{ _.getTime.seconds }
       )
 
            if (afterInitial.check) Some(afterInitial)
