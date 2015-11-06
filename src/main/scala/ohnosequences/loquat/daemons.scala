@@ -57,38 +57,30 @@ protected[loquat] case object daemons {
     val successResults = scala.collection.mutable.HashMap[String, String]()
     val failedResults = scala.collection.mutable.HashMap[String, String]()
 
-    object TerminationDaemonThread extends Thread("TerminationDaemonBundle") {
+    def checkConditions: Unit = {
+      logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
+      logger.info("TerminationDeaemon success results: " + successResults.size)
+      logger.info("TerminationDeaemon failure results: " + failedResults.size)
 
-      override def run(): Unit = {
-        logger.info("TerminationDaemonBundle started")
-
-        while(true) {
-          logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
-          logger.info("TerminationDeaemon success results: " + successResults.size)
-          logger.info("TerminationDeaemon failure results: " + failedResults.size)
-
-          // FIXME: we don't need parsing here, only the numbers of messages
-          receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
-            successResults.put(result.id, result.message)
-          }
-
-          receiveDataMappingsResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
-            failedResults.put(result.id, result.message)
-          }
-
-          val reason = checkConditions(
-            terminationConfig = config.terminationConfig,
-            successResultsCount = successResults.size,
-            failedResultsCount = failedResults.size,
-            initialDataMappingsCount = config.dataMappings.length
-          )
-
-          reason.foreach{ LoquatOps.undeploy(config, aws, _) }
-
-          Thread.sleep(5.minutes.toMillis)
-        }
-
+      // FIXME: we don't need parsing here, only the numbers of messages
+      receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
+        successResults.put(result.id, result.message)
       }
+
+      receiveDataMappingsResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
+        failedResults.put(result.id, result.message)
+      }
+
+      val reason = terminationReason(
+        terminationConfig = config.terminationConfig,
+        successResultsCount = successResults.size,
+        failedResultsCount = failedResults.size,
+        initialDataMappingsCount = config.dataMappings.length
+      )
+
+      reason.foreach{ LoquatOps.undeploy(config, aws, _) }
+
+      Thread.sleep(5.minutes.toMillis)
     }
 
     def receiveDataMappingsResults(queueName: String): List[(String, ProcessingResult)] = {
@@ -125,7 +117,7 @@ protected[loquat] case object daemons {
       }
     }
 
-    def checkConditions(
+    def terminationReason(
       terminationConfig: TerminationConfig,
       successResultsCount: Int,
       failedResultsCount: Int,

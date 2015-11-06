@@ -32,10 +32,8 @@ trait AnyWorkerBundle extends AnyBundle {
 
   val bundleDependencies: List[AnyBundle] = List(instructionsBundle, LogUploaderBundle(config))
 
-  def instructions: AnyInstructions = {
-    LazyTry {
-      new DataProcessor(config, instructionsBundle).runLoop
-    } -&- say("worker installed")
+  def instructions: AnyInstructions = LazyTry {
+    new DataProcessor(config, instructionsBundle).runLoop
   }
 }
 
@@ -64,8 +62,6 @@ class DataProcessor(
   val errorQueue = aws.sqs.getQueueByName(config.resourceNames.errorQueue).get
   val outputQueue = aws.sqs.getQueueByName(config.resourceNames.outputQueue).get
 
-  val MESSAGE_TIMEOUT = 5.seconds
-
   val instance = aws.ec2.getCurrentInstance
 
   @volatile var stopped = false
@@ -77,7 +73,7 @@ class DataProcessor(
     while(message.isEmpty) {
       logger.info("DataProcessor wait for dataMapping")
       instance.foreach(_.createTag(utils.InstanceTags.IDLE))
-      Thread.sleep(MESSAGE_TIMEOUT.toMillis)
+      Thread.sleep(5.seconds.toMillis)
       message = queue.receiveMessage
     }
 

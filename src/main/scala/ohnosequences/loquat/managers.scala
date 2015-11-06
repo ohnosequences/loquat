@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, daemons._
+import dataMappings._, daemons._, utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -101,7 +101,10 @@ protected[loquat]
         } -&-
         LazyTry {
           logger.info("starting termination daemon")
-          terminationDaemon.TerminationDaemonThread.start()
+          schedule(
+            after = 10.minute,
+            every = 5.minutes
+          )(terminationDaemon.checkConditions)
         } -&-
         say("manager installed")
       }
