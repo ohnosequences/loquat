@@ -9,6 +9,7 @@ case object utils {
   import com.typesafe.scalalogging.LazyLogging
   import scala.util._
   import scala.concurrent.duration._
+  import java.util.concurrent._
 
 
   trait AnyStep extends LazyLogging
@@ -22,6 +23,21 @@ case object utils {
           Failure(e)
       }
     }
+  }
+
+  // A minimal wrapped around the Java scheduling thing
+  // Note, that this ScheduledFuture has cancel(Boolean) method
+  def schedule(
+    after: FiniteDuration,
+    every: FiniteDuration
+  )(block: => Unit): ScheduledFuture[_] = {
+
+    new ScheduledThreadPoolExecutor(1).scheduleAtFixedRate(
+      new Runnable { def run(): Unit = block },
+      after.toSeconds,
+      every.toSeconds,
+      SECONDS
+    )
   }
 
 

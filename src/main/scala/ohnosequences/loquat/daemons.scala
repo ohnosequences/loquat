@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 protected[loquat] case object daemons {
 
-  import dataMappings._, configs._
+  import dataMappings._, configs._, utils._
 
   import ohnosequences.statika.bundles._
   import ohnosequences.statika.instructions._
@@ -16,42 +16,36 @@ protected[loquat] case object daemons {
   import ohnosequences.awstools.s3._
   import com.amazonaws.auth.InstanceProfileCredentialsProvider
   import java.io.File
+  import java.util.concurrent._
+  import scala.util.Try
 
 
   case class LogUploaderBundle(val config: AnyLoquatConfig) extends Bundle() with LazyLogging {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
+    val logFile = new File("/root/log.txt")
+
+    val bucket = config.resourceNames.bucket
+
+    def uploadLog(): Unit = Try {
+      aws.ec2.getCurrentInstanceId.get
+    }.map { id =>
+      aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile)
+      ()
+    }.getOrElse {
+      logger.error(s"Failed to upload the log to the bucket [${bucket}]")
+    }
+
     def instructions: AnyInstructions = LazyTry[Unit] {
-      val logFile = new File("/root/log.txt")
-
-      val bucket = config.resourceNames.bucket
-
-      aws.ec2.getCurrentInstanceId match {
-        case None => Failure("can't obtain instanceId")
-        case Some(id) => {
-          val logUploader = new Thread(new Runnable {
-            def run(): Unit = {
-              while(true) {
-                try {
-                  if(aws.s3.bucketExists(bucket)) {
-                    aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile)
-                  } else {
-                    logger.warn(s"Bucket [${bucket}] doesn't exist")
-                  }
-
-                  Thread.sleep(30.seconds.toMillis)
-                } catch {
-                  case t: Throwable => logger.error("log upload fails", t);
-                }
-              }
-            }
-          }, "logUploader")
-          logUploader.setDaemon(true)
-          logUploader.start
-          Success("logUploader started", ())
-        }
+      if (aws.s3.bucketExists(bucket)) {
+        schedule(
+          after = 30.seconds,
+          every = 30.seconds
+        )(uploadLog)
+        Success("Log uploader daemon started", ())
       }
+      else Failure(s"Bucket [${bucket}] doesn't exist")
     }
   }
 
