@@ -3,9 +3,9 @@ package ohnosequences.loquat
 case object utils {
 
   import java.io.{PrintWriter, File}
-  import ohnosequences.awstools.ec2.Tag
+  import ohnosequences.awstools.ec2._
   import ohnosequences.awstools.autoscaling.{ AutoScaling, AutoScalingGroup }
-  import com.amazonaws.services.autoscaling.model._
+  // import com.amazonaws.services.autoscaling.model._
   import com.typesafe.scalalogging.LazyLogging
   import scala.util._
   import scala.concurrent.duration._
@@ -42,17 +42,17 @@ case object utils {
 
 
   object InstanceTags {
-    val PRODUCT_TAG = Tag("product", "loquat")
+    val PRODUCT_TAG = InstanceTag("product", "loquat")
 
     val STATUS_TAG_NAME = "status"
 
     //for instances
-    val RUNNING = Tag(STATUS_TAG_NAME, "running")
-    val INSTALLING = Tag(STATUS_TAG_NAME, "installing")
-    val IDLE = Tag(STATUS_TAG_NAME, "idle")
-    val PROCESSING = Tag(STATUS_TAG_NAME, "processing")
-    val FINISHING = Tag(STATUS_TAG_NAME, "finishing")
-    val FAILED = Tag(STATUS_TAG_NAME, "failed")
+    val RUNNING    = InstanceTag(STATUS_TAG_NAME, "running")
+    val INSTALLING = InstanceTag(STATUS_TAG_NAME, "installing")
+    val IDLE       = InstanceTag(STATUS_TAG_NAME, "idle")
+    val PROCESSING = InstanceTag(STATUS_TAG_NAME, "processing")
+    val FINISHING  = InstanceTag(STATUS_TAG_NAME, "finishing")
+    val FAILED     = InstanceTag(STATUS_TAG_NAME, "failed")
 
     val AUTO_SCALING_GROUP = "autoScalingGroup"
   }
@@ -60,9 +60,9 @@ case object utils {
 
   def tagAutoScalingGroup(as: AutoScaling, groupName: String, status: String): Unit = {
     as.createTags(groupName, InstanceTags.PRODUCT_TAG)
-    as.createTags(groupName, Tag(InstanceTags.AUTO_SCALING_GROUP, groupName))
-    as.createTags(groupName, Tag(InstanceTags.STATUS_TAG_NAME, status))
-    as.createTags(groupName, Tag("Name", groupName))
+    as.createTags(groupName, InstanceTag(InstanceTags.AUTO_SCALING_GROUP, groupName))
+    as.createTags(groupName, InstanceTag(InstanceTags.STATUS_TAG_NAME, status))
+    as.createTags(groupName, InstanceTag("Name", groupName))
   }
 
   /* Some file and pretty printing utils */
