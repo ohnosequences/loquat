@@ -28,7 +28,7 @@ trait AnyLoquat { loquat =>
     override lazy val fullName: String = s"${loquat.fullName}.${this.toString}"
   }
 
-  case object managerCompat extends CompatibleWithPrefix(fullName)(config.ami, manager, config.metadata)
+  case object managerCompat extends CompatibleWithPrefix(fullName)(config.amiEnv, manager, config.metadata)
 
   final def deploy(user: LoquatUser): Unit = LoquatOps.deploy(config, user, managerCompat.userScript)
   final def undeploy(user: LoquatUser): Unit =
@@ -57,7 +57,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
     user: LoquatUser,
     managerUserScript: String
   ): Unit = {
-    logger.info(s"deploying loquat: ${config.loquatName} v${config.loquatVersion}")
+    logger.info(s"Deploying loquat: ${config.loquatName} v${config.loquatVersion}")
 
     if(user.validate.nonEmpty)
       logger.error("User validation failed. Fix it and try to deploy again.")
@@ -67,7 +67,11 @@ protected[loquat] case object LoquatOps extends LazyLogging {
       val aws = AWSClients.create(user.localCredentials)
       val names = config.resourceNames
 
-      val managerGroup = config.managerAutoScalingGroup(user.keypairName)
+      val managerGroup = config.managerConfig.autoScalingGroup(
+        config.resourceNames.managerGroup,
+        user.keypairName,
+        config.iamRoleName
+      )
 
       Seq(
         Step( s"Creating input queue: ${names.inputQueue}" )(

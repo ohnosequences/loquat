@@ -3,9 +3,9 @@ package ohnosequences.loquat
 import dataMappings._, utils._
 
 import ohnosequences.statika.bundles._
-import ohnosequences.statika.aws._, amazonLinuxAMIs._
+import ohnosequences.statika.aws._
 
-import ohnosequences.awstools.ec2.{EC2, Tag, InstanceType, InstanceSpecs }
+import ohnosequences.awstools.ec2._
 import ohnosequences.awstools.s3._
 import ohnosequences.awstools.autoscaling._
 
@@ -45,49 +45,95 @@ case object configs {
   abstract class Config(val subConfigs: AnyConfig*) extends AnyConfig
 
 
-  def checkPurchaseModel(pm: PurchaseModel): Seq[String] = pm match {
-    case Spot(price) if price <= 0 => Seq(s"Spot price must be positive: ${price}")
-    case _ => Seq()
+
+  trait AnyAutoScalingConfig extends Config() { conf =>
+
+    type InstanceSpecs <: AnyInstanceSpecs
+    val  instanceSpecs: InstanceSpecs
+
+    type PurchaseModel <: AnyPurchaseModel
+    val  purchaseModel: PurchaseModel
+
+    val groupSize: AutoScalingGroupSize
+
+    // TODO: use some better type for this
+    val deviceMapping: Map[String, String]
+
+    def validationErrors: Seq[String] = {
+
+      val groupSizeErros: Seq[String] = {
+        if ( groupSize.min < 0 ) Seq(s"Minimal autoscaling group size has to be non-negative: ${groupSize.min}")
+        else if (
+          groupSize.desired < groupSize.min ||
+          groupSize.desired > groupSize.max
+        ) Seq(s"Desired capacity [${groupSize.desired}] has to be in the interval [${groupSize.min}, ${groupSize.max}]")
+        else Seq()
+      }
+
+      val purchaseModelErrors: Seq[String] = purchaseModel match {
+        case Spot(price) if price <= 0 => Seq(s"Spot price has to be positive: ${price}")
+        case _ => Seq()
+      }
+
+      groupSizeErros ++ purchaseModelErrors
+    }
+
+    def autoScalingGroup(
+      groupName: String,
+      keypairName: String,
+      iamRoleName: String
+    ): AutoScalingGroup =
+      AutoScalingGroup(
+        name = groupName,
+        size = conf.groupSize,
+        launchConfiguration = LaunchConfiguration(
+          name = groupName + "loquatWorkersLaunchConfiguration",
+          purchaseModel = conf.purchaseModel,
+          launchSpecs = LaunchSpecs(
+            conf.instanceSpecs
+          )(keyName = keypairName,
+            instanceProfile = Some(iamRoleName),
+            deviceMapping = conf.deviceMapping
+          )
+        )
+      )
+
   }
 
-
   /* Manager autoscaling group configuration */
-  case class ManagerConfig(
-    instanceType: InstanceType,
-    purchaseModel: PurchaseModel
-  ) extends Config() {
+  trait AnyManagerConfig extends AnyAutoScalingConfig {
 
-    def validationErrors: Seq[String] = checkPurchaseModel(purchaseModel)
+    val groupSize = AutoScalingGroupSize(1, 1, 1)
+    val deviceMapping = Map[String, String]()
+  }
+
+  case class ManagerConfig[
+    IS <: AnyInstanceSpecs,
+    PM <: AnyPurchaseModel
+  ](instanceSpecs: IS,
+    purchaseModel: PM
+  ) extends AnyManagerConfig {
+
+    type InstanceSpecs = IS
+    type PurchaseModel = PM
   }
 
   /* Workers autoscaling group configuration */
-  case class WorkersGroupSize(
-    min: Int,
-    desired: Int,
-    max: Int
-  ) extends Config() {
 
-    def validationErrors: Seq[String] =
-      if (
-        desired < min ||
-        desired > max
-      ) Seq(s"Desired capacity [${desired}] has to be in the interval [${min}, ${max}]")
-      else Seq()
-  }
+  trait AnyWorkersConfig extends AnyAutoScalingConfig
 
-
-  case class WorkersConfig(
-    instanceType: InstanceType,
-    purchaseModel: PurchaseModel,
-    groupSize: WorkersGroupSize,
+  case class WorkersConfig[
+    IS <: AnyInstanceSpecs,
+    PM <: AnyPurchaseModel
+  ](instanceSpecs: IS,
+    purchaseModel: PM,
+    groupSize: AutoScalingGroupSize,
     // TODO: use some better type for this
     deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
-  ) extends Config(groupSize) {
+  ) extends AnyWorkersConfig {
 
-    def validationErrors: Seq[String] = {
-      checkPurchaseModel(purchaseModel) ++
-      groupSize.validationErrors
-    }
+    type InstanceSpecs = IS
+    type PurchaseModel = PM
   }
 
 
@@ -242,17 +288,17 @@ case object configs {
 
     /* AMI that will be used for manager and worker instances */
     // NOTE: we need the AMI type here for the manager/worker compats
-    type AMI <: AmazonLinuxAMI
-    val  ami: AMI
+    type AMIEnv <: AnyLinuxAMIEnvironment
+    val  amiEnv: AMIEnv
 
     /* IAM rolse that will be used by the autoscaling groups */
     val iamRoleName: String
 
-    /* Configuration for Manager autoscaling group */
-    val managerConfig: ManagerConfig
+    type ManagerConfig <: AnyManagerConfig
+    val  managerConfig: ManagerConfig
 
-    /* Configuration for Workers autoscaling group */
-    val workersConfig: WorkersConfig
+    type WorkersConfig <: AnyWorkersConfig
+    val  workersConfig: WorkersConfig
 
     /* Termination conditions */
     val terminationConfig: TerminationConfig
@@ -284,42 +330,40 @@ case object configs {
 
     lazy final val resourceNames: ResourceNames = ResourceNames(loquatId)
 
-    def managerAutoScalingGroup(keypairName: String): AutoScalingGroup =
-      AutoScalingGroup(
-        name = resourceNames.managerGroup,
-        minSize = 1,
-        maxSize = 1,
-        desiredCapacity = 1,
-        launchingConfiguration = LaunchConfiguration(
-          name = "loquatManagerLaunchConfiguration" + loquatId,
-          instanceSpecs = InstanceSpecs(
-            instanceType = managerConfig.instanceType,
-            amiId = ami.id,
-            keyName = keypairName,
-            instanceProfile = Some(iamRoleName)
-          ),
-          purchaseModel = managerConfig.purchaseModel
-        )
-      )
-
-    def workersAutoScalingGroup(keypairName: String): AutoScalingGroup =
-      AutoScalingGroup(
-        name = resourceNames.workersGroup,
-        minSize = workersConfig.groupSize.min,
-        maxSize = workersConfig.groupSize.max,
-        desiredCapacity = workersConfig.groupSize.desired,
-        launchingConfiguration = LaunchConfiguration(
-          name = "loquatWorkersLaunchConfiguration" + loquatId,
-          instanceSpecs = InstanceSpecs(
-            instanceType = workersConfig.instanceType,
-            amiId = ami.id,
-            keyName = keypairName,
-            instanceProfile = Some(iamRoleName),
-            deviceMapping = workersConfig.deviceMapping
-          ),
-          purchaseModel = workersConfig.purchaseModel
-        )
-      )
+    // def managerAutoScalingGroup(keypairName: String): AutoScalingGroup =
+    //   AutoScalingGroup(
+    //     name = resourceNames.managerGroup,
+    //     minSize = 1,
+    //     maxSize = 1,
+    //     desiredCapacity = 1,
+    //     launchConfiguration = LaunchConfiguration(
+    //       name = "loquatManagerLaunchConfiguration" + loquatId,
+    //       purchaseModel = managerConfig.purchaseModel,
+    //       launchSpecs = LaunchSpecs(
+    //         managerConfig.instanceSpecs
+    //       )(keyName = keypairName,
+    //         instanceProfile = Some(iamRoleName)
+    //       )
+    //     )
+    //   )
+    //
+    // def workersAutoScalingGroup(keypairName: String): AutoScalingGroup =
+    //   AutoScalingGroup(
+    //     name = resourceNames.workersGroup,
+    //     minSize = workersConfig.groupSize.min,
+    //     maxSize = workersConfig.groupSize.max,
+    //     desiredCapacity = workersConfig.groupSize.desired,
+    //     launchConfiguration = LaunchConfiguration(
+    //       name = "loquatWorkersLaunchConfiguration" + loquatId,
+    //       purchaseModel = workersConfig.purchaseModel,
+    //       launchSpecs = LaunchSpecs(
+    //         workersConfig.instanceSpecs
+    //       )(keyName = keypairName,
+    //         instanceProfile = Some(iamRoleName),
+    //         deviceMapping = workersConfig.deviceMapping
+    //       )
+    //     )
+    //   )
 
     // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
     lazy final val dataMappingsUploaded: S3Object = S3Object(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
