@@ -25,7 +25,7 @@ protected[loquat]
     val config = worker.config
 
     case object workerCompat extends CompatibleWithPrefix(fullName)(
-      environment = config.ami,
+      environment = config.amiEnv,
       bundle = worker,
       metadata = config.metadata
     ) {
@@ -74,12 +74,16 @@ protected[loquat]
         } -&-
         LazyTry {
           aws.as.getAutoScalingGroupByName(config.resourceNames.managerGroup) map { group =>
-            group.launchingConfiguration.instanceSpecs.keyName
+            group.launchConfiguration.launchSpecs.keyName
           } map { keypairName =>
 
             logger.info("Setting up workers userScript")
             val workersGroup = aws.as.fixAutoScalingGroupUserData(
-              config.workersAutoScalingGroup(keypairName),
+              config.workersConfig.autoScalingGroup(
+                config.resourceNames.workersGroup,
+                keypairName,
+                config.iamRoleName
+              ),
               workerCompat.userScript
             )
 
