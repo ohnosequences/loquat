@@ -2,11 +2,16 @@ package ohnosequences.loquat
 
 case object utils {
 
-  import java.io.{PrintWriter, File}
   import ohnosequences.awstools.ec2._
+  import ohnosequences.awstools.s3._
   import ohnosequences.awstools.autoscaling.{ AutoScaling, AutoScalingGroup }
   // import com.amazonaws.services.autoscaling.model._
   import com.typesafe.scalalogging.LazyLogging
+  import com.amazonaws.services.s3.transfer._
+  import com.amazonaws.services.s3.model.{ S3Object => _, _ }
+  import com.amazonaws.event._
+  import better.files._
+  import scala.collection.JavaConversions._
   import scala.util._
 
 
@@ -78,6 +83,78 @@ case object utils {
       Thread.sleep(timeStep.inSeconds * 1000)
       waitForResource(getResource, tries - 1, timeStep)
     } else resource
+  }
+
+
+  implicit def transferManagerOps(tm: TransferManager):
+    TransferManagerOps =
+    TransferManagerOps(tm)
+
+  // TODO: use futures here
+  case class TransferManagerOps(tm: TransferManager) {
+
+    def download(
+      s3Address: AnyS3Address,
+      destination: File
+    ): Try[File] = {
+      println(s"""Dowloading object
+        |from: ${s3Address.url}
+        |to: ${destination.path}
+        |""".stripMargin
+      )
+
+      val transfer: Transfer = s3Address match {
+        case S3Object(bucket, key) => tm.download(bucket, key, destination.toJava)
+        case S3Folder(bucket, key) => tm.downloadDirectory(bucket, key, destination.toJava)
+      }
+
+      // This should attach a default progress listener
+      transfer.addProgressListener(new ProgressTracker())
+
+      Try {
+        // NOTE: this is blocking:
+        transfer.waitForCompletion
+
+        // if this was a virtual directory, the destination actually differs:
+        s3Address match {
+          case S3Object(_, key) => destination
+          case S3Folder(_, key) => destination / key
+        }
+      }
+    }
+
+    def upload(
+      file: File,
+      s3Address: AnyS3Address,
+      s3MetadataProvider: ObjectMetadataProvider
+    ): Try[AnyS3Address] = {
+      val transfer: Transfer = if (file.isDirectory) {
+        tm.uploadDirectory(
+          s3Address.bucket,
+          s3Address.key,
+          file.toJava,
+          true, // includeSubdirectories
+          s3MetadataProvider
+        )
+      } else {
+        tm.uploadFileList(
+          s3Address.bucket,
+          s3Address.key,
+          file.parent.toJava,
+          Seq(file.toJava),
+          s3MetadataProvider
+        )
+      }
+
+      // This should attach a default progress listener
+      transfer.addProgressListener(new ProgressTracker())
+
+      Try {
+        // NOTE: this is blocking:
+        transfer.waitForCompletion
+        s3Address
+      }
+    }
   }
 
 }
