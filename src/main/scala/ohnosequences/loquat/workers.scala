@@ -14,11 +14,12 @@ import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent.Future
 import scala.util.Try
+import scala.collection.JavaConversions._
 import upickle.Js
 
-import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.s3.transfer._
+import com.amazonaws.services.s3.model.ObjectMetadata
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -158,28 +159,10 @@ class DataProcessor(
       logger.info("downloading dataMapping input")
       val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
         case (name, s3Address) =>
-          val destination = inputDir / name
           logger.info("trying to create input object: " + name)
-          // first we try to download it as a normal object:
-          s3Address match {
-            case S3Object(bucket, key) => {
-              println(s"""Dowloading object
-                |from: ${s3Address.url}
-                |to: ${destination.path}
-                |""".stripMargin)
-              transferManager.download(bucket, key, destination.toJava).waitForCompletion
-              (name -> destination)
-            }
-            case S3Folder(bucket, key) => {
-              val fullDestination = destination / key
-              println(s"""Dowloading folder
-                |from: ${s3Address.url}
-                |to: ${fullDestination.path}
-                |""".stripMargin)
-              transferManager.downloadDirectory(bucket, key, destination.toJava).waitForCompletion
-              (name -> fullDestination)
-            }
-          }
+          // FIXME: this shouldn't ignore the returned Try
+          val destination: File = transferManager.download(s3Address, inputDir / name).get
+          (name -> destination)
       }
 
       logger.info("processing data in: " + workingDir.path)
@@ -202,24 +185,17 @@ class DataProcessor(
           // TODO: simplify this huge if-else statement
           if (outputMap.keys.forall(_.exists)) {
 
-            val uploadTries = outputMap map { case (file, objectAddress) =>
-              logger.info(s"publishing output object: ${file} -> ${objectAddress}")
-
-              if (file.isDirectory) Try {
-                transferManager.uploadDirectory(
-                  objectAddress.bucket,
-                  objectAddress.key,
-                  file.toJava,
-                  true // includeSubdirectories
-                ).waitForCompletion
-              }
-              else Try {
-                transferManager.upload(
-                  objectAddress.bucket,
-                  objectAddress.key,
-                  file.toJava
-                ).waitForCompletion
-              }
+            val uploadTries = outputMap map { case (file, s3Address) =>
+              logger.info(s"publishing output object: ${file} -> ${s3Address}")
+              transferManager.upload(
+                file,
+                s3Address,
+                Map(
+                  "artifactName"    -> config.metadata.artifact,
+                  "artifactVersion" -> config.metadata.version,
+                  "artifactUrl"     -> config.metadata.artifactUrl
+                )
+              )
             }
 
             // TODO: check whether we can fold Try's here somehow
