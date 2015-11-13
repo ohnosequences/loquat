@@ -14,11 +14,12 @@ import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent.Future
 import scala.util.Try
+import scala.collection.JavaConversions._
 import upickle.Js
 
-import ohnosequences.awstools.AWSClients
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.s3.transfer._
+import com.amazonaws.services.s3.model.{ S3Object => _, _ }
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -155,6 +156,19 @@ class DataProcessor(
 
       val transferManager = new TransferManager(aws.s3.s3)
 
+      // This is used for adding loquat artifact metadata to the S3 objects that we are uploading
+      case object s3MetadataProvider extends ObjectMetadataProvider {
+        def provideObjectMetadata(file: java.io.File, metadata: ObjectMetadata): Unit = {
+          // NOTE: not sure that this is needed (for multi-file upload)
+          metadata.setContentMD5(file.toScala.md5)
+          metadata.setUserMetadata(Map(
+            "artifactName" -> config.metadata.artifact,
+            "artifactVersion" -> config.metadata.version,
+            "artifactUrl" -> config.metadata.artifactUrl
+          ))
+        }
+      }
+
       logger.info("downloading dataMapping input")
       val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
         case (name, s3Address) =>
@@ -210,14 +224,17 @@ class DataProcessor(
                   objectAddress.bucket,
                   objectAddress.key,
                   file.toJava,
-                  true // includeSubdirectories
+                  true, // includeSubdirectories
+                  s3MetadataProvider
                 ).waitForCompletion
               }
               else Try {
-                transferManager.upload(
+                transferManager.uploadFileList(
                   objectAddress.bucket,
                   objectAddress.key,
-                  file.toJava
+                  file.parent.toJava,
+                  Seq(file.toJava),
+                  s3MetadataProvider
                 ).waitForCompletion
               }
             }
