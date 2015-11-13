@@ -6,7 +6,7 @@ object instructionsExample {
   import ohnosequences.statika.instructions._
   import ohnosequences.datasets._, dataSets._, fileLocations._
   import ohnosequences.cosas._, typeSets._
-  import java.io.File
+  import better.files._
 
 
   // inputs:
@@ -28,8 +28,8 @@ object instructionsExample {
 
     def processDataMapping(dataMappingId: String, workingDir: File): Instructions[OutputFiles] = {
       success("foo",
-        stats.inFile(new File(dataMappingId)) :~:
-        results.inFile(new File(".")) :~:
+        stats.inFile(File(dataMappingId)) :~:
+        results.inFile(File(".")) :~:
         ∅
       )
     }

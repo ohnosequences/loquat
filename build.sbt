@@ -19,7 +19,9 @@ libraryDependencies ++= Seq(
   "ohnosequences" %% "aws-statika" % "2.0.0-amis-SNAPSHOT",
   "ohnosequences" %% "datasets"    % "0.2.0-amis-SNAPSHOT",
   // amazon:
-  "ohnosequences" %% "aws-scala-tools" % "0.15.0-amis-SNAPSHOT"
+  "ohnosequences" %% "aws-scala-tools" % "0.15.0-amis-SNAPSHOT",
+  // files:
+  "com.github.pathikrit" %% "better-files" % "2.13.0"
 )
 
 // dependencyOverrides ++= Set(

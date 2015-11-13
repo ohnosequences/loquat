@@ -13,7 +13,7 @@ import com.amazonaws.AmazonServiceException
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.typesafe.scalalogging.{ LazyLogging, Logger }
 
-import java.io.File
+import better.files._
 import scala.util.Try
 
 
@@ -312,7 +312,7 @@ case object configs {
     /* Here follow all the values that are dependent on those defined on top */
 
     // FIXME: put this constant somewhere else
-    final val workingDir: File = new File("/media/ephemeral0/applicator/loquat")
+    final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
 
     // FIXME: should check that the url string parses to an object address
     lazy final val fatArtifactS3Object: S3Object = {

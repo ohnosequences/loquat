@@ -8,7 +8,7 @@ case object dataMappings {
   import ohnosequences.cosas.ops.typeSets._
 
   import ohnosequences.awstools.s3._
-  import java.io.File
+  import better.files._
   import upickle.Js
 
 

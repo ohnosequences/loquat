@@ -70,26 +70,6 @@ case object utils {
     as.createTags(groupName, InstanceTag("Name", groupName))
   }
 
-  /* Some file and pretty printing utils */
-  def writeStringToFile(s: String, file: File): Unit = {
-    val writer = new PrintWriter(file)
-    writer.print(s)
-    writer.close()
-  }
-
-  def listRecursively(f: File): Seq[File] = {
-    if (f.exists) {
-      f.listFiles.filter(_.isDirectory).flatMap(listRecursively) ++
-      f.listFiles
-    } else Seq()
-  }
-
-  def deleteRecursively(file: File) = {
-    listRecursively(file).foreach{ f =>
-      if (!f.delete) throw new RuntimeException("Failed to delete " + f.getAbsolutePath)
-    }
-  }
-
   @scala.annotation.tailrec
   def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: Time) : Option[R] = {
     val resource = getResource
@@ -99,32 +79,5 @@ case object utils {
       waitForResource(getResource, tries - 1, timeStep)
     } else resource
   }
-
-
-  /* File utils */
-  // type File = java.io.File
-
-  // def file(name: String): FileOps = FileOps(new File(name))
-
-  case class file(javaFile: File) extends AnyVal {
-
-    def /(suffix: String): file = file(new File(javaFile, suffix))
-
-    def parent: file = file(javaFile.getParent)
-
-    def name: String = javaFile.getName
-    def path: String = javaFile.getCanonicalPath
-
-    def rename(change: String => String): file = parent / change(name)
-  }
-
-  object file {
-
-    def apply(name: String): file = file(new File(name))
-  }
-
-  implicit def fromJavaFile(f: File): file = file(f)
-  implicit def   toJavaFile(f: file): File = f.javaFile
-  implicit def fileToString(f: file): String = f.path
 
 }

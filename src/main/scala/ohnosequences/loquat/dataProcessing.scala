@@ -13,12 +13,12 @@ case object dataProcessing {
   import ohnosequences.statika.results._
 
   import upickle.Js
-  import java.io.File
+  import better.files._
 
 
   trait AnyProcessingContext {
 
-    val  workingDir: file
+    val  workingDir: File
 
     type DataSet <: AnyDataSet
     val  dataSet: DataSet
@@ -29,16 +29,16 @@ case object dataProcessing {
     /* user can get the file corresponding to the given data key */
     def file[K <: AnyData](key: K)(implicit
         lookup: DataFiles Lookup (K := FileDataLocation)
-      ): file = lookup(dataFiles).value.location
+      ): File = lookup(dataFiles).value.location.toScala
 
     /* or create a file instance in the orking directory */
-    def /(name: String): file = workingDir / name
+    def /(name: String): File = workingDir / name
   }
 
   case class ProcessingContext[D <: AnyDataSet](
     val dataSet: D,
     val dataFiles: D#LocationsAt[FileDataLocation],
-    val workingDir: file
+    val workingDir: File
   ) extends AnyProcessingContext { type DataSet = D }
 
 
@@ -79,7 +79,7 @@ case object dataProcessing {
       /* This method serialises OutputFiles data mapping to a normal Map */
       def filesMap(filesSet: OutputFiles): Map[String, File] =
         outputFilesToMap(filesSet).map { case (data, loc) =>
-          data.label -> loc.location
+          data.label -> loc.location.toScala
         }
 
       parseInputFiles(inputFilesMap) match {
@@ -88,7 +88,7 @@ case object dataProcessing {
           processData(
             dataMappingId,
             ProcessingContext(input, inputFiles, workingDir)
-          ).run(workingDir) match {
+          ).run(workingDir.toJava) match {
             case Failure(tr) => Failure(tr)
             case Success(tr, of) => Success(tr, filesMap(of))
           }

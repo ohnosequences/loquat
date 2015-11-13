@@ -14,7 +14,7 @@ protected[loquat] case object daemons {
   import ohnosequences.awstools.AWSClients
   import ohnosequences.awstools.s3._
   import com.amazonaws.auth.InstanceProfileCredentialsProvider
-  import java.io.File
+  import better.files._
 
 
   case class LogUploaderBundle(val config: AnyLoquatConfig) extends Bundle() with LazyLogging {
@@ -22,7 +22,7 @@ protected[loquat] case object daemons {
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
     def instructions: AnyInstructions = LazyTry[Unit] {
-      val logFile = new File("/root/log.txt")
+      val logFile = file"/root/log.txt"
 
       val bucket = config.resourceNames.bucket
 
@@ -34,7 +34,7 @@ protected[loquat] case object daemons {
               while(true) {
                 try {
                   if(aws.s3.bucketExists(bucket)) {
-                    aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile)
+                    aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile.toJava)
                   } else {
                     logger.warn(s"Bucket [${bucket}] doesn't exist")
                   }

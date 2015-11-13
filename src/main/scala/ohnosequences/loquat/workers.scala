@@ -11,7 +11,7 @@ import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3._
 import ohnosequences.awstools.AWSClients
 import com.typesafe.scalalogging.LazyLogging
-import java.io.File
+import better.files._
 import scala.concurrent.Future
 import scala.util.Try
 import upickle.Js
@@ -137,20 +137,20 @@ class DataProcessor(
 
   def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
     try {
-      logger.info("cleaning working directory: " + workingDir.getAbsolutePath)
-      utils.deleteRecursively(workingDir)
-      logger.info("creating working directory: " + workingDir.getAbsolutePath)
-      workingDir.mkdir
+      logger.info("cleaning working directory: " + workingDir.path)
+      workingDir.delete()
+      logger.info("creating working directory: " + workingDir.path)
+      workingDir.createDirectories()
 
-      val inputDir = new File(workingDir, "input")
-      logger.info("cleaning input directory: " + inputDir.getAbsolutePath)
-      utils.deleteRecursively(inputDir)
-      inputDir.mkdir
+      val inputDir = workingDir / "input"
+      logger.info("cleaning input directory: " + inputDir.path)
+      inputDir.delete()
+      inputDir.createDirectories()
 
-      val outputDir = new File(workingDir, "output")
-      logger.info("cleaning output directory: " + outputDir.getAbsolutePath)
-      utils.deleteRecursively(outputDir)
-      outputDir.mkdir
+      val outputDir = workingDir / "output"
+      logger.info("cleaning output directory: " + outputDir.path)
+      outputDir.delete()
+      outputDir.createDirectories()
 
 
       val transferManager = new TransferManager(aws.s3.s3)
@@ -167,8 +167,8 @@ class DataProcessor(
                 |from: ${s3Address.url}
                 |to: ${destination.path}
                 |""".stripMargin)
-              transferManager.download(bucket, key, destination).waitForCompletion
-              (name -> destination.javaFile)
+              transferManager.download(bucket, key, destination.toJava).waitForCompletion
+              (name -> destination)
             }
             case S3Folder(bucket, key) => {
               val fullDestination = destination / key
@@ -176,13 +176,13 @@ class DataProcessor(
                 |from: ${s3Address.url}
                 |to: ${fullDestination.path}
                 |""".stripMargin)
-              transferManager.downloadDirectory(bucket, key, destination).waitForCompletion
-              (name -> fullDestination.javaFile)
+              transferManager.downloadDirectory(bucket, key, destination.toJava).waitForCompletion
+              (name -> fullDestination)
             }
           }
       }
 
-      logger.info("processing data in: " + workingDir.getAbsolutePath)
+      logger.info("processing data in: " + workingDir.path)
       val result = instructionsBundle.processFiles(dataMapping.id, inputFilesMap, workingDir)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
@@ -209,7 +209,7 @@ class DataProcessor(
                 transferManager.uploadDirectory(
                   objectAddress.bucket,
                   objectAddress.key,
-                  file,
+                  file.toJava,
                   true // includeSubdirectories
                 ).waitForCompletion
               }
@@ -217,7 +217,7 @@ class DataProcessor(
                 transferManager.upload(
                   objectAddress.bucket,
                   objectAddress.key,
-                  file
+                  file.toJava
                 ).waitForCompletion
               }
             }
@@ -234,7 +234,7 @@ class DataProcessor(
 
           } else {
 
-            val missingFiles = outputMap.keys.filterNot(_.exists).map(_.getCanonicalPath)
+            val missingFiles = outputMap.keys.filterNot(_.exists).map(_.path)
             logger.error(s"some output files don't exist: ${missingFiles}")
             tr +: Failure(Seq(s"Couldn't upload results, because some output files don't exist: ${missingFiles}"))
 
