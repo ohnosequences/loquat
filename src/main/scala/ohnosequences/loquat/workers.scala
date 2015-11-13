@@ -156,19 +156,6 @@ class DataProcessor(
 
       val transferManager = new TransferManager(aws.s3.s3)
 
-      // This is used for adding loquat artifact metadata to the S3 objects that we are uploading
-      case object s3MetadataProvider extends ObjectMetadataProvider {
-        def provideObjectMetadata(file: java.io.File, metadata: ObjectMetadata): Unit = {
-          // NOTE: not sure that this is needed (for multi-file upload)
-          metadata.setContentMD5(file.toScala.md5)
-          metadata.setUserMetadata(Map(
-            "artifactName" -> config.metadata.artifact,
-            "artifactVersion" -> config.metadata.version,
-            "artifactUrl" -> config.metadata.artifactUrl
-          ))
-        }
-      }
-
       logger.info("downloading dataMapping input")
       val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
         case (name, s3Address) =>
@@ -198,9 +185,17 @@ class DataProcessor(
           // TODO: simplify this huge if-else statement
           if (outputMap.keys.forall(_.exists)) {
 
-            val uploadTries = outputMap map { case (file, objectAddress) =>
-              logger.info(s"publishing output object: ${file} -> ${objectAddress}")
-              transferManager.upload(file, objectAddress, s3MetadataProvider)
+            val uploadTries = outputMap map { case (file, s3Address) =>
+              logger.info(s"publishing output object: ${file} -> ${s3Address}")
+              transferManager.upload(
+                file,
+                s3Address,
+                Map(
+                  "artifactName"    -> config.metadata.artifact,
+                  "artifactVersion" -> config.metadata.version,
+                  "artifactUrl"     -> config.metadata.artifactUrl
+                )
+              )
             }
 
             // TODO: check whether we can fold Try's here somehow
