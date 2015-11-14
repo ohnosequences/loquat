@@ -16,17 +16,13 @@ libraryDependencies ++= Seq(
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.7.1",
   "ohnosequences" %% "statika"     % "2.0.0-M4",
-  "ohnosequences" %% "aws-statika" % "2.0.0-amis-SNAPSHOT",
-  "ohnosequences" %% "datasets"    % "0.2.0-amis-SNAPSHOT",
+  "ohnosequences" %% "aws-statika" % "2.0.0-M5",
+  "ohnosequences" %% "datasets"    % "0.2.0-M2",
   // amazon:
-  "ohnosequences" %% "aws-scala-tools" % "0.15.0-amis-SNAPSHOT",
+  "ohnosequences" %% "aws-scala-tools" % "0.15.0-M1",
   // files:
   "com.github.pathikrit" %% "better-files" % "2.13.0"
 )
-
-// dependencyOverrides ++= Set(
-//   "jline" % "jline" % "2.12.1"
-// )
 
 // FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()
