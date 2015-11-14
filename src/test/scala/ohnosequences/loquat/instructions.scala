@@ -24,9 +24,9 @@ object instructionsExample {
     output = stats :^: results :^: DNil
   ) {
 
-    def install: AnyInstructions = say("horay!")
+    def instructions: AnyInstructions = say("horay!")
 
-    def processDataMapping(dataMappingId: String, workingDir: File): Instructions[OutputFiles] = {
+    def processData(dataMappingId: String, context: Context): Instructions[OutputFiles] = {
       success("foo",
         stats.inFile(File(dataMappingId)) :~:
         results.inFile(File(".")) :~:

@@ -29,7 +29,7 @@ case object dataProcessing {
     /* user can get the file corresponding to the given data key */
     def file[K <: AnyData](key: K)(implicit
         lookup: DataFiles Lookup (K := FileDataLocation)
-      ): File = lookup(dataFiles).value.location.toScala
+      ): File = lookup(dataFiles).value.location
 
     /* or create a file instance in the orking directory */
     def /(name: String): File = workingDir / name
@@ -79,7 +79,7 @@ case object dataProcessing {
       /* This method serialises OutputFiles data mapping to a normal Map */
       def filesMap(filesSet: OutputFiles): Map[String, File] =
         outputFilesToMap(filesSet).map { case (data, loc) =>
-          data.label -> loc.location.toScala
+          data.label -> loc.location
         }
 
       parseInputFiles(inputFilesMap) match {
