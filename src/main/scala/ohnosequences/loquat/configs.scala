@@ -238,7 +238,8 @@ case object configs {
       /* name of queue with errors (will be subscribed to errorTopic) */
       val errorQueue: String = "loquatErrorTopic" + suffix
       /* name of bucket for logs files */
-      val bucket: String = "era7loquats"
+      // FIXME: make the bucket name configurable
+      val bucket: String = "era7-projects-loquats"
       /* topic name to notificate user about termination of loquat */
       val notificationTopic: String = "loquatNotificationTopic" + suffix
       /* name of the manager autoscaling group */
@@ -329,41 +330,6 @@ case object configs {
     lazy final val loquatId: String = (loquatName + loquatVersion)
 
     lazy final val resourceNames: ResourceNames = ResourceNames(loquatId)
-
-    // def managerAutoScalingGroup(keypairName: String): AutoScalingGroup =
-    //   AutoScalingGroup(
-    //     name = resourceNames.managerGroup,
-    //     minSize = 1,
-    //     maxSize = 1,
-    //     desiredCapacity = 1,
-    //     launchConfiguration = LaunchConfiguration(
-    //       name = "loquatManagerLaunchConfiguration" + loquatId,
-    //       purchaseModel = managerConfig.purchaseModel,
-    //       launchSpecs = LaunchSpecs(
-    //         managerConfig.instanceSpecs
-    //       )(keyName = keypairName,
-    //         instanceProfile = Some(iamRoleName)
-    //       )
-    //     )
-    //   )
-    //
-    // def workersAutoScalingGroup(keypairName: String): AutoScalingGroup =
-    //   AutoScalingGroup(
-    //     name = resourceNames.workersGroup,
-    //     minSize = workersConfig.groupSize.min,
-    //     maxSize = workersConfig.groupSize.max,
-    //     desiredCapacity = workersConfig.groupSize.desired,
-    //     launchConfiguration = LaunchConfiguration(
-    //       name = "loquatWorkersLaunchConfiguration" + loquatId,
-    //       purchaseModel = workersConfig.purchaseModel,
-    //       launchSpecs = LaunchSpecs(
-    //         workersConfig.instanceSpecs
-    //       )(keyName = keypairName,
-    //         instanceProfile = Some(iamRoleName),
-    //         deviceMapping = workersConfig.deviceMapping
-    //       )
-    //     )
-    //   )
 
     // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
     lazy final val dataMappingsUploaded: S3Object = S3Object(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
