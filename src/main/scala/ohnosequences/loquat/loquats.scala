@@ -143,9 +143,9 @@ protected[loquat] case object LoquatOps extends LazyLogging {
       Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
     ).execute
 
-    // Step(s"deleting temporary bucket: ${names.bucket}")(
-    //   Try { aws.s3.deleteBucket(names.bucket) }
-    // ).execute
+    Step(s"deleting the temporary S3 object: ${config.dataMappingsUploaded}")(
+      Try { aws.s3.deleteObject(config.dataMappingsUploaded) }
+    ).execute
 
     Step(s"deleting error queue: ${names.errorQueue}")(
       Try { aws.sqs.getQueueByName(names.errorQueue).foreach(_.delete) }
