@@ -96,7 +96,7 @@ case object utils {
       import java.util.Base64
       import java.nio.charset.StandardCharsets
       metadata.setContentMD5(
-        Base64.getEncoder.encodeToString(file.toScala.md5.getBytes(StandardCharsets.UTF_8))
+        Base64.getEncoder.encodeToString(file.toScala.md5.toLowerCase.getBytes(StandardCharsets.UTF_8))
       )
       metadata.setUserMetadata(metadataMap)
     }
