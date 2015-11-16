@@ -165,8 +165,7 @@ case object utils {
           file.toJava
         )
 
-        val metadata: ObjectMetadata = request.getMetadata
-
+        val metadata = new ObjectMetadata()
         metadata.setUserMetadata(userMetadata)
 
         tm.upload( request.withMetadata(metadata) )
