@@ -21,7 +21,9 @@ libraryDependencies ++= Seq(
   // amazon:
   "ohnosequences" %% "aws-scala-tools" % "0.15.0-M1",
   // files:
-  "com.github.pathikrit" %% "better-files" % "2.13.0"
+  "com.github.pathikrit" %% "better-files" % "2.13.0",
+  // testing
+  "org.scalatest"  %% "scalatest" % "2.2.5" % Test
 )
 
 // FIXME: warts should be turn on back after the code clean up
