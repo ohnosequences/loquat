@@ -2,15 +2,16 @@
     - migrated from avsl to [scala-logging](https://github.com/typesafehub/scala-logging)
     - migrated from lift-json to [upickle](http://lihaoyi.github.io/upickle-pprint/upickle/)
     - removed unnecessary dependencies
+    - added dependency on [better-files](https://github.com/pathikrit/better-files) lib
 
 * Great refactoring:
     - upgraded to scala-2.11
-    - upgraded to statika-2 (not released yet)
+    - upgraded to statika-2.0
     - changed completely bundles structure (less bundles, less layers)
     - removed CLI
     - removed web-console
     - removed control queue; added its commands to the loquat ops
-    - Moved resources creation to the loquat deploy; removed resources bundle
+    - moved resources creation to the loquat deploy; removed resources bundle
 
 * Other changes:
     - simplified config, moved there _all_ configurable things
