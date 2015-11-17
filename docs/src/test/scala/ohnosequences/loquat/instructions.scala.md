@@ -2,14 +2,13 @@
 ```scala
 package ohnosequences.loquat.test
 
-object instructionsExample {
+import ohnosequences.loquat._, dataProcessing._
+import ohnosequences.statika.instructions._
+import ohnosequences.datasets._, dataSets._, fileLocations._
+import ohnosequences.cosas._, typeSets._
+import better.files._
 
-  import ohnosequences.loquat._, dataProcessing._
-  import ohnosequences.statika.instructions._
-  import ohnosequences.datasets._, dataSets._, fileLocations._
-  import ohnosequences.cosas._, typeSets._
-  import better.files._
-
+case object instructionsExample {
 
   // inputs:
   case object SomeData extends AnyDataType { val label = "someLabel" }
@@ -45,18 +44,39 @@ object instructionsExample {
 
 }
 
+class buhh extends org.scalatest.FunSuite {
+
+  test("files md5") {
+
+    // import java.util.Base64
+    // import java.nio.charset.StandardCharsets
+    //
+    // val file = File("buh")
+    // file << "hola scala"
+    // println { Base64.getEncoder.encodeToString( file.digest("MD5") ) }
+    // println { file.digest("MD5") }
+    //
+    // println { file.md5 }
+    // println { file.md5.toLowerCase }
+    //
+    // println { Base64.getEncoder.encodeToString(file.md5.getBytes(StandardCharsets.UTF_8)) }
+    // println { Base64.getEncoder.encodeToString(file.md5.toLowerCase.getBytes(StandardCharsets.UTF_8)) }
+
+  }
+}
+
 ```
 
 
 
 
+[main/scala/ohnosequences/loquat/configs.scala]: ../../../../main/scala/ohnosequences/loquat/configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: ../../../../main/scala/ohnosequences/loquat/daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../main/scala/ohnosequences/loquat/dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: ../../../../main/scala/ohnosequences/loquat/dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: ../../../../main/scala/ohnosequences/loquat/loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: ../../../../main/scala/ohnosequences/loquat/managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: ../../../../main/scala/ohnosequences/loquat/utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: ../../../../main/scala/ohnosequences/loquat/workers.scala.md
 [test/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
 [test/scala/ohnosequences/loquat/instructions.scala]: instructions.scala.md
-[main/scala/ohnosequences/loquat/dataProcessing.scala]: ../../../../main/scala/ohnosequences/loquat/dataProcessing.scala.md
-[main/scala/ohnosequences/loquat/workers.scala]: ../../../../main/scala/ohnosequences/loquat/workers.scala.md
-[main/scala/ohnosequences/loquat/managers.scala]: ../../../../main/scala/ohnosequences/loquat/managers.scala.md
-[main/scala/ohnosequences/loquat/daemons.scala]: ../../../../main/scala/ohnosequences/loquat/daemons.scala.md
-[main/scala/ohnosequences/loquat/loquats.scala]: ../../../../main/scala/ohnosequences/loquat/loquats.scala.md
-[main/scala/ohnosequences/loquat/utils.scala]: ../../../../main/scala/ohnosequences/loquat/utils.scala.md
-[main/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../main/scala/ohnosequences/loquat/dataMappings.scala.md
-[main/scala/ohnosequences/loquat/configs.scala]: ../../../../main/scala/ohnosequences/loquat/configs.scala.md

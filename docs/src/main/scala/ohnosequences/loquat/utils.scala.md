@@ -95,7 +95,11 @@ case object utils {
 
     def provideObjectMetadata(file: java.io.File, metadata: ObjectMetadata): Unit = {
       // NOTE: not sure that this is needed (for multi-file upload)
-      metadata.setContentMD5(file.toScala.md5)
+      // import java.util.Base64
+      // import java.nio.charset.StandardCharsets
+      // metadata.setContentMD5(
+      //   Base64.getEncoder.encodeToString(file.toScala.md5.toLowerCase.getBytes(StandardCharsets.UTF_8))
+      // )
       metadata.setUserMetadata(metadataMap)
     }
   }
@@ -157,13 +161,16 @@ case object utils {
           s3MetadataProvider(userMetadata)
         )
       } else {
-        tm.uploadFileList(
+        val request = new PutObjectRequest(
           s3Address.bucket,
           s3Address.key,
-          file.parent.toJava,
-          Seq(file.toJava),
-          s3MetadataProvider(userMetadata)
+          file.toJava
         )
+
+        val metadata = new ObjectMetadata()
+        metadata.setUserMetadata(userMetadata)
+
+        tm.upload( request.withMetadata(metadata) )
       }
 
       // This should attach a default progress listener
@@ -184,13 +191,13 @@ case object utils {
 
 
 
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
 [test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
 [test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md
-[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
-[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
-[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
-[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
-[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
-[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
-[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
-[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md

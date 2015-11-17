@@ -250,7 +250,7 @@ Configuration of resources
 
 ```scala
   protected[loquat]
-    case class ResourceNames(suffix: String) {
+    case class ResourceNames(suffix: String, bucketName: String) {
 ```
 
 name of queue with dataMappings
@@ -274,7 +274,9 @@ name of queue with errors (will be subscribed to errorTopic)
 name of bucket for logs files
 
 ```scala
-      val bucket: String = "era7loquats"
+      // FIXME: make the bucket name configurable
+      val bucket: String = bucketName //"era7-projects-loquats"
+
 ```
 
 topic name to notificate user about termination of loquat
@@ -366,6 +368,7 @@ IAM rolse that will be used by the autoscaling groups
 
 ```scala
     val iamRoleName: String
+    val bucketName: String
 
     type ManagerConfig <: AnyManagerConfig
     val  managerConfig: ManagerConfig
@@ -412,42 +415,7 @@ Unique id  of the loquat instance
     lazy final val loquatVersion: String = metadata.version.replace(".", "").toLowerCase
     lazy final val loquatId: String = (loquatName + loquatVersion)
 
-    lazy final val resourceNames: ResourceNames = ResourceNames(loquatId)
-
-    // def managerAutoScalingGroup(keypairName: String): AutoScalingGroup =
-    //   AutoScalingGroup(
-    //     name = resourceNames.managerGroup,
-    //     minSize = 1,
-    //     maxSize = 1,
-    //     desiredCapacity = 1,
-    //     launchConfiguration = LaunchConfiguration(
-    //       name = "loquatManagerLaunchConfiguration" + loquatId,
-    //       purchaseModel = managerConfig.purchaseModel,
-    //       launchSpecs = LaunchSpecs(
-    //         managerConfig.instanceSpecs
-    //       )(keyName = keypairName,
-    //         instanceProfile = Some(iamRoleName)
-    //       )
-    //     )
-    //   )
-    //
-    // def workersAutoScalingGroup(keypairName: String): AutoScalingGroup =
-    //   AutoScalingGroup(
-    //     name = resourceNames.workersGroup,
-    //     minSize = workersConfig.groupSize.min,
-    //     maxSize = workersConfig.groupSize.max,
-    //     desiredCapacity = workersConfig.groupSize.desired,
-    //     launchConfiguration = LaunchConfiguration(
-    //       name = "loquatWorkersLaunchConfiguration" + loquatId,
-    //       purchaseModel = workersConfig.purchaseModel,
-    //       launchSpecs = LaunchSpecs(
-    //         workersConfig.instanceSpecs
-    //       )(keyName = keypairName,
-    //         instanceProfile = Some(iamRoleName),
-    //         deviceMapping = workersConfig.deviceMapping
-    //       )
-    //     )
-    //   )
+    lazy final val resourceNames: ResourceNames = ResourceNames(loquatId, bucketName)
 
     // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
     lazy final val dataMappingsUploaded: S3Object = S3Object(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
@@ -474,13 +442,13 @@ Unique id  of the loquat instance
 
 
 
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
 [test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
 [test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md
-[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
-[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
-[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
-[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
-[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
-[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
-[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
-[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md

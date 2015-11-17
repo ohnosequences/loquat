@@ -16,7 +16,6 @@ import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent.Future
 import scala.util.Try
-import scala.collection.JavaConversions._
 import upickle.Js
 
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
@@ -140,19 +139,19 @@ class DataProcessor(
 
   def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
     try {
-      logger.info("cleaning working directory: " + workingDir.path)
-      workingDir.delete()
+      if(workingDir.exists) {
+        logger.info("deleting working directory: " + workingDir.path)
+        workingDir.delete(true)
+      }
       logger.info("creating working directory: " + workingDir.path)
       workingDir.createDirectories()
 
       val inputDir = workingDir / "input"
-      logger.info("cleaning input directory: " + inputDir.path)
-      inputDir.delete()
+      logger.info("creating input directory: " + workingDir.path)
       inputDir.createDirectories()
 
       val outputDir = workingDir / "output"
-      logger.info("cleaning output directory: " + outputDir.path)
-      outputDir.delete()
+      logger.info("creating output directory: " + workingDir.path)
       outputDir.createDirectories()
 
 
@@ -276,13 +275,13 @@ class DataProcessor(
 
 
 
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
 [test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
 [test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md
-[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
-[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
-[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
-[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
-[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
-[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
-[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
-[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md

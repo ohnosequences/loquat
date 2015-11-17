@@ -85,8 +85,15 @@ protected[loquat] case object LoquatOps extends LazyLogging {
         Step( s"Creating error queue: ${names.errorQueue}" )(
           Try { aws.sqs.createQueue(names.errorQueue) }
         ),
-        Step( s"Creating temporary bucket: ${names.bucket}" )(
-          Try { aws.s3.createBucket(names.bucket) }
+        Step( s"Checking the bucket: ${names.bucket}" )(
+          Try {
+            if(aws.s3.bucketExists(names.bucket)) {
+              logger.info(s"Bucket [${names.bucket}] already exists.")
+            } else {
+              logger.info(s"Bucket [${names.bucket}] doesn't exists. Trying to create it.")
+              aws.s3.createBucket(names.bucket)
+            }
+          }
         ),
         Step( s"Creating notification topic: ${names.notificationTopic}" )(
           Try { aws.sns.createTopic(names.notificationTopic) }
@@ -138,8 +145,8 @@ protected[loquat] case object LoquatOps extends LazyLogging {
       Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
     ).execute
 
-    Step(s"deleting temporary bucket: ${names.bucket}")(
-      Try { aws.s3.deleteBucket(names.bucket) }
+    Step(s"deleting the temporary S3 object: ${config.dataMappingsUploaded}")(
+      Try { aws.s3.deleteObject(config.dataMappingsUploaded) }
     ).execute
 
     Step(s"deleting error queue: ${names.errorQueue}")(
@@ -191,13 +198,13 @@ protected[loquat] case object LoquatOps extends LazyLogging {
 
 
 
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
 [test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
 [test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md
-[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
-[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
-[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
-[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
-[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
-[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
-[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
-[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
