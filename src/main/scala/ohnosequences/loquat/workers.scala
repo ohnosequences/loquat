@@ -14,7 +14,6 @@ import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent.Future
 import scala.util.Try
-import scala.collection.JavaConversions._
 import upickle.Js
 
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
@@ -138,19 +137,19 @@ class DataProcessor(
 
   def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
     try {
-      logger.info("cleaning working directory: " + workingDir.path)
-      workingDir.delete()
+      if(workingDir.exists) {
+        logger.info("deleting working directory: " + workingDir.path)
+        workingDir.delete(true)
+      }
       logger.info("creating working directory: " + workingDir.path)
       workingDir.createDirectories()
 
       val inputDir = workingDir / "input"
-      logger.info("cleaning input directory: " + inputDir.path)
-      inputDir.delete()
+      logger.info("creating input directory: " + workingDir.path)
       inputDir.createDirectories()
 
       val outputDir = workingDir / "output"
-      logger.info("cleaning output directory: " + outputDir.path)
-      outputDir.delete()
+      logger.info("creating output directory: " + workingDir.path)
       outputDir.createDirectories()
 
 

@@ -93,7 +93,11 @@ case object utils {
 
     def provideObjectMetadata(file: java.io.File, metadata: ObjectMetadata): Unit = {
       // NOTE: not sure that this is needed (for multi-file upload)
-      metadata.setContentMD5(file.toScala.md5)
+      // import java.util.Base64
+      // import java.nio.charset.StandardCharsets
+      // metadata.setContentMD5(
+      //   Base64.getEncoder.encodeToString(file.toScala.md5.toLowerCase.getBytes(StandardCharsets.UTF_8))
+      // )
       metadata.setUserMetadata(metadataMap)
     }
   }
@@ -155,13 +159,16 @@ case object utils {
           s3MetadataProvider(userMetadata)
         )
       } else {
-        tm.uploadFileList(
+        val request = new PutObjectRequest(
           s3Address.bucket,
           s3Address.key,
-          file.parent.toJava,
-          Seq(file.toJava),
-          s3MetadataProvider(userMetadata)
+          file.toJava
         )
+
+        val metadata = new ObjectMetadata()
+        metadata.setUserMetadata(userMetadata)
+
+        tm.upload( request.withMetadata(metadata) )
       }
 
       // This should attach a default progress listener

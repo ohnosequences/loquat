@@ -2,7 +2,6 @@ package ohnosequences.loquat
 
 case object dataProcessing {
 
-  import utils._
   import ohnosequences.datasets._, dataSets._, fileLocations._
 
   import ohnosequences.cosas._, types._
