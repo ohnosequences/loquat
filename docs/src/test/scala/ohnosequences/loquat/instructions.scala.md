@@ -1,3 +1,5 @@
+
+```scala
 package ohnosequences.loquat.test
 
 import ohnosequences.loquat._, dataProcessing._
@@ -62,3 +64,19 @@ class buhh extends org.scalatest.FunSuite {
 
   }
 }
+
+```
+
+
+
+
+[main/scala/ohnosequences/loquat/configs.scala]: ../../../../main/scala/ohnosequences/loquat/configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: ../../../../main/scala/ohnosequences/loquat/daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../main/scala/ohnosequences/loquat/dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: ../../../../main/scala/ohnosequences/loquat/dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: ../../../../main/scala/ohnosequences/loquat/loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: ../../../../main/scala/ohnosequences/loquat/managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: ../../../../main/scala/ohnosequences/loquat/utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: ../../../../main/scala/ohnosequences/loquat/workers.scala.md
+[test/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[test/scala/ohnosequences/loquat/instructions.scala]: instructions.scala.md

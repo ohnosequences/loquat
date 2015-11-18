@@ -1,3 +1,5 @@
+
+```scala
 package ohnosequences.loquat
 
 case object dataProcessing {
@@ -24,13 +26,19 @@ case object dataProcessing {
 
     type DataFiles  = DataSet#LocationsAt[FileDataLocation]
     val  dataFiles: DataFiles
+```
 
-    /* user can get the file corresponding to the given data key */
+user can get the file corresponding to the given data key
+
+```scala
     def file[K <: AnyData](key: K)(implicit
         lookup: DataFiles Lookup (K := FileDataLocation)
       ): File = lookup(dataFiles).value.location
+```
 
-    /* or create a file instance in the orking directory */
+or create a file instance in the orking directory
+
+```scala
     def /(name: String): File = workingDir / name
   }
 
@@ -58,24 +66,32 @@ case object dataProcessing {
     val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
 
     type Context = ProcessingContext[Input]
+```
 
-    /* this is where user describes how to process each dataMapping:
-       - it takes input data file locations
-       - it must produce same for the output files */
+this is where user describes how to process each dataMapping:
+- it takes input data file locations
+- it must produce same for the output files
+
+```scala
     def processData(
       dataMappingId: String,
       context: Context
     ): Instructions[OutputFiles]
+```
 
+This is a cover-method, which will be used in the worker run-loop
 
-    /* This is a cover-method, which will be used in the worker run-loop */
+```scala
     final def processFiles(
       dataMappingId: String,
       inputFilesMap: Map[String, File],
       workingDir: File
     ): Result[Map[String, File]] = {
+```
 
-      /* This method serialises OutputFiles data mapping to a normal Map */
+This method serialises OutputFiles data mapping to a normal Map
+
+```scala
       def filesMap(filesSet: OutputFiles): Map[String, File] =
         outputFilesToMap(filesSet).map { case (data, loc) =>
           data.label -> loc.location
@@ -113,3 +129,19 @@ case object dataProcessing {
   }
 
 }
+
+```
+
+
+
+
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
+[test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md

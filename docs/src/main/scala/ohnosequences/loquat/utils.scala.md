@@ -1,3 +1,5 @@
+
+```scala
 package ohnosequences.loquat
 
 case object utils {
@@ -15,8 +17,6 @@ case object utils {
   import better.files._
   import scala.collection.JavaConversions._
   import scala.util._
-  import scala.concurrent.duration._
-  import java.util.concurrent._
 
 
   trait AnyStep extends LazyLogging
@@ -32,20 +32,27 @@ case object utils {
     }
   }
 
-  // A minimal wrapped around the Java scheduling thing
-  // Note, that this ScheduledFuture has cancel(Boolean) method
-  def schedule(
-    after: FiniteDuration,
-    every: FiniteDuration
-  )(block: => Unit): ScheduledFuture[_] = {
 
-    new ScheduledThreadPoolExecutor(1).scheduleAtFixedRate(
-      new Runnable { def run(): Unit = block },
-      after.toSeconds,
-      every.toSeconds,
-      SECONDS
-    )
+  class Time(val inSeconds: Long) {
+    val millis: Long = inSeconds * 1000
+    val seconds: Long = inSeconds
+    val minutes: Long = inSeconds / 60
+    val hours: Long = inSeconds / (60 * 60)
+
+    def prettyPrint: String = List(
+      (hours, "hours"),
+      (minutes, "min"),
+      (seconds, "sec")
+    ).map{ case (value, label) =>
+      (if (value > 0) s"${value} ${label}" else "")
+    }.mkString
   }
+
+  case class Millis(ms: Long) extends Time(ms / 1000)
+  case class Seconds(s: Long) extends Time(s)
+  case class Minutes(m: Long) extends Time(m * 60)
+  case class   Hours(h: Long) extends Time(h * 60 * 60)
+
 
 
   object InstanceTags {
@@ -73,11 +80,11 @@ case object utils {
   }
 
   @scala.annotation.tailrec
-  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: FiniteDuration) : Option[R] = {
+  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: Time) : Option[R] = {
     val resource = getResource
 
     if (resource.isEmpty && tries <= 0) {
-      Thread.sleep(timeStep.toMillis)
+      Thread.sleep(timeStep.inSeconds * 1000)
       waitForResource(getResource, tries - 1, timeStep)
     } else resource
   }
@@ -178,3 +185,19 @@ case object utils {
   }
 
 }
+
+```
+
+
+
+
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
+[test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md

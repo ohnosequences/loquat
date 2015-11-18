@@ -1,6 +1,8 @@
+
+```scala
 package ohnosequences.loquat
 
-import dataMappings._
+import dataMappings._, utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.aws._
@@ -15,22 +17,30 @@ import com.typesafe.scalalogging.{ LazyLogging, Logger }
 
 import better.files._
 import scala.util.Try
-import scala.concurrent.duration._
 
 
 case object configs {
+```
 
-  /* Any config here can validate itself (in runtime) */
+Any config here can validate itself (in runtime)
+
+```scala
   trait AnyConfig extends LazyLogging {
 
     lazy val label: String = this.toString
 
     def validationErrors: Seq[String]
+```
 
-    /* Config dependencies */
+Config dependencies
+
+```scala
     val subConfigs: Seq[AnyConfig]
+```
 
-    /* This method validates subconfigs and logs validation errors */
+This method validates subconfigs and logs validation errors
+
+```scala
     final def validate: Seq[String] = {
       val subErrors = subConfigs.flatMap{ _.validate }
 
@@ -100,8 +110,11 @@ case object configs {
       )
 
   }
+```
 
-  /* Manager autoscaling group configuration */
+Manager autoscaling group configuration
+
+```scala
   trait AnyManagerConfig extends AnyAutoScalingConfig {
 
     val groupSize = AutoScalingGroupSize(1, 1, 1)
@@ -118,9 +131,11 @@ case object configs {
     type InstanceSpecs = IS
     type PurchaseModel = PM
   }
+```
 
-  /* Workers autoscaling group configuration */
+Workers autoscaling group configuration
 
+```scala
   trait AnyWorkersConfig extends AnyAutoScalingConfig
 
   case class WorkersConfig[
@@ -171,35 +186,37 @@ case object configs {
   }
 
   case class TerminateAfterGlobalTimeout(
-    val globalTimeout: Option[FiniteDuration],
-    val startTime: Option[FiniteDuration]
+    val globalTimeout: Option[Time],
+    val startTime: Option[Time]
   ) extends AnyTerminationReason {
 
     def check: Boolean = (startTime, globalTimeout) match {
       case (Some(timestamp), Some(globalTimeout)) =>
-        (System.currentTimeMillis - timestamp.toMillis) > globalTimeout.toMillis
+        (System.currentTimeMillis - timestamp.inSeconds) > globalTimeout.inSeconds
       case _ => false
     }
 
-    def msg: String = s"Terminated due to the global timeout: ${globalTimeout.getOrElse(0.seconds)}"
+    def msg: String = s"Terminated due to the global timeout: ${globalTimeout.getOrElse(Seconds(0))}"
   }
 
   case object TerminateManually extends AnyTerminationReason {
     def check: Boolean = true
     def msg: String = "Terminated manually"
   }
+```
 
+Configuration of termination conditions
 
-  /* Configuration of termination conditions */
+```scala
   case class TerminationConfig(
     // if true loquat will terminate after solving all initial tasks
     terminateAfterInitialDataMappings: Boolean,
     // if true loquat will terminate after errorQueue will contain more unique messages then threshold
     errorsThreshold: Option[Int] = None,
     // maximum time for processing one task
-    taskProcessingTimeout: Option[FiniteDuration] = None,
+    taskProcessingTimeout: Option[Time] = None,
     // maximum time for everything
-    globalTimeout: Option[FiniteDuration] = None
+    globalTimeout: Option[Time] = None
   ) extends Config() {
 
     def validationErrors: Seq[String] = {
@@ -210,16 +227,16 @@ case object configs {
 
       val localTimeoutErr = taskProcessingTimeout match {
         case Some(time) if (
-            time <= 0.seconds ||
-            time > 12.hours
+            time.inSeconds < 0 ||
+            time.inSeconds > Hours(12).inSeconds
           ) => Seq(s"Task processing timeout [${time}] has to be between 0 seconds and 12 hours")
         case _ => Seq()
       }
 
       val globalTimeoutErr = globalTimeout match {
         case Some(time) if (
-            time <= 0.seconds ||
-            time > 12.hours
+            time.inSeconds < 0 ||
+            time.inSeconds > Hours(12).inSeconds
           ) => Seq(s"Global timeout [${time}] has to be between 0 seconds and 12 hours")
         case _ => Seq()
       }
@@ -227,36 +244,81 @@ case object configs {
       treshholdErr ++ localTimeoutErr ++ globalTimeoutErr
     }
   }
+```
 
+Configuration of resources
 
-  /* Configuration of resources */
+```scala
   protected[loquat]
     case class ResourceNames(suffix: String, bucketName: String) {
-      /* name of queue with dataMappings */
+```
+
+name of queue with dataMappings
+
+```scala
       val inputQueue: String = "loquatInputQueue" + suffix
-      /* name of topic for dataMappings result notifications */
+```
+
+name of topic for dataMappings result notifications
+
+```scala
       val outputQueue: String = "loquatOutputQueue" + suffix
-      /* name of queue with errors (will be subscribed to errorTopic) */
+```
+
+name of queue with errors (will be subscribed to errorTopic)
+
+```scala
       val errorQueue: String = "loquatErrorTopic" + suffix
-      /* name of bucket for logs files */
+```
+
+name of bucket for logs files
+
+```scala
       // FIXME: make the bucket name configurable
       val bucket: String = bucketName //"era7-projects-loquats"
-      /* topic name to notificate user about termination of loquat */
+
+```
+
+topic name to notificate user about termination of loquat
+
+```scala
       val notificationTopic: String = "loquatNotificationTopic" + suffix
-      /* name of the manager autoscaling group */
+```
+
+name of the manager autoscaling group
+
+```scala
       val managerGroup: String = "loquatManagerGroup" + suffix
-      /* name of the workers autoscaling group */
+```
+
+name of the workers autoscaling group
+
+```scala
       val workersGroup: String = "loquatWorkersGroup" + suffix
     }
+```
 
+Simple type to separate user-related data from the config
 
-  /* Simple type to separate user-related data from the config */
+```scala
   case class LoquatUser(
-    /* email address for notifications */
+```
+
+email address for notifications
+
+```scala
     val email: String,
-    /* these are credentials that are used to launch loquat */
+```
+
+these are credentials that are used to launch loquat
+
+```scala
     val localCredentials: AWSCredentialsProvider,
-    /* keypair name for connecting to the loquat instances */
+```
+
+keypair name for connecting to the loquat instances
+
+```scala
     val keypairName: String
   ) extends Config() {
 
@@ -280,20 +342,31 @@ case object configs {
       }
     }
   }
+```
 
+Configuration for loquat
 
-  /* Configuration for loquat */
+```scala
   abstract class AnyLoquatConfig extends AnyConfig {
+```
 
-    /* Metadata generated for your loquat project */
+Metadata generated for your loquat project
+
+```scala
     val metadata: AnyArtifactMetadata
+```
 
-    /* AMI that will be used for manager and worker instances */
+AMI that will be used for manager and worker instances
+
+```scala
     // NOTE: we need the AMI type here for the manager/worker compats
     type AMIEnv <: AnyLinuxAMIEnvironment
     val  amiEnv: AMIEnv
+```
 
-    /* IAM rolse that will be used by the autoscaling groups */
+IAM rolse that will be used by the autoscaling groups
+
+```scala
     val iamRoleName: String
     val bucketName: String
 
@@ -302,18 +375,26 @@ case object configs {
 
     type WorkersConfig <: AnyWorkersConfig
     val  workersConfig: WorkersConfig
+```
 
-    /* Termination conditions */
+Termination conditions
+
+```scala
     val terminationConfig: TerminationConfig
+```
 
-    /* List of tiny or big dataMappings */
+List of tiny or big dataMappings
+
+```scala
     val dataMappings: List[AnyDataMapping]
 
     // TODO: AWS region should be also configurable
 
+```
 
-    /* Here follow all the values that are dependent on those defined on top */
+Here follow all the values that are dependent on those defined on top
 
+```scala
     // FIXME: put this constant somewhere else
     final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
 
@@ -325,8 +406,11 @@ case object configs {
         case _ => throw new Error("Wrong fat jar url, it should be published to S3")
       }
     }
+```
 
-    /* Unique id  of the loquat instance */
+Unique id  of the loquat instance
+
+```scala
     lazy final val loquatName: String = metadata.artifact.replace(".", "").toLowerCase
     lazy final val loquatVersion: String = metadata.version.replace(".", "").toLowerCase
     lazy final val loquatId: String = (loquatName + loquatVersion)
@@ -352,3 +436,19 @@ case object configs {
   }
 
 }
+
+```
+
+
+
+
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
+[test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md

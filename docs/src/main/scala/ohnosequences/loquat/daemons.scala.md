@@ -1,3 +1,5 @@
+
+```scala
 package ohnosequences.loquat
 
 protected[loquat] case object daemons {
@@ -10,13 +12,10 @@ protected[loquat] case object daemons {
 
   import com.typesafe.scalalogging.LazyLogging
   import scala.collection.mutable.ListBuffer
-  import scala.concurrent.duration._
 
   import ohnosequences.awstools.AWSClients
   import ohnosequences.awstools.s3._
   import com.amazonaws.auth.InstanceProfileCredentialsProvider
-  import java.util.concurrent._
-  import scala.util.Try
   import better.files._
 
 
@@ -24,28 +23,36 @@ protected[loquat] case object daemons {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-    val logFile = file"/root/log.txt"
-
-    val bucket = config.resourceNames.bucket
-
-    def uploadLog(): Unit = Try {
-      aws.ec2.getCurrentInstanceId.get
-    }.map { id =>
-      aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile.toJava)
-      ()
-    }.getOrElse {
-      logger.error(s"Failed to upload the log to the bucket [${bucket}]")
-    }
-
     def instructions: AnyInstructions = LazyTry[Unit] {
-      if (aws.s3.bucketExists(bucket)) {
-        schedule(
-          after = 30.seconds,
-          every = 30.seconds
-        )(uploadLog)
-        Success("Log uploader daemon started", ())
+      val logFile = file"/root/log.txt"
+
+      val bucket = config.resourceNames.bucket
+
+      aws.ec2.getCurrentInstanceId match {
+        case None => Failure("can't obtain instanceId")
+        case Some(id) => {
+          val logUploader = new Thread(new Runnable {
+            def run(): Unit = {
+              while(true) {
+                try {
+                  if(aws.s3.bucketExists(bucket)) {
+                    aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile.toJava)
+                  } else {
+                    logger.warn(s"Bucket [${bucket}] doesn't exist")
+                  }
+
+                  Thread.sleep(Seconds(30).millis)
+                } catch {
+                  case t: Throwable => logger.error("log upload fails", t);
+                }
+              }
+            }
+          }, "logUploader")
+          logUploader.setDaemon(true)
+          logUploader.start
+          Success("logUploader started", ())
+        }
       }
-      else Failure(s"Bucket [${bucket}] doesn't exist")
     }
   }
 
@@ -54,33 +61,43 @@ protected[loquat] case object daemons {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
+    val TIMEOUT = 300 //5 min
+
     val successResults = scala.collection.mutable.HashMap[String, String]()
     val failedResults = scala.collection.mutable.HashMap[String, String]()
 
-    def checkConditions(): Unit = {
-      logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
-      logger.info("TerminationDeaemon success results: " + successResults.size)
-      logger.info("TerminationDeaemon failure results: " + failedResults.size)
+    object TerminationDaemonThread extends Thread("TerminationDaemonBundle") {
 
-      // FIXME: we don't need parsing here, only the numbers of messages
-      receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
-        successResults.put(result.id, result.message)
+      override def run(): Unit = {
+        logger.info("TerminationDaemonBundle started")
+
+        while(true) {
+          logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
+          logger.info("TerminationDeaemon success results: " + successResults.size)
+          logger.info("TerminationDeaemon failure results: " + failedResults.size)
+
+          // FIXME: we don't need parsing here, only the numbers of messages
+          receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
+            successResults.put(result.id, result.message)
+          }
+
+          receiveDataMappingsResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
+            failedResults.put(result.id, result.message)
+          }
+
+          val reason = checkConditions(
+            terminationConfig = config.terminationConfig,
+            successResultsCount = successResults.size,
+            failedResultsCount = failedResults.size,
+            initialDataMappingsCount = config.dataMappings.length
+          )
+
+          reason.foreach{ LoquatOps.undeploy(config, aws, _) }
+
+          Thread.sleep(TIMEOUT * 1000)
+        }
+
       }
-
-      receiveDataMappingsResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
-        failedResults.put(result.id, result.message)
-      }
-
-      val reason = terminationReason(
-        terminationConfig = config.terminationConfig,
-        successResultsCount = successResults.size,
-        failedResultsCount = failedResults.size,
-        initialDataMappingsCount = config.dataMappings.length
-      )
-
-      reason.foreach{ LoquatOps.undeploy(config, aws, _) }
-
-      Thread.sleep(5.minutes.toMillis)
     }
 
     def receiveDataMappingsResults(queueName: String): List[(String, ProcessingResult)] = {
@@ -117,7 +134,7 @@ protected[loquat] case object daemons {
       }
     }
 
-    def terminationReason(
+    def checkConditions(
       terminationConfig: TerminationConfig,
       successResultsCount: Int,
       failedResultsCount: Int,
@@ -135,7 +152,7 @@ protected[loquat] case object daemons {
       )
       lazy val globalTimeout = TerminateAfterGlobalTimeout(
         terminationConfig.globalTimeout,
-        aws.as.getCreatedTime(config.resourceNames.managerGroup).map{ _.getTime.seconds }
+        aws.as.getCreatedTime(config.resourceNames.managerGroup).map{ x => Seconds(x.getTime) }
       )
 
            if (afterInitial.check) Some(afterInitial)
@@ -149,3 +166,19 @@ protected[loquat] case object daemons {
   }
 
 }
+
+```
+
+
+
+
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
+[test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md

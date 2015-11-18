@@ -1,3 +1,5 @@
+
+```scala
 package ohnosequences.loquat
 
 import dataProcessing._, configs._, utils._
@@ -190,3 +192,19 @@ protected[loquat] case object LoquatOps extends LazyLogging {
   //   )
   // }
 }
+
+```
+
+
+
+
+[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
+[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
+[test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md
