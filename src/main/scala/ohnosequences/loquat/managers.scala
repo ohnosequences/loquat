@@ -34,9 +34,14 @@ protected[loquat]
       override lazy val fullName: String = s"${manager.fullName}.${this.toString}"
     }
 
+    val scheduler = Scheduler(2)
+
     val terminationDaemon = TerminationDaemonBundle(config)
 
-    val bundleDependencies: List[AnyBundle] = List(terminationDaemon, LogUploaderBundle(config))
+    val bundleDependencies: List[AnyBundle] = List(
+      terminationDaemon,
+      LogUploaderBundle(config, scheduler)
+    )
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
@@ -105,7 +110,7 @@ protected[loquat]
         } -&-
         LazyTry {
           logger.info("starting termination daemon")
-          schedule(
+          scheduler.repeat(
             after = 10.minute,
             every = 5.minutes
           )(terminationDaemon.checkConditions)

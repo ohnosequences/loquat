@@ -30,7 +30,12 @@ trait AnyWorkerBundle extends AnyBundle {
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  val bundleDependencies: List[AnyBundle] = List(instructionsBundle, LogUploaderBundle(config))
+  val scheduler = Scheduler(2)
+
+  val bundleDependencies: List[AnyBundle] = List(
+    instructionsBundle,
+    LogUploaderBundle(config, scheduler)
+  )
 
   def instructions: AnyInstructions = LazyTry {
     new DataProcessor(config, instructionsBundle).runLoop

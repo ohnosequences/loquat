@@ -20,18 +20,18 @@ protected[loquat] case object daemons {
   import better.files._
 
 
-  case class LogUploaderBundle(val config: AnyLoquatConfig) extends Bundle() with LazyLogging {
+  case class LogUploaderBundle(val config: AnyLoquatConfig, val scheduler: Scheduler)
+  extends Bundle() with LazyLogging {
 
     lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
     val logFile = file"/root/log.txt"
-
     val bucket = config.resourceNames.bucket
 
     def uploadLog(): Unit = Try {
       aws.ec2.getCurrentInstanceId.get
     }.map { id =>
-      aws.s3.uploadFile(S3Folder(bucket, config.loquatId) / id, logFile.toJava)
+      aws.s3.uploadFile(S3Object(bucket, s"${config.loquatId}/${id}.log"), logFile.toJava)
       ()
     }.getOrElse {
       logger.error(s"Failed to upload the log to the bucket [${bucket}]")
@@ -39,7 +39,7 @@ protected[loquat] case object daemons {
 
     def instructions: AnyInstructions = LazyTry[Unit] {
       if (aws.s3.bucketExists(bucket)) {
-        schedule(
+        scheduler.repeat(
           after = 30.seconds,
           every = 30.seconds
         )(uploadLog)

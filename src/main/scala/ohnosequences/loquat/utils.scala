@@ -32,19 +32,23 @@ case object utils {
     }
   }
 
-  // A minimal wrapped around the Java scheduling thing
-  // Note, that this ScheduledFuture has cancel(Boolean) method
-  def schedule(
-    after: FiniteDuration,
-    every: FiniteDuration
-  )(block: => Unit): ScheduledFuture[_] = {
+  // A minimal wrapper around the Java scheduling thing
+  case class Scheduler(val threadsNumber: Int) {
+    lazy final val pool = new ScheduledThreadPoolExecutor(threadsNumber)
 
-    new ScheduledThreadPoolExecutor(1).scheduleAtFixedRate(
-      new Runnable { def run(): Unit = block },
-      after.toSeconds,
-      every.toSeconds,
-      SECONDS
-    )
+    // Note, that the returned ScheduledFuture has cancel(Boolean) method
+    def repeat(
+      after: FiniteDuration,
+      every: FiniteDuration
+    )(block: => Unit): ScheduledFuture[_] = {
+
+      pool.scheduleAtFixedRate(
+        new Runnable { def run(): Unit = block },
+        after.toSeconds,
+        every.toSeconds,
+        SECONDS
+      )
+    }
   }
 
 
