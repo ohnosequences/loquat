@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, dataProcessing._, daemons._, configs._, utils._
+import utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -137,7 +137,7 @@ class DataProcessor(
     instance.foreach(_.terminate)
   }
 
-  def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
+  private def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
     try {
       if(workingDir.exists) {
         logger.info("deleting working directory: " + workingDir.path)
