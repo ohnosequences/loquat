@@ -36,10 +36,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   val scheduler = Scheduler(2)
 
-  val terminationDaemon = TerminationDaemonBundle(config)
+  val terminationDaemon = TerminationDaemonBundle(config, scheduler)
 
   val bundleDependencies: List[AnyBundle] = List(
-    terminationDaemon,
     LogUploaderBundle(config, scheduler)
   )
 

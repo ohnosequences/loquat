@@ -18,13 +18,15 @@ import scala.util.Try
 import better.files._
 
 private[loquat]
-case class TerminationDaemonBundle(val config: AnyLoquatConfig)
-extends Bundle() with LazyLogging {
+case class TerminationDaemonBundle(
+  val config: AnyLoquatConfig,
+  val scheduler: Scheduler
+) extends LazyLogging {
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-  val successResults = scala.collection.mutable.HashMap[String, String]()
-  val failedResults = scala.collection.mutable.HashMap[String, String]()
+  private val successResults = scala.collection.mutable.HashMap[String, String]()
+  private val failedResults = scala.collection.mutable.HashMap[String, String]()
 
   def checkConditions(): Unit = {
     logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
@@ -112,7 +114,5 @@ extends Bundle() with LazyLogging {
     else if (globalTimeout.check) Some(globalTimeout)
     else None
   }
-
-  def instructions: AnyInstructions = say("TerminationDaemonBundle installed")
 
 }
