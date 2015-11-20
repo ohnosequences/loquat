@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataMappings._, dataProcessing._, daemons._, configs._, utils._
+import utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -13,6 +13,7 @@ import ohnosequences.awstools.AWSClients
 import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.Try
 import upickle.Js
 
@@ -29,12 +30,15 @@ trait AnyWorkerBundle extends AnyBundle {
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  val bundleDependencies: List[AnyBundle] = List(instructionsBundle, LogUploaderBundle(config))
+  val scheduler = Scheduler(2)
 
-  def instructions: AnyInstructions = {
-    LazyTry {
-      new DataProcessor(config, instructionsBundle).runLoop
-    } -&- say("worker installed")
+  val bundleDependencies: List[AnyBundle] = List(
+    instructionsBundle,
+    LogUploaderBundle(config, scheduler)
+  )
+
+  def instructions: AnyInstructions = LazyTry {
+    new DataProcessor(config, instructionsBundle).runLoop
   }
 }
 
@@ -63,8 +67,6 @@ class DataProcessor(
   val errorQueue = aws.sqs.getQueueByName(config.resourceNames.errorQueue).get
   val outputQueue = aws.sqs.getQueueByName(config.resourceNames.outputQueue).get
 
-  val MESSAGE_TIMEOUT = Seconds(5)
-
   val instance = aws.ec2.getCurrentInstance
 
   @volatile var stopped = false
@@ -76,28 +78,28 @@ class DataProcessor(
     while(message.isEmpty) {
       logger.info("DataProcessor wait for dataMapping")
       instance.foreach(_.createTag(utils.InstanceTags.IDLE))
-      Thread.sleep(MESSAGE_TIMEOUT.millis)
+      Thread.sleep(5.seconds.toMillis)
       message = queue.receiveMessage
     }
 
     message.get
   }
 
-  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[Time] = {
-    val startTime: Time = Millis(System.currentTimeMillis)
-    val step: Time = Seconds(5)
+  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
+    val startTime = System.currentTimeMillis.millis
+    val step = 5.seconds
 
-    def timeSpent: Time = {
-      val currentTime = Millis(System.currentTimeMillis)
-      Seconds(currentTime.inSeconds - startTime.inSeconds)
+    def timeSpent: FiniteDuration = {
+      val currentTime = System.currentTimeMillis.millis
+      (currentTime - startTime).toSeconds.seconds
     }
 
-    val taskProcessingTimeout: Time =
-      config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12))
+    val taskProcessingTimeout: FiniteDuration =
+      config.terminationConfig.taskProcessingTimeout.getOrElse(12.hours)
 
     @scala.annotation.tailrec
     def waitMore(tries: Int): AnyResult = {
-      if(timeSpent.inSeconds > taskProcessingTimeout.inSeconds) {
+      if(timeSpent > taskProcessingTimeout) {
         terminateWorker
         Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
       } else {
@@ -109,8 +111,8 @@ class DataProcessor(
                 logger.warn("Couldn't change the visibility globalTimeout")
               // FIXME: something weird is happening here
             }
-            Thread.sleep(step.millis)
-            logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
+            Thread.sleep(step.toMillis)
+            // logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
             waitMore(tries + 1)
           }
           case Some(scala.util.Success(r)) => {
@@ -135,7 +137,7 @@ class DataProcessor(
     instance.foreach(_.terminate)
   }
 
-  def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
+  private def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
     try {
       if(workingDir.exists) {
         logger.info("deleting working directory: " + workingDir.path)

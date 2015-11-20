@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import dataProcessing._, configs._, utils._
+import utils._
 
 import ohnosequences.statika.bundles._
 
@@ -50,7 +50,8 @@ abstract class Loquat[
 
 
 
-protected[loquat] case object LoquatOps extends LazyLogging {
+private[loquat]
+case object LoquatOps extends LazyLogging {
 
   def deploy(
     config: AnyLoquatConfig,

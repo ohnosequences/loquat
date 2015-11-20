@@ -15,6 +15,8 @@ case object utils {
   import better.files._
   import scala.collection.JavaConversions._
   import scala.util._
+  import scala.concurrent.duration._
+  import java.util.concurrent._
 
 
   trait AnyStep extends LazyLogging
@@ -30,27 +32,24 @@ case object utils {
     }
   }
 
+  // A minimal wrapper around the Java scheduling thing
+  case class Scheduler(val threadsNumber: Int) {
+    lazy final val pool = new ScheduledThreadPoolExecutor(threadsNumber)
 
-  class Time(val inSeconds: Long) {
-    val millis: Long = inSeconds * 1000
-    val seconds: Long = inSeconds
-    val minutes: Long = inSeconds / 60
-    val hours: Long = inSeconds / (60 * 60)
+    // Note, that the returned ScheduledFuture has cancel(Boolean) method
+    def repeat(
+      after: FiniteDuration,
+      every: FiniteDuration
+    )(block: => Unit): ScheduledFuture[_] = {
 
-    def prettyPrint: String = List(
-      (hours, "hours"),
-      (minutes, "min"),
-      (seconds, "sec")
-    ).map{ case (value, label) =>
-      (if (value > 0) s"${value} ${label}" else "")
-    }.mkString
+      pool.scheduleAtFixedRate(
+        new Runnable { def run(): Unit = block },
+        after.toSeconds,
+        every.toSeconds,
+        SECONDS
+      )
+    }
   }
-
-  case class Millis(ms: Long) extends Time(ms / 1000)
-  case class Seconds(s: Long) extends Time(s)
-  case class Minutes(m: Long) extends Time(m * 60)
-  case class   Hours(h: Long) extends Time(h * 60 * 60)
-
 
 
   object InstanceTags {
@@ -78,11 +77,11 @@ case object utils {
   }
 
   @scala.annotation.tailrec
-  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: Time) : Option[R] = {
+  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: FiniteDuration) : Option[R] = {
     val resource = getResource
 
     if (resource.isEmpty && tries <= 0) {
-      Thread.sleep(timeStep.inSeconds * 1000)
+      Thread.sleep(timeStep.toMillis)
       waitForResource(getResource, tries - 1, timeStep)
     } else resource
   }
