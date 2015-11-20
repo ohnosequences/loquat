@@ -7,7 +7,7 @@ client.zip
 clientData/*
 gridLog.log
 
-# IntelliJ Indea
+# IntelliJ Idea
 .idea/
 .idea_modules/
 src/main/main.iml
@@ -18,3 +18,5 @@ gridBase/grid.config.generated
 .tags*
 .ensime*
 .classpath*
+
+.imdone*

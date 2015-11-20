@@ -110,7 +110,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       LazyTry {
         logger.info("starting termination daemon")
         scheduler.repeat(
-          after = 10.minute,
+          after = 5.minutes,
           every = 5.minutes
         )(terminationDaemon.checkConditions)
       } -&-
