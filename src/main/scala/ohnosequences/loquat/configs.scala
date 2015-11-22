@@ -19,7 +19,7 @@ import scala.concurrent.duration._
 /* Any config here can validate itself (in runtime) */
 trait AnyConfig extends LazyLogging {
 
-  lazy val label: String = this.toString
+  lazy private val label: String = this.toString
 
   def validationErrors: Seq[String]
 
@@ -84,7 +84,7 @@ trait AnyAutoScalingConfig extends Config() { conf =>
       name = groupName,
       size = conf.groupSize,
       launchConfiguration = LaunchConfiguration(
-        name = groupName + "loquatWorkersLaunchConfiguration",
+        name = groupName + "-launchConfiguration",
         purchaseModel = conf.purchaseModel,
         launchSpecs = LaunchSpecs(
           conf.instanceSpecs
@@ -227,22 +227,22 @@ case class TerminationConfig(
 
 /* Configuration of resources */
 private[loquat]
-case class ResourceNames(suffix: String, bucketName: String) {
+case class ResourceNames(prefix: String, bucketName: String) {
   /* name of queue with dataMappings */
-  val inputQueue: String = "loquatInputQueue" + suffix
+  val inputQueue: String = prefix + "-loquat-inputQueue"
   /* name of topic for dataMappings result notifications */
-  val outputQueue: String = "loquatOutputQueue" + suffix
+  val outputQueue: String = prefix + "-loquat-outputQueue"
   /* name of queue with errors (will be subscribed to errorTopic) */
-  val errorQueue: String = "loquatErrorTopic" + suffix
+  val errorQueue: String = prefix + "-loquat-errorTopic"
   /* name of bucket for logs files */
   // FIXME: make the bucket name configurable
   val bucket: String = bucketName //"era7-projects-loquats"
   /* topic name to notificate user about termination of loquat */
-  val notificationTopic: String = "loquatNotificationTopic" + suffix
+  val notificationTopic: String = prefix + "-loquat-notificationTopic"
   /* name of the manager autoscaling group */
-  val managerGroup: String = "loquatManagerGroup" + suffix
+  val managerGroup: String = prefix + "-loquat-managerGroup"
   /* name of the workers autoscaling group */
-  val workersGroup: String = "loquatWorkersGroup" + suffix
+  val workersGroup: String = prefix + "-loquat-workersGroup"
 }
 
 
@@ -280,6 +280,8 @@ case class LoquatUser(
 
 /* Configuration for loquat */
 abstract class AnyLoquatConfig extends AnyConfig {
+  // TODO: limit allowed symbols and check on validation
+  val loquatName: String
 
   /* Metadata generated for your loquat project */
   val metadata: AnyArtifactMetadata
@@ -323,9 +325,9 @@ abstract class AnyLoquatConfig extends AnyConfig {
   }
 
   /* Unique id  of the loquat instance */
-  lazy final val loquatName: String = metadata.artifact.replace(".", "").toLowerCase
-  lazy final val loquatVersion: String = metadata.version.replace(".", "").toLowerCase
-  lazy final val loquatId: String = (loquatName + loquatVersion)
+  lazy final val artifactName: String = metadata.artifact.replace(".", "-").toLowerCase
+  lazy final val artifactVersion: String = metadata.version.replace(".", "-").toLowerCase
+  lazy final val loquatId: String = s"${loquatName}-${artifactName}-${artifactVersion}"
 
   lazy final val resourceNames: ResourceNames = ResourceNames(loquatId, bucketName)
 
