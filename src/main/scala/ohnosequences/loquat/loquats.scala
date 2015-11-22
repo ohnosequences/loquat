@@ -58,7 +58,7 @@ case object LoquatOps extends LazyLogging {
     user: LoquatUser,
     managerUserScript: String
   ): Unit = {
-    logger.info(s"Deploying loquat: ${config.loquatName} v${config.loquatVersion}")
+    logger.info(s"Deploying loquat: v${config.loquatId}")
 
     if(user.validate.nonEmpty)
       logger.error("User validation failed. Fix it and try to deploy again.")
@@ -128,7 +128,7 @@ case object LoquatOps extends LazyLogging {
     aws: AWSClients,
     reason: AnyTerminationReason
   ): Unit = {
-    logger.info(s"undeploying loquat: ${config.loquatName} v${config.loquatVersion}")
+    logger.info(s"Undeploying loquat: ${config.loquatId}")
 
     val names = config.resourceNames
 
