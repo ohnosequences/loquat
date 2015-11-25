@@ -49,12 +49,12 @@ trait AnyDataProcessingBundle extends AnyBundle {
   type Output <: AnyDataSet
   val  output: Output
 
-  type InputFiles  <: Input#Raw with AnyKList.Of[AnyDenotation { type Value = File }]
-  type OutputFiles <: Output#Raw with AnyKList.Of[AnyDenotation { type Value = File }]
+  type InputFiles  <: Input#Raw with AnyKList.withBound[AnyDenotation { type Value = File }]
+  type OutputFiles <: Output#Raw with AnyKList.withBound[AnyDenotation { type Value = File }]
 
   // should be provided implicitly:
   val parseInputFiles: ParseDenotations[InputFiles, File]
-  val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
+  // val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
 
   type Context = ProcessingContext[Input]
 
@@ -76,9 +76,11 @@ trait AnyDataProcessingBundle extends AnyBundle {
 
     /* This method serialises OutputFiles data mapping to a normal Map */
     def filesMap(filesSet: OutputFiles): Map[String, File] =
-      outputFilesToMap(filesSet).map { case (data, loc) =>
-        data.label -> loc.location
-      }
+      (input.keys.types.asList map { t => t.label }) zip (filesSet.asList map { d => d.value }) toMap
+
+      // outputFilesToMap(filesSet).map { case (data, loc) =>
+      //   data.label -> loc.location
+      // }
 
     parseInputFiles(inputFilesMap) match {
       case Left(err) => Failure(err.toString)
