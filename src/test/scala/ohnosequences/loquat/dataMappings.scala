@@ -1,23 +1,23 @@
 package ohnosequences.loquat.test
 
-object dataMappingsExample {
+case object dataMappingsExample {
 
   import ohnosequences.awstools.s3._
-  import ohnosequences.loquat._, dataMappings._
-  import ohnosequences.datasets._, s3Locations._
-  import ohnosequences.cosas._, typeSets._
+  import ohnosequences.loquat._
+  import ohnosequences.datasets._, S3DataLocation._
+  import ohnosequences.cosas._, klists._, types._
   import instructionsExample._
 
 
   val dataMapping = DataMapping(id = "dataMapping3498734", dataProcessing = instructs)(
     remoteInput =
-      sample.inS3(S3Object("bucket", "key")) :~:
-      fastq.inS3(S3Object("bucket", "key")) :~:
-      ∅,
+      S3DataOps(sample).inS3(S3Object("bucket", "key")) ::
+      fastq.inS3(S3Object("bucket", "key")) ::
+      *[AnyDenotation { type Value = S3DataLocation }],
     remoteOutput =
-      stats.inS3(S3Object("bucket", "key")) :~:
-      results.inS3(S3Object("bucket", "key")) :~:
-      ∅
+      stats.inS3(S3Object("bucket", "key")) ::
+      results.inS3(S3Object("bucket", "key")) ::
+      *[AnyDenotation { type Value = S3DataLocation }]
   )
 
 }
