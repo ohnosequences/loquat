@@ -19,10 +19,10 @@ trait AnyDataMapping {
 
   /* These are records with references to the remote locations of
      where to get inputs and where to put outputs of the dataMapping */
-  type RemoteInput <: DataProcessing#Input#Raw with AnyKList.withBound[AnyDenotation { type Value = S3DataLocation }]
+  type RemoteInput = DataProcessing#Input#Raw with AnyKList.withBound[AnyDenotation { type Value = S3DataLocation }]
   val  remoteInput: RemoteInput
 
-  type RemoteOutput <: DataProcessing#Output#Raw with AnyKList.withBound[AnyDenotation { type Value = S3DataLocation }]
+  type RemoteOutput = DataProcessing#Output#Raw with AnyKList.withBound[AnyDenotation { type Value = S3DataLocation }]
   val  remoteOutput: RemoteOutput
 
   /* These two vals a needed for serialization */
@@ -45,21 +45,17 @@ trait AnyDataMapping {
 }
 
 case class DataMapping[
-  DP <: AnyDataProcessingBundle,
-  RI <: DP#Input#Raw with AnyKList.withBound[AnyDenotation { type Value = S3DataLocation }],
-  RO <: DP#Output#Raw with AnyKList.withBound[AnyDenotation { type Value = S3DataLocation }]
+  DP <: AnyDataProcessingBundle
 ](
   val id: String,
   val dataProcessing: DP
 )(
-  val remoteInput: RI,
-  val remoteOutput: RO
+  val remoteInput: DP#Input#Raw with AnyKList.withBound[AnyDenotation { type Value = S3DataLocation }],
+  val remoteOutput: DP#Output#Raw with AnyKList.withBound[AnyDenotation { type Value = S3DataLocation }]
 )
 extends AnyDataMapping {
 
   type DataProcessing = DP
-  type RemoteInput = RI
-  type RemoteOutput = RO
 }
 
 

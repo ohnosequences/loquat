@@ -8,11 +8,9 @@ import better.files._
 
 case object dataProcessing {
 
-  case object instructs extends DataProcessingBundle[
-    inputData.type,
-    (sample.type := FileDataLocation) :: (fastq.type := FileDataLocation) :: *[AnyDenotation { type Value = FileDataLocation }],
-    outputData.type, (stats.type := FileDataLocation) :: (results.type := FileDataLocation) :: *[AnyDenotation { type Value = FileDataLocation }]
-  ]()(
+  implicit def fileParser[D <: AnyData](implicit d: D): DenotationParser[D,AnyDataLocation, FileDataLocation] = new DenotationParser(d,d.label)( { v: FileDataLocation => Some(v) })
+
+  case object instructs extends DataProcessingBundle()(
     inputData,
     outputData
   ) {

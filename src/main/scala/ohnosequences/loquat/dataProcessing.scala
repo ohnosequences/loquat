@@ -20,7 +20,7 @@ trait AnyProcessingContext {
   type DataSet <: AnyDataSet
   val  dataSet: DataSet
 
-  type DataFiles <: DataSet#Raw with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
+  type DataFiles <: DataSet#Raw
   val  dataFiles: DataFiles
 
   /* user can get the file corresponding to the given data key */
@@ -33,7 +33,7 @@ trait AnyProcessingContext {
 }
 
 // TODO predicate on DV for all of them being files?
-case class ProcessingContext[D <: AnyDataSet, DV <: D#Raw with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]](
+case class ProcessingContext[D <: AnyDataSet, DV <: D#Raw](
   val dataSet: D,
   val dataFiles: DV,
   val workingDir: File
@@ -53,12 +53,13 @@ trait AnyDataProcessingBundle extends AnyBundle {
   type Output <: AnyDataSet
   val  output: Output
 
-  type InputFiles  <: Input#Raw with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
-  type OutputFiles <: Output#Raw with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
+  type InputFiles  = Input#Raw
+  type OutputFiles = Output#Raw with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
 
   // should be provided implicitly:
   val parseInputFiles: AnyApp1At[FileDataLocation ParseDenotations Input#Keys, Map[String,FileDataLocation]] { type Y = Either[ParseDenotationsError, InputFiles] } // ParseDenotations[InputFiles, File]
   // val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
+  // val mapValue: AnyApp2At[mapKList[denotationValue.type, FileDataLocation], denotationValue.type, OutputFiles]
 
   type Context = ProcessingContext[Input, InputFiles]
 
@@ -81,7 +82,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
     /* This method serialises OutputFiles data mapping to a normal Map */
     def filesMap(filesSet: OutputFiles): Map[String, File] =
       (input.keys.types.asList.map{ _.label }) zip
-      (filesSet.asList.map{ _.value.location }) toMap
+      (filesSet.asList.map { _.value.location }) toMap
 
     parseInputFiles(inputFilesMap mapValues { f => FileDataLocation(f) }) match {
       case Left(err) => Failure(err.toString)
@@ -105,17 +106,17 @@ trait AnyDataProcessingBundle extends AnyBundle {
 // }
 
 abstract class DataProcessingBundle[
-  I <: AnyDataSet, IF <: I#Raw with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }],
-  O <: AnyDataSet, OF <: O#Raw with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
+  I <: AnyDataSet,
+  O <: AnyDataSet
 ](deps: AnyBundle*)(
   val input: I,
   val output: O
 )(implicit
-  val parseInputFiles: AnyApp1At[FileDataLocation ParseDenotations I#Keys, Map[String,FileDataLocation]] { type Y = Either[ParseDenotationsError, IF] }
+  val parseInputFiles: AnyApp1At[FileDataLocation ParseDenotations I#Keys, Map[String,FileDataLocation]] { type Y = Either[ParseDenotationsError, I#Raw] }
 ) extends Bundle(deps: _*) with AnyDataProcessingBundle {
 
   type Input = I
-  type InputFiles = IF
+  // type InputFiles = I#Raw // with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
   type Output = O
-  type OutputFiles = OF
+  // type OutputFiles =  O#Raw with AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
 }
