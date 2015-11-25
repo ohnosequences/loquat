@@ -42,16 +42,15 @@ case class TerminationDaemonBundle(
       failedResults.put(result.id, result.message)
     }
 
-    val reason = terminationReason(
+    val reason: Option[AnyTerminationReason] = terminationReason(
       terminationConfig = config.terminationConfig,
       successResultsCount = successResults.size,
       failedResultsCount = failedResults.size,
       initialDataMappingsCount = config.dataMappings.length
     )
 
+    // if there is a reason inside, we undeploy everything
     reason.foreach{ LoquatOps.undeploy(config, aws, _) }
-
-    Thread.sleep(5.minutes.toMillis)
   }
 
   def receiveDataMappingsResults(queueName: String): List[(String, ProcessingResult)] = {
