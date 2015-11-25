@@ -80,7 +80,8 @@ trait AnyDataProcessingBundle extends AnyBundle {
 
     /* This method serialises OutputFiles data mapping to a normal Map */
     def filesMap(filesSet: OutputFiles): Map[String, File] =
-      (input.keys.types.asList map { t => t.label }) zip (filesSet.asList map { d => d.value.location }) toMap
+      (input.keys.types.asList.map{ _.label }) zip
+      (filesSet.asList.map{ _.value.location }) toMap
 
     parseInputFiles(inputFilesMap mapValues { f => FileDataLocation(f) }) match {
       case Left(err) => Failure(err.toString)

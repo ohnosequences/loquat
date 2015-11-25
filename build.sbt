@@ -26,7 +26,7 @@ libraryDependencies ++= Seq(
   "org.scalatest"  %% "scalatest" % "2.2.5" % Test
 )
 
-scalacOptions ++= Seq("-Xlog-implicits")
+// scalacOptions ++= Seq("-Xlog-implicits")
 
 // FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()

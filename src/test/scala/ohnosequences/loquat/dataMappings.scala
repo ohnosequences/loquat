@@ -1,13 +1,11 @@
 package ohnosequences.loquat.test
 
-case object dataMappingsExample {
+import ohnosequences.awstools.s3._
+import ohnosequences.datasets._, S3DataLocation._
+import ohnosequences.cosas._, klists._, types._
+import ohnosequences.loquat._, test.data._, test.dataProcessing._
 
-  import ohnosequences.awstools.s3._
-  import ohnosequences.loquat._
-  import ohnosequences.datasets._, S3DataLocation._
-  import ohnosequences.cosas._, klists._, types._
-  import instructionsExample._
-
+case object dataMappings {
 
   val dataMapping = DataMapping(id = "dataMapping3498734", dataProcessing = instructs)(
     remoteInput =
