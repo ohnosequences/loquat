@@ -1,7 +1,7 @@
 package ohnosequences.loquat
 
-import ohnosequences.datasets._, dataSets._, s3Locations._
-import ohnosequences.cosas.ops.typeSets._
+import ohnosequences.datasets._
+// import ohnosequences.cosas.ops.typeSets._
 
 import ohnosequences.awstools.s3._
 import better.files._
