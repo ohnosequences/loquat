@@ -1,4 +1,4 @@
-# TODO for loquat
+# Parametric input/output types
 
 A little recap for how loquat works. The idea is that you define a way of turning an input into an output, represented as
 
@@ -27,6 +27,8 @@ If the types are parametric there's no hope of retrieving them implicitly. What 
 
 1. creating an input product **type** from a value (normally a set of `String`s)
 2. **easy** generate a set of labels from the output types
+
+The key here is the connection between sets of `String`s assumed to be labels and particular types.
 
 This should be part of the specification of the data processing bundle. As values of types are important now, we need a signature like
 
