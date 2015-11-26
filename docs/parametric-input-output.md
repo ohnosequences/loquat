@@ -41,3 +41,7 @@ val process: InputContext => Instructions[OutputContext]
 ```
 
 A cover method analogous to the current `processFiles` will take as input the set of input keys and files; from there it will parse both types and denotations and execute `process` above on them. This result is serialized to a set of labels and a map of files.
+
+### data mapping
+
+Here again we need to add *values* for input and output types. They need to be serialized and deserialized etc.
