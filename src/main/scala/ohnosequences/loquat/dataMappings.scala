@@ -27,8 +27,6 @@ trait AnyDataMapping {
 
   /* These two vals a needed for serialization */
   // should be provided implicitly:
-  // val inputsToMap:  ToMap[RemoteInput,  AnyData, S3DataLocation]
-  // val outputsToMap: ToMap[RemoteOutput, AnyData, S3DataLocation]
   def inputsToMap: Map[String,AnyS3Address] =
     (dataProcessing.input.keys.types.asList map { t => t.label }) zip (remoteInput.asList map { d => d.value.location }) toMap
 

@@ -44,4 +44,4 @@ A cover method analogous to the current `processFiles` will take as input the se
 
 ### data mapping
 
-Here again we need to add *values* for input and output types. They need to be serialized and deserialized etc.
+No need to change anything here as all this information is already in the input and output `Map`s: the keys are assumed to be the type labels.
