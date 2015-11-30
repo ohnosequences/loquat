@@ -21,8 +21,9 @@ case object utils {
   import scala.concurrent.duration._
   import java.util.concurrent._
 
-  type FileLocations = AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
-  type FileLocationsFor[D <: AnyDataSet] = D#Raw with FileLocations
+
+  type DataSetLocations[D <: AnyDataSet, L <: AnyDataLocation] =
+    D#Raw { type Bound = AnyDenotation { type Value = L } }
 
 
   trait AnyStep extends LazyLogging

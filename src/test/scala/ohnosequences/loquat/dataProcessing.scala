@@ -13,13 +13,13 @@ case object dataProcessing {
     DenotationParser[D, AnyDataLocation, FileDataLocation] =
     new DenotationParser(d, d.label)({ f: FileDataLocation => Some(f) })
 
-  case object inputData extends DataSet(sample :×: fastq :×: |[AnyData])
-  case object outputData extends DataSet(stats :×: results :×: |[AnyData])
+  case class inputData(sample: Sample) extends DataSet(reads1(sample) :×: reads2(sample) :×: |[AnyData])
+  case class outputData(sample: Sample) extends DataSet(stats :×: mergedReads(sample) :×: |[AnyData])
 
-  case object instructs extends DataProcessingBundle[
-    DataSet[|[AnyData]],
-    DataSet[stats.type :×: results.type :×: |[AnyData]]
-  ]() {
+  case class processingBundle(sample: Sample) extends DataProcessingBundle()(
+    inputData(sample), 
+    outputData(sample)
+  ) {
 
     def instructions: AnyInstructions = say("horay!")
 
