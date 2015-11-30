@@ -63,18 +63,18 @@ trait AnyDataProcessingBundle extends AnyBundle {
       ]
     }
 
-  type OutputContext = (Output, DataSetLocations[Output, FileDataLocation])
+  type OutputFiles = DataSetLocations[Output, FileDataLocation]
 
   // this is where you define what to do
-  def process(context: ProcessingContext[Input]): Instructions[OutputContext]
+  def process(context: ProcessingContext[Input]): Instructions[OutputFiles]
 
 
   final def runProcess(workingDir: File, inputFiles: Map[String,File]): Result[Map[String, File]] = {
 
     // TODO move to utils
-    def outputAsMap(outCtx: OutputContext): Map[String, File] =
-      (outCtx._1.keys.types.asList.map{ _.label }) zip
-      (outCtx._2.asList.map { _.value.location }) toMap
+    def outputAsMap(outputFiles: OutputFiles): Map[String, File] =
+      (output.keys.types.asList.map{ _.label }) zip
+      (outputFiles.asList.map { _.value.location }) toMap
 
     parseInputFiles(inputFiles mapValues { f => FileDataLocation(f) }) match {
       case Left(err) => Failure(err.toString)

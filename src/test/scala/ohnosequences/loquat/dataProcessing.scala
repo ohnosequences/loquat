@@ -17,19 +17,17 @@ case object dataProcessing {
   case class outputData(sample: Sample) extends DataSet(stats :×: mergedReads(sample) :×: |[AnyData])
 
   case class processingBundle(sample: Sample) extends DataProcessingBundle()(
-    inputData(sample), 
+    inputData(sample),
     outputData(sample)
   ) {
 
     def instructions: AnyInstructions = say("horay!")
 
-    def process(context: ProcessingContext[Input]): Instructions[OutputContext] = {
+    def process(context: ProcessingContext[Input]): Instructions[OutputFiles] = {
       success("foo",
-        (outputData,
-          stats.inFile(File("foo.bar")) ::
-          results.inFile(File(".")) ::
-          *[AnyDenotation { type Value = FileDataLocation }]
-        )
+        stats.inFile(File("foo.bar.txt")) ::
+        mergedReads(sample).inFile(File(".")) ::
+        *[AnyDenotation { type Value = FileDataLocation }]
       )
     }
   }
