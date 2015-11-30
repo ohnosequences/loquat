@@ -27,11 +27,11 @@ trait AnyDataMapping {
 
   /* These two vals a needed for serialization */
   // should be provided implicitly:
-  def inputsToMap: Map[String,AnyS3Address] =
-    (dataProcessing.input.keys.types.asList map { t => t.label }) zip (remoteInput.asList map { d => d.value.location }) toMap
+  def inputsToMap: Map[String,AnyS3Address] = ???
+    // (dataProcessing.input.keys.types.asList map { t => t.label }) zip (remoteInput.asList map { d => d.value.location }) toMap
 
-  def outputsToMap: Map[String,AnyS3Address] =
-    (dataProcessing.output.keys.types.asList map { t => t.label }) zip (remoteOutput.asList map { d => d.value.location }) toMap
+  def outputsToMap: Map[String,AnyS3Address] = ???
+    // (dataProcessing.output.keys.types.asList map { t => t.label }) zip (remoteOutput.asList map { d => d.value.location }) toMap
   /* We can transform any dataMapping to this simple form (but not another way round) */
   private[loquat]
   def simplify: SimpleDataMapping =

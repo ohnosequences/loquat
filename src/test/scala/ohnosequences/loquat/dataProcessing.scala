@@ -1,5 +1,6 @@
 package ohnosequences.loquat.test
 
+import ohnosequences.datasets._
 import ohnosequences.loquat._, test.data._
 import ohnosequences.statika.instructions._
 import ohnosequences.datasets._, FileDataLocation._
@@ -9,21 +10,26 @@ import better.files._
 case object dataProcessing {
 
   implicit def fileParser[D <: AnyData](implicit d: D):
-    DenotationParser[D,AnyDataLocation, FileDataLocation] = 
-    new DenotationParser(d,d.label)( { v: FileDataLocation => Some(v) })
+    DenotationParser[D, AnyDataLocation, FileDataLocation] =
+    new DenotationParser(d, d.label)({ f: FileDataLocation => Some(f) })
 
-  case object instructs extends DataProcessingBundle()(
-    inputData,
-    outputData
-  ) {
+  case object inputData extends DataSet(sample :×: fastq :×: |[AnyData])
+  case object outputData extends DataSet(stats :×: results :×: |[AnyData])
+
+  case object instructs extends DataProcessingBundle[
+    DataSet[|[AnyData]],
+    DataSet[stats.type :×: results.type :×: |[AnyData]]
+  ]() {
 
     def instructions: AnyInstructions = say("horay!")
 
-    def process(context: ProcessingContext[InputFiles]): Instructions[OutputContext] = {
+    def process(context: ProcessingContext[Input]): Instructions[OutputContext] = {
       success("foo",
-        stats.inFile(File(dataMappingId)) ::
-        results.inFile(File(".")) ::
-        *[AnyDenotation { type Value = FileDataLocation}]
+        (outputData,
+          stats.inFile(File("foo.bar")) ::
+          results.inFile(File(".")) ::
+          *[AnyDenotation { type Value = FileDataLocation }]
+        )
       )
     }
   }

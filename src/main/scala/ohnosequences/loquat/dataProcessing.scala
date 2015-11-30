@@ -19,14 +19,15 @@ trait AnyProcessingContext {
 
   val  workingDir: File
 
-  type DataFiles <: FileLocations
-  val  dataFiles: DataFiles
+  type DataSet <: AnyDataSet
+  // type DataFiles <: FileLocationsFor[DataSet]
+  val  dataFiles: FileLocationsFor[DataSet]
 
   /* user can get the file corresponding to the given data key */
   def file[K <: AnyData](key: K)(implicit
       lookup: AnyApp1At[
         FindS[AnyDenotationOf[K] { type Value = FileDataLocation }],
-        DataFiles
+        FileLocationsFor[DataSet]
       ] { type Y = K := FileDataLocation }
     ): File = lookup(dataFiles).value.location
 
@@ -36,35 +37,35 @@ trait AnyProcessingContext {
 
 // TODO predicate on DV for all of them being files?
 case class ProcessingContext[
-  DF <: FileLocations
-](val dataFiles: DF,
+  D <: AnyDataSet
+](val dataFiles: FileLocationsFor[D],
   val workingDir: File
 ) extends AnyProcessingContext {
-  type DataFiles = DF
+  type DataSet = D
 }
 
 
 trait AnyDataProcessingBundle extends AnyBundle {
 
   type Input <: AnyDataSet
-  val  input: Input
+  // val  input: Input
 
   type Output <: AnyDataSet
-  val  output: Output
+  // val  output: Output
 
-  type InputFiles  = FileLocationsFor[Input]
-  type OutputFiles = FileLocationsFor[Output]
+  // type InputFiles  = FileLocationsFor[Input]
+  // type OutputFiles = FileLocationsFor[Output]
 
   // should be provided implicitly:
   val parseInputFiles: AnyApp1At[
     FileDataLocation ParseDenotations Input#Keys,
     Map[String,FileDataLocation]
-  ] { type Y = Either[ParseDenotationsError, InputFiles] }
+  ] { type Y = Either[ParseDenotationsError, FileLocationsFor[Input]] }
 
-  type OutputContext = (Output, OutputFiles)
+  type OutputContext = (Output, FileLocationsFor[Output])
 
   // this is where you define what to do
-  def process(context: ProcessingContext[InputFiles]): Instructions[OutputContext]
+  def process(context: ProcessingContext[Input]): Instructions[OutputContext]
 
   final def runProcess(workingDir: File, inputFiles: Map[String,File]): Result[Map[String, File]] = {
 
@@ -77,7 +78,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
       case Left(err) => Failure(err.toString)
       case Right(inputFiles) => {
         process(
-          ProcessingContext[InputFiles](inputFiles, workingDir)
+          ProcessingContext[Input](inputFiles, workingDir)
         ).run(workingDir.toJava) match {
           case Failure(tr) => Failure(tr)
           case Success(tr, of) => Success(tr, outputAsMap(of))
@@ -91,10 +92,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
 abstract class DataProcessingBundle[
   I <: AnyDataSet,
   O <: AnyDataSet
-](deps: AnyBundle*)(
-  val input: I,
-  val output: O
-)(implicit
+](deps: AnyBundle*)(implicit
   val parseInputFiles: AnyApp1At[
     FileDataLocation ParseDenotations I#Keys,
     Map[String, FileDataLocation]

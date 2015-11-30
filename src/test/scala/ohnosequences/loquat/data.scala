@@ -14,7 +14,4 @@ case object data {
   case object stats extends Data(SomeData, "stats")
   case object results extends Data(SomeData, "results")
 
-
-  case object inputData extends DataSet(sample :×: fastq :×: |[AnyData])
-  case object outputData extends DataSet(stats :×: results :×: |[AnyData])
 }
