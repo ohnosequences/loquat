@@ -8,7 +8,9 @@ import better.files._
 
 case object dataProcessing {
 
-  implicit def fileParser[D <: AnyData](implicit d: D): DenotationParser[D,AnyDataLocation, FileDataLocation] = new DenotationParser(d,d.label)( { v: FileDataLocation => Some(v) })
+  implicit def fileParser[D <: AnyData](implicit d: D):
+    DenotationParser[D,AnyDataLocation, FileDataLocation] = 
+    new DenotationParser(d,d.label)( { v: FileDataLocation => Some(v) })
 
   case object instructs extends DataProcessingBundle()(
     inputData,
@@ -17,7 +19,7 @@ case object dataProcessing {
 
     def instructions: AnyInstructions = say("horay!")
 
-    def processData(dataMappingId: String, context: Context): Instructions[OutputFiles] = {
+    def process(context: ProcessingContext[InputFiles]): Instructions[OutputContext] = {
       success("foo",
         stats.inFile(File(dataMappingId)) ::
         results.inFile(File(".")) ::

@@ -2,6 +2,9 @@ package ohnosequences.loquat
 
 case object utils {
 
+  import ohnosequences.datasets._
+  import ohnosequences.cosas._, types._, klists._
+
   import com.typesafe.scalalogging.LazyLogging
 
   import ohnosequences.awstools.ec2._
@@ -17,6 +20,9 @@ case object utils {
   import scala.util._
   import scala.concurrent.duration._
   import java.util.concurrent._
+
+  type FileLocations = AnyKList.withBound[AnyDenotation { type Value = FileDataLocation }]
+  type FileLocationsFor[D <: AnyDataSet] = D#Raw with FileLocations
 
 
   trait AnyStep extends LazyLogging
