@@ -28,22 +28,13 @@ trait AnyDataMapping {
   type RemoteOutput = DataSetLocations[DataProcessing#Output, S3DataLocation]
   val  remoteOutput: RemoteOutput
 
-  /* These two vals are needed for serialization */
-  def inputsMap: Map[String, AnyS3Address] =
-    dataProcessing.input.keys.types.asList.map{ t => t.label } zip
-    remoteInput.asList.map{ d => d.value.location } toMap
-
-  def outputsMap: Map[String, AnyS3Address] =
-    dataProcessing.output.keys.types.asList.map{ t => t.label } zip
-    remoteOutput.asList.map{ d => d.value.location } toMap
-
   /* We can transform any dataMapping to this simple form (but not another way round) */
   private[loquat]
   def simplify: SimpleDataMapping =
     SimpleDataMapping(
       id = this.id,
-      inputs = inputsMap,
-      outputs = outputsMap
+      inputs = toMap(remoteInput),
+      outputs = toMap(remoteOutput)
     )
 }
 

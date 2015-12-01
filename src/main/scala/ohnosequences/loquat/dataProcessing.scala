@@ -26,7 +26,7 @@ trait AnyProcessingContext {
   /* user can get the file corresponding to the given data key */
   def file[K <: AnyData](key: K)(implicit
       lookup: AnyApp1At[
-        FindS[AnyDenotationOf[K] { type Value = FileDataLocation }],
+        FindS[AnyDenotation.Of[K] { type Value = FileDataLocation }],
         DataSetLocations[DataSet, FileDataLocation]
       ] { type Y = K := FileDataLocation }
     ): File = lookup(dataFiles).value.location
@@ -48,10 +48,7 @@ case class ProcessingContext[
 trait AnyDataProcessingBundle extends AnyBundle {
 
   type Input <: AnyDataSet
-  val  input: Input
-
   type Output <: AnyDataSet
-  val  output: Output
 
   // should be provided implicitly:
   val parseInputFiles: AnyApp1At[
@@ -69,13 +66,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
   def process(context: ProcessingContext[Input]): Instructions[OutputFiles]
 
 
-  final def runProcess(workingDir: File, inputFiles: Map[String,File]): Result[Map[String, File]] = {
-
-    // TODO move to utils
-    def outputAsMap(outputFiles: OutputFiles): Map[String, File] =
-      (output.keys.types.asList.map{ _.label }) zip
-      (outputFiles.asList.map { _.value.location }) toMap
-
+  final def runProcess(workingDir: File, inputFiles: Map[String, File]): Result[Map[String, File]] = {
     parseInputFiles(inputFiles mapValues { f => FileDataLocation(f) }) match {
       case Left(err) => Failure(err.toString)
       case Right(inputFiles) => {
@@ -83,7 +74,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
           ProcessingContext[Input](inputFiles, workingDir)
         ).run(workingDir.toJava) match {
           case Failure(tr) => Failure(tr)
-          case Success(tr, of) => Success(tr, outputAsMap(of))
+          case Success(tr, of) => Success(tr, toMap(of))
         }
       }
     }
@@ -94,10 +85,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
 abstract class DataProcessingBundle[
   I <: AnyDataSet,
   O <: AnyDataSet
-](deps: AnyBundle*)(
-  val input: I,
-  val output: O
-)(implicit
+](deps: AnyBundle*)(implicit
   val parseInputFiles: AnyApp1At[
     ParseDenotations[FileDataLocation, I#Keys],
     Map[String, FileDataLocation]
