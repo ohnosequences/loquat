@@ -16,9 +16,18 @@ case object dataProcessing {
   case class inputData(sample: Sample) extends DataSet(reads1(sample) :×: reads2(sample) :×: |[AnyData])
   case class outputData(sample: Sample) extends DataSet(stats :×: mergedReads(sample) :×: |[AnyData])
 
-  case class processingBundle(sample: Sample) extends DataProcessingBundle()(
-    inputData(sample),
-    outputData(sample)
+  case class processingBundle(sample: Sample) extends DataProcessingBundle[
+    DataSet[reads1 :×: |[AnyData]],
+    DataSet[stats.type :×: mergedReads :×: |[AnyData]]
+  ]()(
+    ParseDenotations.nonEmpty[
+      FileDataLocation,
+      reads1, FileDataLocation, |[AnyData],
+      *[AnyDenotation]
+    ](
+      fileParser[reads1],
+      ParseDenotations.empty
+    )
   ) {
 
     def instructions: AnyInstructions = say("horay!")
