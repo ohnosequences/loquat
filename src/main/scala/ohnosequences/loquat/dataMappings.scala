@@ -1,9 +1,12 @@
 package ohnosequences.loquat
 
-import ohnosequences.datasets._, dataSets._, s3Locations._
-import ohnosequences.cosas.ops.typeSets._
+import utils._
 
+import ohnosequences.datasets._
+
+import ohnosequences.cosas._, records._, fns._, types._, klists._
 import ohnosequences.awstools.s3._
+
 import better.files._
 import upickle.Js
 
@@ -19,26 +22,19 @@ trait AnyDataMapping {
 
   /* These are records with references to the remote locations of
      where to get inputs and where to put outputs of the dataMapping */
-  type RemoteInput = DataProcessing#Input#LocationsAt[S3DataLocation]
+  type RemoteInput = DataSetLocations[DataProcessing#Input, S3DataLocation]
   val  remoteInput: RemoteInput
 
-  type RemoteOutput = DataProcessing#Output#LocationsAt[S3DataLocation]
+  type RemoteOutput = DataSetLocations[DataProcessing#Output, S3DataLocation]
   val  remoteOutput: RemoteOutput
-
-  /* These two vals a needed for serialization */
-  // should be provided implicitly:
-  val inputsToMap:  ToMap[RemoteInput,  AnyData, S3DataLocation]
-  val outputsToMap: ToMap[RemoteOutput, AnyData, S3DataLocation]
 
   /* We can transform any dataMapping to this simple form (but not another way round) */
   private[loquat]
   def simplify: SimpleDataMapping =
     SimpleDataMapping(
       id = this.id,
-      inputs = this.inputsToMap(this.remoteInput)
-        .map{ case (data, s3loc) => (data.label -> s3loc.location) },
-      outputs = this.outputsToMap(this.remoteOutput)
-        .map{ case (data, s3loc) => (data.label -> s3loc.location) }
+      inputs = toMap(remoteInput),
+      outputs = toMap(remoteOutput)
     )
 }
 
@@ -46,11 +42,8 @@ case class DataMapping[
   DP <: AnyDataProcessingBundle
 ](val id: String,
   val dataProcessing: DP
-)(val remoteInput: DP#Input#LocationsAt[S3DataLocation],
-  val remoteOutput: DP#Output#LocationsAt[S3DataLocation]
-)(implicit
-  val inputsToMap:  ToMap[DP#Input#LocationsAt[S3DataLocation], AnyData, S3DataLocation],
-  val outputsToMap: ToMap[DP#Output#LocationsAt[S3DataLocation], AnyData, S3DataLocation]
+)(val remoteInput: DataSetLocations[DP#Input, S3DataLocation],
+  val remoteOutput: DataSetLocations[DP#Output, S3DataLocation]
 ) extends AnyDataMapping {
 
   type DataProcessing = DP
