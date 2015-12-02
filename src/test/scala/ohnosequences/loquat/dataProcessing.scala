@@ -1,5 +1,6 @@
 package ohnosequences.loquat.test
 
+import ohnosequences.datasets._
 import ohnosequences.loquat._, test.data._
 import ohnosequences.statika.instructions._
 import ohnosequences.datasets._, FileDataLocation._
@@ -8,20 +9,34 @@ import better.files._
 
 case object dataProcessing {
 
-  implicit def fileParser[D <: AnyData](implicit d: D): DenotationParser[D,AnyDataLocation, FileDataLocation] = new DenotationParser(d,d.label)( { v: FileDataLocation => Some(v) })
+  implicit def fileParser[D <: AnyData](implicit d: D):
+    DenotationParser[D, AnyDataLocation, FileDataLocation] =
+    new DenotationParser(d, d.label)({ f: FileDataLocation => Some(f) })
 
-  case object instructs extends DataProcessingBundle()(
-    inputData,
-    outputData
+  case class inputData(sample: Sample) extends DataSet(reads1(sample) :×: reads2(sample) :×: |[AnyData])
+  case class outputData(sample: Sample) extends DataSet(stats :×: mergedReads(sample) :×: |[AnyData])
+
+  case class processingBundle(sample: Sample) extends DataProcessingBundle[
+    DataSet[reads1 :×: |[AnyData]],
+    DataSet[stats.type :×: mergedReads :×: |[AnyData]]
+  ]()(
+    ParseDenotations.nonEmpty[
+      FileDataLocation,
+      reads1, FileDataLocation, |[AnyData],
+      *[AnyDenotation]
+    ](
+      fileParser[reads1],
+      ParseDenotations.empty
+    )
   ) {
 
     def instructions: AnyInstructions = say("horay!")
 
-    def processData(dataMappingId: String, context: Context): Instructions[OutputFiles] = {
+    def process(context: ProcessingContext[Input]): Instructions[OutputFiles] = {
       success("foo",
-        stats.inFile(File(dataMappingId)) ::
-        results.inFile(File(".")) ::
-        *[AnyDenotation { type Value = FileDataLocation}]
+        stats.inFile(File("foo.bar.txt")) ::
+        mergedReads(sample).inFile(File(".")) ::
+        *[AnyDenotation { type Value = FileDataLocation }]
       )
     }
   }
