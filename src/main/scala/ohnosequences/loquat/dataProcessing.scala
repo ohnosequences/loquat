@@ -48,7 +48,10 @@ case class ProcessingContext[
 trait AnyDataProcessingBundle extends AnyBundle {
 
   type Input <: AnyDataSet
+  val  input: Input
+
   type Output <: AnyDataSet
+  val  output: Output
 
   // should be provided implicitly:
   val parseInputFiles: AnyApp1At[
@@ -85,7 +88,10 @@ trait AnyDataProcessingBundle extends AnyBundle {
 abstract class DataProcessingBundle[
   I <: AnyDataSet,
   O <: AnyDataSet
-](deps: AnyBundle*)(implicit
+](deps: AnyBundle*)(
+  val input: I,
+  val output: O
+)(implicit
   val parseInputFiles: AnyApp1At[
     ParseDenotations[FileDataLocation, I#Keys],
     Map[String, FileDataLocation]
