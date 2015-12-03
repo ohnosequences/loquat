@@ -19,8 +19,7 @@ import better.files._
 
 private[loquat]
 case class TerminationDaemonBundle(
-  val config: AnyLoquatConfig,
-  val scheduler: Scheduler
+  val config: AnyLoquatConfig
 ) extends LazyLogging {
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
@@ -29,9 +28,9 @@ case class TerminationDaemonBundle(
   private val failedResults = scala.collection.mutable.HashMap[String, String]()
 
   def checkConditions(): Unit = {
-    logger.info("TerminationDeaemon conditions: " + config.terminationConfig)
-    logger.info("TerminationDeaemon success results: " + successResults.size)
-    logger.info("TerminationDeaemon failure results: " + failedResults.size)
+    logger.info("TerminationDeaemon is checking conditions: " + config.terminationConfig)
+    logger.info("- success results: " + successResults.size)
+    logger.info("- failure results: " + failedResults.size)
 
     // FIXME: we don't need parsing here, only the numbers of messages
     receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>

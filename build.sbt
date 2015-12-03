@@ -26,6 +26,10 @@ libraryDependencies ++= Seq(
   "org.scalatest"  %% "scalatest" % "2.2.5" % Test
 )
 
+// dependencyOverrides ++= Set(
+//   "ohnosequences" %% "cosas" % "0.8.0-parsing-SNAPSHOT"
+// )
+
 // scalacOptions ++= Seq("-Xlog-implicits")
 
 // FIXME: warts should be turn on back after the code clean up

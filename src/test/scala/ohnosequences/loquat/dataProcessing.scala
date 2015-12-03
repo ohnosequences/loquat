@@ -13,29 +13,26 @@ case object dataProcessing {
     DenotationParser[D, AnyDataLocation, FileDataLocation] =
     new DenotationParser(d, d.label)({ f: FileDataLocation => Some(f) })
 
-  case class inputData(sample: Sample) extends DataSet(reads1(sample) :×: reads2(sample) :×: |[AnyData])
-  case class outputData(sample: Sample) extends DataSet(stats :×: mergedReads(sample) :×: |[AnyData])
+  case object inputData extends DataSet(matrix :×: |[AnyData])
+  case object outputData extends DataSet(transposed :×: |[AnyData])
 
-  case class processingBundle(sample: Sample) extends DataProcessingBundle[
-    DataSet[reads1 :×: |[AnyData]],
-    DataSet[stats.type :×: mergedReads :×: |[AnyData]]
-  ]()(
-    ParseDenotations.nonEmpty[
-      FileDataLocation,
-      reads1, FileDataLocation, |[AnyData],
-      *[AnyDenotation]
-    ](
-      fileParser[reads1],
-      ParseDenotations.empty
-    )
+  case object processingBundle extends DataProcessingBundle()(
+    inputData,
+    outputData
   ) {
 
     def instructions: AnyInstructions = say("horay!")
 
-    def process(context: ProcessingContext[Input]): Instructions[OutputFiles] = {
+    def process(context: ProcessingContext[Input, IRaw]): Instructions[OutputFiles] = {
+
+      val matrixRows = context.lookup(matrix)//(
+        //FindS.foundInHead[AnyDenotation.Of[matrix.type], AnyDenotation.Of[matrix.type], *[AnyDenotation]]
+      //.lines
+
+      val trans = matrixRows.map{ _.reverse }.toList.reverse
+
       success("foo",
-        stats.inFile(File("foo.bar.txt")) ::
-        mergedReads(sample).inFile(File(".")) ::
+        transposed.inFile(File("foo.bar.txt")) ::
         *[AnyDenotation { type Value = FileDataLocation }]
       )
     }

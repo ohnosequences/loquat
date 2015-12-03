@@ -34,9 +34,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     override lazy val fullName: String = s"${manager.fullName}.${this.toString}"
   }
 
-  val scheduler = Scheduler(2)
+  val scheduler = Scheduler(4)
 
-  val terminationDaemon = TerminationDaemonBundle(config, scheduler)
+  val terminationDaemon = TerminationDaemonBundle(config)
 
   val bundleDependencies: List[AnyBundle] = List(
     LogUploaderBundle(config, scheduler)
@@ -108,10 +108,10 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         }
       } -&-
       LazyTry {
-        logger.info("starting termination daemon")
+        logger.info("Starting termination daemon")
         scheduler.repeat(
-          after = 5.minutes,
-          every = 5.minutes
+          after = 1.minutes,
+          every = 1.minutes
         )(terminationDaemon.checkConditions)
       } -&-
       say("manager installed")
