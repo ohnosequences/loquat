@@ -16,10 +16,10 @@ libraryDependencies ++= Seq(
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0-SNAPSHOT",
   "ohnosequences" %% "statika"     % "2.0.0-M4",
-  "ohnosequences" %% "aws-statika" % "2.0.0-M5",
+  "ohnosequences" %% "aws-statika" % "2.0.0-M6",
   "ohnosequences" %% "datasets"    % "0.2.0-new-cosas-SNAPSHOT",
   // amazon:
-  "ohnosequences" %% "aws-scala-tools" % "0.15.0-M1",
+  "ohnosequences" %% "aws-scala-tools" % "0.15.0",
   // files:
   "com.github.pathikrit" %% "better-files" % "2.13.0",
   // testing

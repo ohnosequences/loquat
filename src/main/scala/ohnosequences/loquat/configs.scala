@@ -68,7 +68,8 @@ trait AnyAutoScalingConfig extends Config() { conf =>
     }
 
     val purchaseModelErrors: Seq[String] = purchaseModel match {
-      case Spot(price) if price <= 0 => Seq(s"Spot price has to be positive: ${price}")
+      case Spot(Some(price), Some(delta)) if price <= 0 || delta < 0 =>
+        Seq(s"Spot price has to be positive: ${price}")
       case _ => Seq()
     }
 
