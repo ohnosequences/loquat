@@ -1,0 +1,3 @@
+Milestone release. See notes for 2.0.0.
+
+- This milestone updates dependencies to use aws-scala-tools `v0.15.0`.

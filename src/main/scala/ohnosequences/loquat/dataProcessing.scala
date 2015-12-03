@@ -1,9 +1,11 @@
 package ohnosequences.loquat
 
-import ohnosequences.datasets._, dataSets._, fileLocations._
+import utils._
 
-import ohnosequences.cosas._, types._
-import ops.typeSets._
+import ohnosequences.datasets._
+
+import ohnosequences.cosas._, types._, records._, fns._, klists._
+// import ops.typeSets._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -18,26 +20,29 @@ trait AnyProcessingContext {
   val  workingDir: File
 
   type DataSet <: AnyDataSet
-  val  dataSet: DataSet
-
-  type DataFiles  = DataSet#LocationsAt[FileDataLocation]
-  val  dataFiles: DataFiles
+  // type DataFiles <: FileLocationsFor[DataSet]
+  val  dataFiles: DataSetLocations[DataSet, FileDataLocation]
 
   /* user can get the file corresponding to the given data key */
   def file[K <: AnyData](key: K)(implicit
-      lookup: DataFiles Lookup (K := FileDataLocation)
+      lookup: AnyApp1At[
+        findS[AnyDenotation.Of[K] { type Value = FileDataLocation }],
+        DataSetLocations[DataSet, FileDataLocation]
+      ] { type Y = K := FileDataLocation }
     ): File = lookup(dataFiles).value.location
 
   /* or create a file instance in the orking directory */
   def /(name: String): File = workingDir / name
 }
 
-case class ProcessingContext[D <: AnyDataSet](
-  val dataSet: D,
-  val dataFiles: D#LocationsAt[FileDataLocation],
+// TODO predicate on DV for all of them being files?
+case class ProcessingContext[
+  D <: AnyDataSet
+](val dataFiles: DataSetLocations[D, FileDataLocation],
   val workingDir: File
-) extends AnyProcessingContext { type DataSet = D }
-
+) extends AnyProcessingContext {
+  type DataSet = D
+}
 
 
 trait AnyDataProcessingBundle extends AnyBundle {
@@ -48,51 +53,36 @@ trait AnyDataProcessingBundle extends AnyBundle {
   type Output <: AnyDataSet
   val  output: Output
 
-  type InputFiles  = Input#LocationsAt[FileDataLocation]
-  type OutputFiles = Output#LocationsAt[FileDataLocation]
-
   // should be provided implicitly:
-  val parseInputFiles: ParseDenotations[InputFiles, File]
-  val outputFilesToMap: ToMap[OutputFiles, AnyData, FileDataLocation]
+  val parseInputFiles: AnyApp1At[
+    ParseDenotations[FileDataLocation, Input#Keys],
+    Map[String, FileDataLocation]
+  ] { type Y = Either[
+        ParseDenotationsError,
+        DataSetLocations[Input, FileDataLocation]
+      ]
+    }
 
-  type Context = ProcessingContext[Input]
+  type OutputFiles = DataSetLocations[Output, FileDataLocation]
 
-  /* this is where user describes how to process each dataMapping:
-     - it takes input data file locations
-     - it must produce same for the output files */
-  def processData(
-    dataMappingId: String,
-    context: Context
-  ): Instructions[OutputFiles]
+  // this is where you define what to do
+  def process(context: ProcessingContext[Input]): Instructions[OutputFiles]
 
 
-  /* This is a cover-method, which will be used in the worker run-loop */
-  final def processFiles(
-    dataMappingId: String,
-    inputFilesMap: Map[String, File],
-    workingDir: File
-  ): Result[Map[String, File]] = {
-
-    /* This method serialises OutputFiles data mapping to a normal Map */
-    def filesMap(filesSet: OutputFiles): Map[String, File] =
-      outputFilesToMap(filesSet).map { case (data, loc) =>
-        data.label -> loc.location
-      }
-
-    parseInputFiles(inputFilesMap) match {
+  final def runProcess(workingDir: File, inputFiles: Map[String, File]): Result[Map[String, File]] = {
+    parseInputFiles(inputFiles mapValues { f => FileDataLocation(f) }) match {
       case Left(err) => Failure(err.toString)
       case Right(inputFiles) => {
-        processData(
-          dataMappingId,
-          ProcessingContext(input, inputFiles, workingDir)
+        process(
+          ProcessingContext[Input](inputFiles, workingDir)
         ).run(workingDir.toJava) match {
           case Failure(tr) => Failure(tr)
-          case Success(tr, of) => Success(tr, filesMap(of))
+          case Success(tr, of) => Success(tr, toMap(of))
         }
       }
     }
-
   }
+
 }
 
 abstract class DataProcessingBundle[
@@ -102,8 +92,14 @@ abstract class DataProcessingBundle[
   val input: I,
   val output: O
 )(implicit
-  val parseInputFiles: ParseDenotations[I#LocationsAt[FileDataLocation], File],
-  val outputFilesToMap: ToMap[O#LocationsAt[FileDataLocation], AnyData, FileDataLocation]
+  val parseInputFiles: AnyApp1At[
+    ParseDenotations[FileDataLocation, I#Keys],
+    Map[String, FileDataLocation]
+  ] { type Y = Either[
+        ParseDenotationsError,
+        DataSetLocations[I, FileDataLocation]
+      ]
+    }
 ) extends Bundle(deps: _*) with AnyDataProcessingBundle {
 
   type Input = I

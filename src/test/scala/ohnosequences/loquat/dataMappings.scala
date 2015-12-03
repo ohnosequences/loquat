@@ -1,23 +1,21 @@
 package ohnosequences.loquat.test
 
-object dataMappingsExample {
+import ohnosequences.awstools.s3._
+import ohnosequences.datasets._, S3DataLocation._
+import ohnosequences.cosas._, klists._, types._
+import ohnosequences.loquat._, test.data._, test.dataProcessing._
 
-  import ohnosequences.awstools.s3._
-  import ohnosequences.loquat._, dataMappings._
-  import ohnosequences.datasets._, s3Locations._
-  import ohnosequences.cosas._, typeSets._
-  import instructionsExample._
+case object dataMappings {
 
-
-  val dataMapping = DataMapping(id = "dataMapping3498734", dataProcessing = instructs)(
-    remoteInput =
-      sample.inS3(S3Object("bucket", "key")) :~:
-      fastq.inS3(S3Object("bucket", "key")) :~:
-      ∅,
-    remoteOutput =
-      stats.inS3(S3Object("bucket", "key")) :~:
-      results.inS3(S3Object("bucket", "key")) :~:
-      ∅
-  )
+  // val dataMapping = DataMapping(id = "dataMapping3498734", dataProcessing = instructs)(
+  //   remoteInput =
+  //     // S3DataOps(sample).inS3(S3Object("bucket", "key")) ::
+  //     // fastq.inS3(S3Object("bucket", "key")) ::
+  //     *[AnyDenotation { type Value = S3DataLocation }],
+  //   remoteOutput =
+  //     stats.inS3(S3Object("bucket", "key")) ::
+  //     results.inS3(S3Object("bucket", "key")) ::
+  //     *[AnyDenotation { type Value = S3DataLocation }]
+  // )
 
 }
