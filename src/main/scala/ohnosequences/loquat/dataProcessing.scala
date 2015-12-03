@@ -26,7 +26,7 @@ trait AnyProcessingContext {
   /* user can get the file corresponding to the given data key */
   def file[K <: AnyData](key: K)(implicit
       lookup: AnyApp1At[
-        FindS[AnyDenotation.Of[K] { type Value = FileDataLocation }],
+        findS[AnyDenotation.Of[K] { type Value = FileDataLocation }],
         DataSetLocations[DataSet, FileDataLocation]
       ] { type Y = K := FileDataLocation }
     ): File = lookup(dataFiles).value.location
