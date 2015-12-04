@@ -17,25 +17,24 @@ import better.files._
 
 trait AnyProcessingContext {
 
-  val  workingDir: File
+  val workingDir: File
+  val inputDir: File
 
   type DataSet <: AnyDataSet
-  val  dataSet: DataSet
 
   /* user can get the file corresponding to the given data key */
-  def file[K <: AnyData](key: K)(implicit
+  def inputFile[K <: AnyData](key: K)(implicit
     isIn: K isOneOf DataSet#Keys#Types#Hola
-  ): File = workingDir / "input" / key.label
+  ): File = inputDir / key.label
 
   /* or create a file instance in the orking directory */
   def /(name: String): File = workingDir / name
 }
 
-// TODO predicate on DV for all of them being files?
 case class ProcessingContext[
   D <: AnyDataSet
-](val dataSet: D,
-  val workingDir: File
+](val workingDir: File,
+  val inputDir: File
 ) extends AnyProcessingContext {
   type DataSet = D
 }
@@ -55,8 +54,8 @@ trait AnyDataProcessingBundle extends AnyBundle {
   def process(context: ProcessingContext[Input]): Instructions[OutputFiles]
 
 
-  final def runProcess(workingDir: File): Result[Map[String, File]] = {
-    process(ProcessingContext(input, workingDir))
+  final def runProcess(workingDir: File, inputDir: File): Result[Map[String, File]] = {
+    process(ProcessingContext[Input](workingDir, inputDir))
       .run(workingDir.toJava) match {
         case Failure(tr) => Failure(tr)
         case Success(tr, of) => Success(tr, toMap(of))
