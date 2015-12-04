@@ -167,7 +167,7 @@ class DataProcessor(
       }
 
       logger.info("processing data in: " + workingDir.path)
-      val result = instructionsBundle.runProcess(workingDir, inputFilesMap)
+      val result = instructionsBundle.runProcess(workingDir, inputDir)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
 
