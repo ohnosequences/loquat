@@ -23,7 +23,7 @@ case object utils {
 
 
   type DataSetLocations[D <: AnyDataSet, L <: AnyDataLocation] =
-    D#Raw { type Bound = AnyDenotation { type Value = L } }
+    D#Raw with AnyKList { type Bound = AnyDenotation { type Value = L } }
 
   def toMap[V <: AnyDataLocation](l: AnyKList.Of[AnyDenotation { type Value <: V }]): Map[String, V#Location] =
     l.asList.map{ d => (d.tpe.label, d.value.location) }.toMap

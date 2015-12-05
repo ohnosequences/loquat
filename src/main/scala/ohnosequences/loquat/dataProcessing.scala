@@ -31,14 +31,10 @@ trait AnyProcessingContext {
   def /(name: String): File = workingDir / name
 }
 
-case class ProcessingContext[
-  D <: AnyDataSet
-](val workingDir: File,
+case class ProcessingContext[D <: AnyDataSet](
+  val workingDir: File,
   val inputDir: File
-) extends AnyProcessingContext {
-  type DataSet = D
-  type DataFiles = DF
-}
+) extends AnyProcessingContext { type DataSet = D }
 
 
 trait AnyDataProcessingBundle extends AnyBundle {
@@ -46,15 +42,13 @@ trait AnyDataProcessingBundle extends AnyBundle {
   type Input <: AnyDataSet
   val  input: Input
 
-  type IRaw <: Input#Raw
-
   type Output <: AnyDataSet
   val  output: Output
 
   type OutputFiles = DataSetLocations[Output, FileDataLocation]
 
   // this is where you define what to do
-  def process(context: ProcessingContext[Input, IRaw]): Instructions[OutputFiles]
+  def process(context: ProcessingContext[Input]): AnyInstructions { type Out <: OutputFiles }
 
 
   final def runProcess(workingDir: File, inputDir: File): Result[Map[String, File]] = {
@@ -68,7 +62,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
 }
 
 abstract class DataProcessingBundle[
-  I <: AnyDataSet, IR <: I#Raw,
+  I <: AnyDataSet,
   O <: AnyDataSet
 ](deps: AnyBundle*)(
   val input: I,
@@ -77,5 +71,4 @@ abstract class DataProcessingBundle[
 
   type Input = I
   type Output = O
-  type IRaw = IR
 }

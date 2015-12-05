@@ -148,7 +148,7 @@ case class TerminateAfterInitialDataMappings(
 
   def check: Boolean = isOn && (successfulCount >= initialCount)
 
-  def msg: String = s"""|Terminated after successfully processing all the initial data mappings.
+  def msg: String = s"""|Termination after successfully processing all the initial data mappings.
     |  Initial data mappings count: ${initialCount}
     |  Successful results: ${successfulCount}
     |""".stripMargin
@@ -161,7 +161,7 @@ case class TerminateWithTooManyErrors(
 
   def check: Boolean = errorsThreshold.map{ failedCount >= _ }.getOrElse(false)
 
-  def msg: String = s"""|Terminated due to too many errors.
+  def msg: String = s"""|Termination due to too many errors.
     |  Errors threshold: ${errorsThreshold}
     |  Failed results count: ${failedCount}
     |""".stripMargin
@@ -178,12 +178,12 @@ case class TerminateAfterGlobalTimeout(
     case _ => false
   }
 
-  def msg: String = s"Terminated due to the global timeout: ${globalTimeout.getOrElse(0.seconds)}"
+  def msg: String = s"Termination due to the global timeout: ${globalTimeout.getOrElse(0.seconds)}"
 }
 
 case object TerminateManually extends AnyTerminationReason {
   def check: Boolean = true
-  def msg: String = "Terminated manually"
+  def msg: String = "Manual termination"
 }
 
 

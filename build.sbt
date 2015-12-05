@@ -26,11 +26,23 @@ libraryDependencies ++= Seq(
   "org.scalatest"  %% "scalatest" % "2.2.5" % Test
 )
 
-// dependencyOverrides ++= Set(
-//   "ohnosequences" %% "cosas" % "0.8.0-parsing-SNAPSHOT"
-// )
-
-// scalacOptions ++= Seq("-Xlog-implicits")
 
 // FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()
+
+
+fatArtifactSettings
+
+enablePlugins(BuildInfoPlugin)
+buildInfoPackage := "generated.metadata"
+buildInfoObject  := name.value.split("""\W""").map(_.capitalize).mkString
+buildInfoOptions := Seq(BuildInfoOption.Traits("ohnosequences.statika.bundles.AnyArtifactMetadata"))
+buildInfoKeys    := Seq[BuildInfoKey](
+  organization,
+  version,
+  "artifact" -> name.value.toLowerCase,
+  "artifactUrl" -> fatArtifactUrl.value
+)
+
+// For including test code in the fat artifact:
+// unmanagedSourceDirectories in Compile += (scalaSource in Test).value
