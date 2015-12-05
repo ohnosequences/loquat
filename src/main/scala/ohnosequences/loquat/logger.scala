@@ -19,8 +19,10 @@ import better.files._
 
 
 private[loquat]
-case class LogUploaderBundle(val config: AnyLoquatConfig, val scheduler: Scheduler)
-extends Bundle() with LazyLogging {
+case class LogUploaderBundle(
+  val config: AnyLoquatConfig,
+  val scheduler: Scheduler
+) extends Bundle() with LazyLogging {
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 

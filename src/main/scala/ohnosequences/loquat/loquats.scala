@@ -58,7 +58,7 @@ case object LoquatOps extends LazyLogging {
     user: LoquatUser,
     managerUserScript: String
   ): Unit = {
-    logger.info(s"Deploying loquat: v${config.loquatId}")
+    logger.info(s"Deploying loquat: ${config.loquatId}")
 
     if(user.validate.nonEmpty)
       logger.error("User validation failed. Fix it and try to deploy again.")

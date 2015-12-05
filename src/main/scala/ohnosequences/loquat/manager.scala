@@ -34,12 +34,11 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     override lazy val fullName: String = s"${manager.fullName}.${this.toString}"
   }
 
-  val scheduler = Scheduler(2)
-
-  val terminationDaemon = TerminationDaemonBundle(config, scheduler)
+  lazy final val scheduler = Scheduler(2)
 
   val bundleDependencies: List[AnyBundle] = List(
-    LogUploaderBundle(config, scheduler)
+    LogUploaderBundle(config, scheduler),
+    TerminationDaemonBundle(config, scheduler)
   )
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
@@ -106,13 +105,6 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           logger.info("Creating tags for workers autoscaling group")
           utils.tagAutoScalingGroup(aws.as, workersGroup.name, utils.InstanceTags.INSTALLING.value)
         }
-      } -&-
-      LazyTry {
-        logger.info("starting termination daemon")
-        scheduler.repeat(
-          after = 5.minutes,
-          every = 5.minutes
-        )(terminationDaemon.checkConditions)
       } -&-
       say("manager installed")
     }

@@ -31,13 +31,10 @@ trait AnyProcessingContext {
   def /(name: String): File = workingDir / name
 }
 
-case class ProcessingContext[
-  D <: AnyDataSet
-](val workingDir: File,
+case class ProcessingContext[D <: AnyDataSet](
+  val workingDir: File,
   val inputDir: File
-) extends AnyProcessingContext {
-  type DataSet = D
-}
+) extends AnyProcessingContext { type DataSet = D }
 
 
 trait AnyDataProcessingBundle extends AnyBundle {
@@ -51,7 +48,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
   type OutputFiles = DataSetLocations[Output, FileDataLocation]
 
   // this is where you define what to do
-  def process(context: ProcessingContext[Input]): Instructions[OutputFiles]
+  def process(context: ProcessingContext[Input]): AnyInstructions { type Out <: OutputFiles }
 
 
   final def runProcess(workingDir: File, inputDir: File): Result[Map[String, File]] = {
