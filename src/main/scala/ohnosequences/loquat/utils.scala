@@ -62,29 +62,33 @@ case object utils {
   }
 
 
-  object InstanceTags {
-    val PRODUCT_TAG = InstanceTag("product", "loquat")
+  sealed trait AnyStatusTag {
+    val status: String
+    val instanceTag = InstanceTag(StatusTag.label, status)
+  }
+  implicit def toAwsInstanceTag(st: AnyStatusTag): InstanceTag = st.instanceTag
 
-    val STATUS_TAG_NAME = "status"
+  class StatusTag(val status: String) extends AnyStatusTag
 
-    //for instances
-    val RUNNING    = InstanceTag(STATUS_TAG_NAME, "running")
-    val INSTALLING = InstanceTag(STATUS_TAG_NAME, "installing")
-    val IDLE       = InstanceTag(STATUS_TAG_NAME, "idle")
-    val PROCESSING = InstanceTag(STATUS_TAG_NAME, "processing")
-    val FINISHING  = InstanceTag(STATUS_TAG_NAME, "finishing")
-    val FAILED     = InstanceTag(STATUS_TAG_NAME, "failed")
+  case object StatusTag {
+    val label: String = "status"
 
-    val AUTO_SCALING_GROUP = "autoScalingGroup"
+    case object preparing   extends StatusTag("preparing")
+    case object running     extends StatusTag("running")
+
+    case object processing  extends StatusTag("processing")
+    case object idle        extends StatusTag("idle")
+    case object terminating extends StatusTag("terminating")
+    // case object failed      extends StatusTag("failed")
   }
 
-
-  def tagAutoScalingGroup(as: AutoScaling, groupName: String, status: String): Unit = {
-    as.createTags(groupName, InstanceTags.PRODUCT_TAG)
-    as.createTags(groupName, InstanceTag(InstanceTags.AUTO_SCALING_GROUP, groupName))
-    as.createTags(groupName, InstanceTag(InstanceTags.STATUS_TAG_NAME, status))
-    as.createTags(groupName, InstanceTag("Name", groupName))
+  def tagAutoScalingGroup(as: AutoScaling, group: AutoScalingGroup, statusTag: AnyStatusTag): Unit = {
+    as.createTags(group.name, InstanceTag("product", "loquat"))
+    // TODO: loquat name/id
+    as.createTags(group.name, InstanceTag("group", group.name))
+    as.createTags(group.name, statusTag)
   }
+
 
   @scala.annotation.tailrec
   def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: FiniteDuration) : Option[R] = {

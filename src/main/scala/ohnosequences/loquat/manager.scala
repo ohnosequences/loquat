@@ -43,23 +43,43 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
 
-  // FIXME: rewrite this method
-  def uploadInitialDataMappings(dataMappings: List[AnyDataMapping]): Unit = {
-    try {
-      logger.info("adding initial dataMappings to SQS")
-      // FIXME: match on Option instead of get
-      val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
+  def uploadInitialDataMappings(dataMappings: List[AnyDataMapping]): Try[Unit] = {
+    val managerStatus = aws.as.getTagValue(config.resourceNames.managerGroup, StatusTag.label)
 
-      // logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")
+    if (managerStatus == Some(StatusTag.running.status)) {
 
-      // NOTE: we can send messages in parallel
-      dataMappings.par.foreach { dataMapping =>
-        inputQueue.sendMessage(upickle.default.write[SimpleDataMapping](dataMapping.simplify))
+      logger.info("DataMappings are supposed to be in the queue already")
+      scala.util.Success( () )
+    } else {
+
+      lazy val getQueue = Try { aws.sqs.getQueueByName(config.resourceNames.inputQueue).get }
+
+      lazy val upload = getQueue match {
+        case scala.util.Failure(t) => {
+          logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")
+          scala.util.Failure[Unit](t)
+        }
+        case scala.util.Success(inputQueue) => Try {
+          logger.debug("Adding initial dataMappings to SQS")
+
+          // NOTE: we can send messages in parallel
+          dataMappings.par.foreach { dataMapping =>
+            inputQueue.sendMessage(upickle.default.write[SimpleDataMapping](dataMapping.simplify))
+          }
+        }
       }
-      aws.s3.uploadString(config.dataMappingsUploaded, "")
-      logger.info("initial dataMappings are ready")
-    } catch {
-      case t: Throwable => logger.error("error during uploading initial dataMappings", t)
+
+      upload match {
+        case fail @ scala.util.Failure(_) => {
+          logger.error("Failed to upload initial dataMappings")
+          fail
+        }
+        case scala.util.Success(inputQueue) => Try {
+          // NOTE: we tag manager group as running
+          aws.as.createTags(config.resourceNames.managerGroup, StatusTag.running)
+          logger.info("Initial dataMappings are ready")
+        }
+      }
     }
   }
 
@@ -68,21 +88,15 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
     lazy val normalScenario: Instructions[Unit] = {
       LazyTry {
-        logger.info("manager is started")
-        logger.info("checking if the initial dataMappings are uploaded")
-        if (aws.s3.listObjects(config.dataMappingsUploaded.bucket, config.dataMappingsUploaded.key).isEmpty) {
-          logger.warn("uploading initial dataMappings")
-          uploadInitialDataMappings(config.dataMappings)
-        } else {
-          logger.warn("skipping uploading dataMappings")
-        }
+        logger.debug("Uploading initial dataMappings to the input queue")
+        uploadInitialDataMappings(config.dataMappings).get
       } -&-
       LazyTry {
         aws.as.getAutoScalingGroupByName(config.resourceNames.managerGroup) map { group =>
           group.launchConfiguration.launchSpecs.keyName
         } map { keypairName =>
 
-          logger.info("Setting up workers userScript")
+          logger.debug("Setting up workers userScript")
           val workersGroup = aws.as.fixAutoScalingGroupUserData(
             config.workersConfig.autoScalingGroup(
               config.resourceNames.workersGroup,
@@ -92,18 +106,18 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
             workerCompat.userScript
           )
 
-          logger.info("Creating workers autoscaling group")
+          logger.debug("Creating workers autoscaling group")
           aws.as.createAutoScalingGroup(workersGroup)
 
-          logger.info("Waiting for the workers autoscaling group creation")
+          logger.debug("Waiting for the workers autoscaling group creation")
           utils.waitForResource(
             getResource = aws.as.getAutoScalingGroupByName(workersGroup.name),
             tries = 30,
             timeStep = 5.seconds
           )
 
-          logger.info("Creating tags for workers autoscaling group")
-          utils.tagAutoScalingGroup(aws.as, workersGroup.name, utils.InstanceTags.INSTALLING.value)
+          logger.debug("Creating tags for workers autoscaling group")
+          utils.tagAutoScalingGroup(aws.as, workersGroup, StatusTag.running)
         }
       } -&-
       say("manager installed")
@@ -117,7 +131,6 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       failure[Unit]("Manager failed during installation")
     }
 
-    // FIXME: this should happen only if the normal scenario fails!
     normalScenario -|- failScenario
   }
 }

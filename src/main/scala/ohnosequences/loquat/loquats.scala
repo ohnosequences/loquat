@@ -109,7 +109,7 @@ case object LoquatOps extends LazyLogging {
             .map { asGroup =>
               aws.as.createAutoScalingGroup(asGroup)
               // TODO: make use of the managerGroup status tag
-              utils.tagAutoScalingGroup(aws.as, asGroup.name, "manager")
+              utils.tagAutoScalingGroup(aws.as, asGroup, StatusTag.preparing)
             }
         ),
         Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(Success(true))
@@ -142,10 +142,6 @@ case object LoquatOps extends LazyLogging {
 
     Step(s"deleting workers group: ${names.workersGroup}")(
       Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
-    ).execute
-
-    Step(s"deleting the temporary S3 object: ${config.dataMappingsUploaded}")(
-      Try { aws.s3.deleteObject(config.dataMappingsUploaded) }
     ).execute
 
     Step(s"deleting error queue: ${names.errorQueue}")(

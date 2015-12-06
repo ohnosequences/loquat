@@ -230,20 +230,19 @@ case class TerminationConfig(
 private[loquat]
 case class ResourceNames(prefix: String, bucketName: String) {
   /* name of queue with dataMappings */
-  val inputQueue: String = prefix + "-loquat-inputQueue"
+  val inputQueue: String = prefix + "-loquat-input"
   /* name of topic for dataMappings result notifications */
-  val outputQueue: String = prefix + "-loquat-outputQueue"
+  val outputQueue: String = prefix + "-loquat-output"
   /* name of queue with errors (will be subscribed to errorTopic) */
-  val errorQueue: String = prefix + "-loquat-errorTopic"
+  val errorQueue: String = prefix + "-loquat-errors"
   /* name of bucket for logs files */
-  // FIXME: make the bucket name configurable
-  val bucket: String = bucketName //"era7-projects-loquats"
+  val bucket: String = bucketName
   /* topic name to notificate user about termination of loquat */
-  val notificationTopic: String = prefix + "-loquat-notificationTopic"
+  val notificationTopic: String = prefix + "-loquat-notifications"
   /* name of the manager autoscaling group */
-  val managerGroup: String = prefix + "-loquat-managerGroup"
+  val managerGroup: String = prefix + "-loquat-manager"
   /* name of the workers autoscaling group */
-  val workersGroup: String = prefix + "-loquat-workersGroup"
+  val workersGroup: String = prefix + "-loquat-workers"
 }
 
 
@@ -332,8 +331,6 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
   lazy final val resourceNames: ResourceNames = ResourceNames(loquatId, bucketName)
 
-  // FIXME: this is just an empty object in S3 witnessing that the initial dataMappings were uploaded:
-  lazy final val dataMappingsUploaded: S3Object = S3Object(resourceNames.bucket, loquatId) / "dataMappingsUploaded"
 
 
   lazy final val subConfigs: List[AnyConfig] = List(
