@@ -8,11 +8,6 @@ case object config {
 
   val defaultAMI = AmazonLinuxAMI(Ireland, HVM, InstanceStore)
 
-  val defaultManagerConfig = ManagerConfig(
-    InstanceSpecs(defaultAMI, m3.medium),
-    purchaseModel = Spot(maxPrice = Some(1.0))
-  )
-
   case object testConfig extends AnyLoquatConfig { config =>
     val bucketName = "loquat.testing"
     val loquatName = "experimental"
@@ -25,8 +20,11 @@ case object config {
 
     val metadata: AnyArtifactMetadata = generated.metadata.Loquat
 
-    type ManagerConfig = defaultManagerConfig.type
-    val  managerConfig = defaultManagerConfig: ManagerConfig
+    type ManagerConfig = AnyManagerConfig
+    val  managerConfig = ManagerConfig(
+      InstanceSpecs(defaultAMI, m3.medium),
+      purchaseModel = Spot(maxPrice = Some(1.0))
+    )
 
     type WorkersConfig = AnyWorkersConfig
     val workersConfig = WorkersConfig(

@@ -19,13 +19,17 @@ libraryDependencies ++= Seq(
   "ohnosequences" %% "aws-statika" % "2.0.0-M6",
   "ohnosequences" %% "datasets"    % "0.2.0-new-cosas-SNAPSHOT",
   // amazon:
-  "ohnosequences" %% "aws-scala-tools" % "0.15.0",
+  "ohnosequences" %% "aws-scala-tools" % "0.16.0",
   // files:
   "com.github.pathikrit" %% "better-files" % "2.13.0",
   // testing
   "org.scalatest"  %% "scalatest" % "2.2.5" % Test
 )
 
+
+dependencyOverrides ++= Set(
+  "ohnosequences" %% "aws-scala-tools" % "0.16.0"
+)
 
 // FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()
@@ -45,4 +49,4 @@ buildInfoKeys    := Seq[BuildInfoKey](
 )
 
 // For including test code in the fat artifact:
-// unmanagedSourceDirectories in Compile += (scalaSource in Test).value
+unmanagedSourceDirectories in Compile += (scalaSource in Test).value
