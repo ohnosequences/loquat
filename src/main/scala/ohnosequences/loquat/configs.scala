@@ -53,6 +53,9 @@ trait AnyAutoScalingConfig extends Config() { conf =>
 
   val groupSize: AutoScalingGroupSize
 
+  /* Preferred availability zones, if empty, set to all available zones */
+  val availabilityZones: List[String]
+
   // TODO: use some better type for this
   val deviceMapping: Map[String, String]
 
@@ -93,7 +96,8 @@ trait AnyAutoScalingConfig extends Config() { conf =>
           instanceProfile = Some(iamRoleName),
           deviceMapping = conf.deviceMapping
         )
-      )
+      ),
+      availabilityZones = conf.availabilityZones
     )
 
 }
@@ -109,7 +113,8 @@ case class ManagerConfig[
   IS <: AnyInstanceSpecs,
   PM <: AnyPurchaseModel
 ](instanceSpecs: IS,
-  purchaseModel: PM
+  purchaseModel: PM,
+  availabilityZones: List[String] = List()
 ) extends AnyManagerConfig {
 
   type InstanceSpecs = IS
@@ -126,6 +131,7 @@ case class WorkersConfig[
 ](instanceSpecs: IS,
   purchaseModel: PM,
   groupSize: AutoScalingGroupSize,
+  availabilityZones: List[String] = List(),
   // TODO: use some better type for this
   deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
 ) extends AnyWorkersConfig {
