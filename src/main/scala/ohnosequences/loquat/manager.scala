@@ -63,8 +63,16 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           logger.debug("Adding initial dataMappings to SQS")
 
           // NOTE: we can send messages in parallel
-          dataMappings.par.foreach { dataMapping =>
-            inputQueue.sendMessage(upickle.default.write[SimpleDataMapping](dataMapping.simplify))
+          dataMappings.zipWithIndex.par.foreach { case (dataMapping, ix) =>
+            inputQueue.sendMessage(
+              upickle.default.write[SimpleDataMapping](
+                SimpleDataMapping(
+                  id = ix.toString,
+                  inputs = toMap(dataMapping.remoteInput),
+                  outputs = toMap(dataMapping.remoteOutput)
+                )
+              )
+            )
           }
         }
       }

@@ -10,10 +10,8 @@ case object dataMappings {
   val input = S3Folder("loquat.testing", "input")
   val output = S3Folder("loquat.testing", "output")
 
-  val dataMapping = DataMapping(
-    id = "dataMapping3498734",
-    dataProcessing = processingBundle
-  )(remoteInput =
+  val dataMapping = DataMapping(processingBundle)(
+    remoteInput =
       matrix.inS3(input / matrix.label) ::
       *[AnyDenotation { type Value = S3DataLocation }],
     remoteOutput =

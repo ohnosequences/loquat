@@ -11,11 +11,7 @@ import better.files._
 import upickle.Js
 
 
-case class ProcessingResult(id: String, message: String)
-
 trait AnyDataMapping {
-
-  val id: String
 
   type DataProcessing <: AnyDataProcessingBundle
   val  dataProcessing: DataProcessing
@@ -28,27 +24,20 @@ trait AnyDataMapping {
   type RemoteOutput = DataSetLocations[DataProcessing#Output, S3DataLocation]
   val  remoteOutput: RemoteOutput
 
-  /* We can transform any dataMapping to this simple form (but not another way round) */
-  private[loquat]
-  def simplify: SimpleDataMapping =
-    SimpleDataMapping(
-      id = this.id,
-      inputs = toMap(remoteInput),
-      outputs = toMap(remoteOutput)
-    )
 }
 
 case class DataMapping[
   DP <: AnyDataProcessingBundle
-](val id: String,
-  val dataProcessing: DP
-)(val remoteInput: DataSetLocations[DP#Input, S3DataLocation],
+](val dataProcessing: DP)(
+  val remoteInput: DataSetLocations[DP#Input, S3DataLocation],
   val remoteOutput: DataSetLocations[DP#Output, S3DataLocation]
 ) extends AnyDataMapping {
 
   type DataProcessing = DP
 }
 
+
+case class ProcessingResult(id: String, message: String)
 
 /* This is easy to parse/serialize, but it's only for internal use. */
 private[loquat]
