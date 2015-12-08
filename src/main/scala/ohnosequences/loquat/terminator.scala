@@ -12,6 +12,7 @@ import scala.concurrent.duration._
 
 import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.s3._
+import ohnosequences.awstools.sqs
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import java.util.concurrent._
 import scala.util.Try
@@ -28,7 +29,7 @@ case class TerminationDaemonBundle(
   private val successResults = scala.collection.mutable.HashMap[String, String]()
   private val failedResults = scala.collection.mutable.HashMap[String, String]()
 
-  lazy val mangerCreationTime: Option[FiniteDuration] =
+  lazy val managerCreationTime: Option[FiniteDuration] =
     aws.as.getCreatedTime(config.resourceNames.managerGroup)
       .map{ _.getTime.millis }
 
@@ -41,96 +42,74 @@ case class TerminationDaemonBundle(
 
 
   def checkConditions(): Unit = {
-    logger.info(s"Checking termination conditions:")
-    // FIXME: we don't need parsing here, only the numbers of messages
-    receiveDataMappingsResults(config.resourceNames.outputQueue).foreach { case (handle, result) =>
-      successResults.put(result.id, result.message)
-    }
-    // logger.debug("success results: " + successResults.size)
+    logger.info(s"Checking termination conditions")
 
-    receiveDataMappingsResults(config.resourceNames.errorQueue).foreach { case (handle, result) =>
-      failedResults.put(result.id, result.message)
-    }
-    // logger.debug("failure results: " + failedResults.size)
-
-    val reason: Option[AnyTerminationReason] = terminationReason(
-      terminationConfig = config.terminationConfig,
-      successResultsCount = successResults.size,
-      failedResultsCount = failedResults.size,
-      initialDataMappingsCount = config.dataMappings.length,
-      creationTime = mangerCreationTime
-    )
-    logger.info(s"Termination reason: ${reason}")
-
-    // if there is a reason inside, we undeploy everything
-    reason.foreach{ LoquatOps.undeploy(config, aws, _) }
-  }
-
-  def receiveDataMappingsResults(queueName: String): List[(String, ProcessingResult)] = {
-    val rawMessages: List[(String, String)] = getQueueMessagesWithHandles(queueName)
-
-    rawMessages.map { case (handle, rawMessageBody) =>
-      // TODO: check this:
-      val resultDescription: ProcessingResult = upickle.default.read[ProcessingResult](rawMessageBody)
-        // upickle.default.read[ProcessingResult](snsMessage.Message.replace("\\\"", "\""))
-      logger.info(resultDescription.toString)
-      (handle, resultDescription)
-    }
-  }
-
-  def getQueueMessagesWithHandles(queueName: String): List[(String, String)] = {
-    aws.sqs.getQueueByName(queueName) match {
-      case None => Nil
-      case Some(queue) => {
-        var messages = ListBuffer[(String, String)]()
-        var empty = false
-        var i = 0
-        while(!empty && i < 10) {
-          val chuck = queue.receiveMessages(10)
-          if (chuck.isEmpty) {
-            empty = true
-          }
-          messages ++= chuck.map { m=>
-            m.receiptHandle -> m.body
-          }
-          i += 1
+    aws.sqs.getQueueByName(config.resourceNames.outputQueue) match {
+      case None => logger.error(s"Couldn't access output queue: ${config.resourceNames.outputQueue}")
+      case Some(outputQueue) =>
+        receiveDataMappingsResults(outputQueue).foreach { case result =>
+          successResults.put(result.id, result.message)
         }
-        messages.toList
-      }
     }
-  }
+    logger.debug("Success results: " + successResults.size)
 
-  def terminationReason(
-    terminationConfig: TerminationConfig,
-    successResultsCount: Int,
-    failedResultsCount: Int,
-    initialDataMappingsCount: Int,
-    creationTime: Option[FiniteDuration]
-  ): Option[AnyTerminationReason] = {
+    aws.sqs.getQueueByName(config.resourceNames.errorQueue) match {
+      case None => logger.error(s"Couldn't access error queue: ${config.resourceNames.errorQueue}")
+      case Some(errorQueue) =>
+        receiveDataMappingsResults(errorQueue).foreach { case result =>
+          failedResults.put(result.id, result.message)
+        }
+    }
+    logger.debug("Failure results: " + failedResults.size)
 
     lazy val afterInitial = TerminateAfterInitialDataMappings(
-      terminationConfig.terminateAfterInitialDataMappings,
-      initialDataMappingsCount,
-      successResultsCount
+      config.terminationConfig.terminateAfterInitialDataMappings,
+      config.dataMappings.length,
+      successResults.size
     )
     logger.debug(s"${afterInitial}: ${afterInitial.check}")
 
     lazy val tooManyErrors = TerminateWithTooManyErrors(
-      terminationConfig.errorsThreshold,
-      failedResultsCount
+      config.terminationConfig.errorsThreshold,
+      failedResults.size
     )
     logger.debug(s"${tooManyErrors}: ${tooManyErrors.check}")
 
     lazy val globalTimeout = TerminateAfterGlobalTimeout(
-      terminationConfig.globalTimeout,
-      creationTime
+      config.terminationConfig.globalTimeout,
+      managerCreationTime
     )
     logger.debug(s"${globalTimeout}: ${globalTimeout.check}")
 
-         if (afterInitial.check) Some(afterInitial)
-    else if (tooManyErrors.check) Some(tooManyErrors)
-    else if (globalTimeout.check) Some(globalTimeout)
-    else None
+    val reason: Option[AnyTerminationReason] =
+           if (afterInitial.check) Some(afterInitial)
+      else if (tooManyErrors.check) Some(tooManyErrors)
+      else if (globalTimeout.check) Some(globalTimeout)
+      else None
+
+    logger.info(s"Termination reason: ${reason}")
+
+    // if there is a reason, we undeploy everything
+    reason.foreach{ LoquatOps.undeploy(config, aws, _) }
+  }
+
+  def receiveDataMappingsResults(queue: sqs.Queue): List[ProcessingResult] = {
+    getQueueMessages(queue).map { message =>
+      upickle.default.read[ProcessingResult](message.body)
+    }
+  }
+
+  def getQueueMessages(queue: sqs.Queue): List[sqs.Message] = {
+    var messages = ListBuffer[sqs.Message]()
+    var empty = false
+    var i = 0
+    while(!empty && i < 10) {
+      val chuck = queue.receiveMessages(10)
+      if (chuck.isEmpty) { empty = true }
+      messages ++= chuck
+      i += 1
+    }
+    messages.toList
   }
 
 }
