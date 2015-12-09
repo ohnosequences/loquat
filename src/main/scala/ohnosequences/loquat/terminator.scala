@@ -13,8 +13,10 @@ import scala.concurrent.duration._
 import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.s3._
 import ohnosequences.awstools.sqs
+import com.amazonaws.{ services => amzn }
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import java.util.concurrent._
+import scala.collection.JavaConversions._
 import scala.util.Try
 import better.files._
 
@@ -47,7 +49,7 @@ case class TerminationDaemonBundle(
     aws.sqs.getQueueByName(config.resourceNames.outputQueue) match {
       case None => logger.error(s"Couldn't access output queue: ${config.resourceNames.outputQueue}")
       case Some(outputQueue) =>
-        receiveDataMappingsResults(outputQueue).foreach { case result =>
+        receiveProcessingResults(outputQueue).foreach { case result =>
           successResults.put(result.id, result.message)
         }
     }
@@ -56,7 +58,7 @@ case class TerminationDaemonBundle(
     aws.sqs.getQueueByName(config.resourceNames.errorQueue) match {
       case None => logger.error(s"Couldn't access error queue: ${config.resourceNames.errorQueue}")
       case Some(errorQueue) =>
-        receiveDataMappingsResults(errorQueue).foreach { case result =>
+        receiveProcessingResults(errorQueue).foreach { case result =>
           failedResults.put(result.id, result.message)
         }
     }
@@ -93,23 +95,33 @@ case class TerminationDaemonBundle(
     reason.foreach{ LoquatOps.undeploy(config, aws, _) }
   }
 
-  def receiveDataMappingsResults(queue: sqs.Queue): List[ProcessingResult] = {
-    getQueueMessages(queue).map { message =>
-      upickle.default.read[ProcessingResult](message.body)
-    }
-  }
+  def receiveProcessingResults(queue: sqs.Queue): List[ProcessingResult] = {
 
-  def getQueueMessages(queue: sqs.Queue): List[sqs.Message] = {
-    var messages = ListBuffer[sqs.Message]()
-    var empty = false
-    var i = 0
-    while(!empty && i < 10) {
-      val chuck = queue.receiveMessages(10)
-      if (chuck.isEmpty) { empty = true }
-      messages ++= chuck
-      i += 1
+    def getMessageBodies(): List[String] =
+      queue.sqs.receiveMessage(
+        new amzn.sqs.model.ReceiveMessageRequest(queue.url)
+          .withMaxNumberOfMessages(10) // this is the maximum we can ask Amazon for
+          .withVisibilityTimeout(21)   // hiding messages to avoid getting the same ones
+          .withWaitTimeSeconds(20)     // long polling
+      ).getMessages.toList.map{ _.getBody }
+
+    /* We are polling the queue until we get an empty response */
+    def pollQueue: List[String] = {
+
+      @scala.annotation.tailrec
+        def pollQueue_rec(
+          response: List[String],
+          acc: scala.collection.mutable.ListBuffer[String]
+        ): List[String] = {
+          if (response.isEmpty) acc.toList
+          else pollQueue_rec(getMessageBodies, acc ++= response)
+        }
+
+      pollQueue_rec(getMessageBodies(), scala.collection.mutable.ListBuffer())
     }
-    messages.toList
+
+    pollQueue.map { upickle.default.read[ProcessingResult](_) }
+
   }
 
 }
