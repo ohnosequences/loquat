@@ -49,7 +49,7 @@ case class TerminationDaemonBundle(
     aws.sqs.getQueueByName(config.resourceNames.outputQueue) match {
       case None => logger.error(s"Couldn't access output queue: ${config.resourceNames.outputQueue}")
       case Some(outputQueue) =>
-        receiveProcessingResults(outputQueue).foreach { case result =>
+        receiveProcessingResults(outputQueue).foreach { result =>
           successResults.put(result.id, result.message)
         }
     }
@@ -58,7 +58,7 @@ case class TerminationDaemonBundle(
     aws.sqs.getQueueByName(config.resourceNames.errorQueue) match {
       case None => logger.error(s"Couldn't access error queue: ${config.resourceNames.errorQueue}")
       case Some(errorQueue) =>
-        receiveProcessingResults(errorQueue).foreach { case result =>
+        receiveProcessingResults(errorQueue).foreach { result =>
           failedResults.put(result.id, result.message)
         }
     }
