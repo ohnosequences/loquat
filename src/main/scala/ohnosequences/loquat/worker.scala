@@ -231,15 +231,12 @@ class DataProcessor(
     logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
 
     while(!stopped) {
-      var dataMappingId: String = ""
-      var lastTimeSpent = 0
       try {
         val message = waitForDataMapping(inputQueue)
 
         instance.foreach(_.createTag(StatusTag.processing))
         logger.info("DataProcessor: received message " + message)
         val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
-        dataMappingId = dataMapping.id
 
         logger.info("DataProcessor processing message")
 

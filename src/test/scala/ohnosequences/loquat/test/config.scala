@@ -23,13 +23,13 @@ case object config {
     type ManagerConfig = AnyManagerConfig
     val  managerConfig = ManagerConfig(
       InstanceSpecs(defaultAMI, m3.medium),
-      purchaseModel = Spot(maxPrice = Some(1.0))
+      purchaseModel = Spot(maxPrice = Some(0.1))
     )
 
     type WorkersConfig = AnyWorkersConfig
     val workersConfig = WorkersConfig(
       instanceSpecs = InstanceSpecs(defaultAMI, m3.medium),
-      purchaseModel = Spot(maxPrice = Some(1.0)),
+      purchaseModel = Spot(maxPrice = Some(0.1)),
       groupSize = AutoScalingGroupSize(0, 1, 1)
     )
 
@@ -37,7 +37,8 @@ case object config {
       terminateAfterInitialDataMappings = true
     )
 
-    val dataMappings: List[AnyDataMapping] = List(test.dataMappings.dataMapping)
+    val N = 100
+    val dataMappings: List[AnyDataMapping] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
   }
 
   case object testLoquat extends Loquat(testConfig, test.dataProcessing.processingBundle)
