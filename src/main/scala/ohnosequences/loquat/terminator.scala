@@ -38,7 +38,7 @@ case class TerminationDaemonBundle(
   def instructions: AnyInstructions = LazyTry[Unit] {
     scheduler.repeat(
       after = 3.minutes,
-      every = 3.minutes
+      every = 30.seconds //3.minutes
     )(checkConditions)
   } -&- say("Termination daemon started")
 
@@ -53,7 +53,7 @@ case class TerminationDaemonBundle(
           successResults.put(result.id, result.message)
         }
     }
-    logger.debug("Success results: " + successResults.size)
+    logger.debug(s"Success results: ${successResults.size}")
 
     aws.sqs.getQueueByName(config.resourceNames.errorQueue) match {
       case None => logger.error(s"Couldn't access error queue: ${config.resourceNames.errorQueue}")
@@ -62,7 +62,7 @@ case class TerminationDaemonBundle(
           failedResults.put(result.id, result.message)
         }
     }
-    logger.debug("Failure results: " + failedResults.size)
+    logger.debug(s"Failure results: ${failedResults.size}")
 
     lazy val afterInitial = TerminateAfterInitialDataMappings(
       config.terminationConfig.terminateAfterInitialDataMappings,
@@ -97,27 +97,38 @@ case class TerminationDaemonBundle(
 
   def receiveProcessingResults(queue: sqs.Queue): List[ProcessingResult] = {
 
-    def getMessageBodies(): List[String] =
-      queue.sqs.receiveMessage(
+    /* Note that this request does so called short-polling, see the [Amazon documentation](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/sqs/model/ReceiveMessageRequest.html).
+       Long polling doesn't work here, because it returns too many responses with the same messages (so it's not clear when you can stop polling).
+    */
+    def getMessageBodies(): List[String] = {
+      val bodies = queue.sqs.receiveMessage(
         new amzn.sqs.model.ReceiveMessageRequest(queue.url)
           .withMaxNumberOfMessages(10) // this is the maximum we can ask Amazon for
-          .withVisibilityTimeout(21)   // hiding messages to avoid getting the same ones
-          .withWaitTimeSeconds(20)     // long polling
       ).getMessages.toList.map{ _.getBody }
+      // logger.debug(s"Received [${bodies.length}] messages from the queue ${queue.name}")
+      bodies
+    }
 
-    /* We are polling the queue until we get an empty response */
+    /* We are polling the queue until we get an empty response 5+ times in a row,
+       because short polling eventually returns false empty responses.
+    */
     def pollQueue: List[String] = {
 
       @scala.annotation.tailrec
         def pollQueue_rec(
-          response: List[String],
-          acc: scala.collection.mutable.ListBuffer[String]
+          acc: scala.collection.mutable.ListBuffer[String],
+          tries: Int
         ): List[String] = {
-          if (response.isEmpty) acc.toList
-          else pollQueue_rec(getMessageBodies, acc ++= response)
+          val response = getMessageBodies()
+
+          if (response.isEmpty) {
+            if (tries > 5) acc.toList
+            else pollQueue_rec(acc ++= response, tries + 1)
+          }
+          else pollQueue_rec(acc ++= response, 0)
         }
 
-      pollQueue_rec(getMessageBodies(), scala.collection.mutable.ListBuffer())
+      pollQueue_rec(scala.collection.mutable.ListBuffer(), 0)
     }
 
     pollQueue.map { upickle.default.read[ProcessingResult](_) }
