@@ -2,7 +2,7 @@
 ```scala
 package ohnosequences.loquat
 
-import dataMappings._, dataProcessing._, daemons._, configs._, utils._
+import utils._
 
 import ohnosequences.statika.bundles._
 import ohnosequences.statika.instructions._
@@ -15,6 +15,7 @@ import ohnosequences.awstools.AWSClients
 import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.Try
 import upickle.Js
 
@@ -31,12 +32,15 @@ trait AnyWorkerBundle extends AnyBundle {
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  val bundleDependencies: List[AnyBundle] = List(instructionsBundle, LogUploaderBundle(config))
+  val scheduler = Scheduler(2)
 
-  def instructions: AnyInstructions = {
-    LazyTry {
-      new DataProcessor(config, instructionsBundle).runLoop
-    } -&- say("worker installed")
+  val bundleDependencies: List[AnyBundle] = List(
+    instructionsBundle,
+    LogUploaderBundle(config, scheduler)
+  )
+
+  def instructions: AnyInstructions = LazyTry {
+    new DataProcessor(config, instructionsBundle).runLoop
   }
 }
 
@@ -65,8 +69,6 @@ class DataProcessor(
   val errorQueue = aws.sqs.getQueueByName(config.resourceNames.errorQueue).get
   val outputQueue = aws.sqs.getQueueByName(config.resourceNames.outputQueue).get
 
-  val MESSAGE_TIMEOUT = Seconds(5)
-
   val instance = aws.ec2.getCurrentInstance
 
   @volatile var stopped = false
@@ -76,30 +78,30 @@ class DataProcessor(
     var message: Option[Message] = queue.receiveMessage
 
     while(message.isEmpty) {
-      logger.info("DataProcessor wait for dataMapping")
-      instance.foreach(_.createTag(utils.InstanceTags.IDLE))
-      Thread.sleep(MESSAGE_TIMEOUT.millis)
+      logger.info("Data processor is waiting for new data")
+      instance.foreach(_.createTag(StatusTag.idle))
+      Thread.sleep(5.seconds.toMillis)
       message = queue.receiveMessage
     }
 
     message.get
   }
 
-  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[Time] = {
-    val startTime: Time = Millis(System.currentTimeMillis)
-    val step: Time = Seconds(5)
+  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
+    val startTime = System.currentTimeMillis.millis
+    val step = 5.seconds
 
-    def timeSpent: Time = {
-      val currentTime = Millis(System.currentTimeMillis)
-      Seconds(currentTime.inSeconds - startTime.inSeconds)
+    def timeSpent: FiniteDuration = {
+      val currentTime = System.currentTimeMillis.millis
+      (currentTime - startTime).toSeconds.seconds
     }
 
-    val taskProcessingTimeout: Time =
-      config.terminationConfig.taskProcessingTimeout.getOrElse(Hours(12))
+    val taskProcessingTimeout: FiniteDuration =
+      config.terminationConfig.taskProcessingTimeout.getOrElse(12.hours)
 
     @scala.annotation.tailrec
     def waitMore(tries: Int): AnyResult = {
-      if(timeSpent.inSeconds > taskProcessingTimeout.inSeconds) {
+      if(timeSpent > taskProcessingTimeout) {
         terminateWorker
         Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
       } else {
@@ -111,8 +113,8 @@ class DataProcessor(
                 logger.warn("Couldn't change the visibility globalTimeout")
               // FIXME: something weird is happening here
             }
-            Thread.sleep(step.millis)
-            logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
+            Thread.sleep(step.toMillis)
+            // logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
             waitMore(tries + 1)
           }
           case Some(scala.util.Success(r)) => {
@@ -132,12 +134,12 @@ class DataProcessor(
 
   def terminateWorker(): Unit = {
     stopped = true
-    instance.foreach(_.createTag(utils.InstanceTags.FINISHING))
-    logger.info("terminating")
+    instance.foreach(_.createTag(StatusTag.terminating))
+    logger.info("Terminating instance")
     instance.foreach(_.terminate)
   }
 
-  def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
+  private def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
     try {
       if(workingDir.exists) {
         logger.info("deleting working directory: " + workingDir.path)
@@ -167,7 +169,7 @@ class DataProcessor(
       }
 
       logger.info("processing data in: " + workingDir.path)
-      val result = instructionsBundle.processFiles(dataMapping.id, inputFilesMap, workingDir)
+      val result = instructionsBundle.runProcess(workingDir, inputDir)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
 
@@ -231,15 +233,12 @@ class DataProcessor(
     logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
 
     while(!stopped) {
-      var dataMappingId: String = ""
-      var lastTimeSpent = 0
       try {
         val message = waitForDataMapping(inputQueue)
 
-        instance.foreach(_.createTag(utils.InstanceTags.PROCESSING))
+        instance.foreach(_.createTag(StatusTag.processing))
         logger.info("DataProcessor: received message " + message)
         val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
-        dataMappingId = dataMapping.id
 
         logger.info("DataProcessor processing message")
 
@@ -276,12 +275,16 @@ class DataProcessor(
 
 
 [main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
-[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
 [main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
 [main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/logger.scala]: logger.scala.md
 [main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
-[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/manager.scala]: manager.scala.md
+[main/scala/ohnosequences/loquat/terminator.scala]: terminator.scala.md
 [main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
-[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
-[test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
-[test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md
+[main/scala/ohnosequences/loquat/worker.scala]: worker.scala.md
+[test/scala/ohnosequences/loquat/test/config.scala]: ../../../../test/scala/ohnosequences/loquat/test/config.scala.md
+[test/scala/ohnosequences/loquat/test/data.scala]: ../../../../test/scala/ohnosequences/loquat/test/data.scala.md
+[test/scala/ohnosequences/loquat/test/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/test/dataProcessing.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataProcessing.scala.md
+[test/scala/ohnosequences/loquat/test/md5.scala]: ../../../../test/scala/ohnosequences/loquat/test/md5.scala.md

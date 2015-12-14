@@ -4,6 +4,9 @@ package ohnosequences.loquat
 
 case object utils {
 
+  import ohnosequences.datasets._
+  import ohnosequences.cosas._, types._, klists._
+
   import com.typesafe.scalalogging.LazyLogging
 
   import ohnosequences.awstools.ec2._
@@ -17,6 +20,15 @@ case object utils {
   import better.files._
   import scala.collection.JavaConversions._
   import scala.util._
+  import scala.concurrent.duration._
+  import java.util.concurrent._
+
+
+  type DataSetLocations[D <: AnyDataSet, L <: AnyDataLocation] =
+    D#Raw with AnyKList { type Bound = AnyDenotation { type Value = L } }
+
+  def toMap[V <: AnyDataLocation](l: AnyKList.Of[AnyDenotation { type Value <: V }]): Map[String, V#Location] =
+    l.asList.map{ d => (d.tpe.label, d.value.location) }.toMap
 
 
   trait AnyStep extends LazyLogging
@@ -32,59 +44,60 @@ case object utils {
     }
   }
 
+  // A minimal wrapper around the Java scheduling thing
+  case class Scheduler(val threadsNumber: Int) {
+    lazy final val pool = new ScheduledThreadPoolExecutor(threadsNumber)
 
-  class Time(val inSeconds: Long) {
-    val millis: Long = inSeconds * 1000
-    val seconds: Long = inSeconds
-    val minutes: Long = inSeconds / 60
-    val hours: Long = inSeconds / (60 * 60)
+    // Note, that the returned ScheduledFuture has cancel(Boolean) method
+    def repeat(
+      after: FiniteDuration,
+      every: FiniteDuration
+    )(block: => Unit): ScheduledFuture[_] = {
 
-    def prettyPrint: String = List(
-      (hours, "hours"),
-      (minutes, "min"),
-      (seconds, "sec")
-    ).map{ case (value, label) =>
-      (if (value > 0) s"${value} ${label}" else "")
-    }.mkString
-  }
-
-  case class Millis(ms: Long) extends Time(ms / 1000)
-  case class Seconds(s: Long) extends Time(s)
-  case class Minutes(m: Long) extends Time(m * 60)
-  case class   Hours(h: Long) extends Time(h * 60 * 60)
-
-
-
-  object InstanceTags {
-    val PRODUCT_TAG = InstanceTag("product", "loquat")
-
-    val STATUS_TAG_NAME = "status"
-
-    //for instances
-    val RUNNING    = InstanceTag(STATUS_TAG_NAME, "running")
-    val INSTALLING = InstanceTag(STATUS_TAG_NAME, "installing")
-    val IDLE       = InstanceTag(STATUS_TAG_NAME, "idle")
-    val PROCESSING = InstanceTag(STATUS_TAG_NAME, "processing")
-    val FINISHING  = InstanceTag(STATUS_TAG_NAME, "finishing")
-    val FAILED     = InstanceTag(STATUS_TAG_NAME, "failed")
-
-    val AUTO_SCALING_GROUP = "autoScalingGroup"
+      pool.scheduleAtFixedRate(
+        new Runnable { def run(): Unit = block },
+        after.toSeconds,
+        every.toSeconds,
+        SECONDS
+      )
+    }
   }
 
 
-  def tagAutoScalingGroup(as: AutoScaling, groupName: String, status: String): Unit = {
-    as.createTags(groupName, InstanceTags.PRODUCT_TAG)
-    as.createTags(groupName, InstanceTag(InstanceTags.AUTO_SCALING_GROUP, groupName))
-    as.createTags(groupName, InstanceTag(InstanceTags.STATUS_TAG_NAME, status))
-    as.createTags(groupName, InstanceTag("Name", groupName))
+  sealed trait AnyStatusTag {
+    val status: String
+    val instanceTag = InstanceTag(StatusTag.label, status)
   }
+  implicit def toAwsInstanceTag(st: AnyStatusTag): InstanceTag = st.instanceTag
+
+  class StatusTag(val status: String) extends AnyStatusTag
+
+  case object StatusTag {
+    val label: String = "status"
+
+    case object preparing   extends StatusTag("preparing")
+    case object running     extends StatusTag("running")
+
+    case object processing  extends StatusTag("processing")
+    case object idle        extends StatusTag("idle")
+    case object terminating extends StatusTag("terminating")
+    // case object failed      extends StatusTag("failed")
+  }
+
+  def tagAutoScalingGroup(as: AutoScaling, group: AutoScalingGroup, statusTag: AnyStatusTag): Unit = {
+    as.createTags(group.name, InstanceTag("product", "loquat"))
+    // TODO: loquat name/id
+    as.createTags(group.name, InstanceTag("group", group.name))
+    as.createTags(group.name, statusTag)
+  }
+
 
   @scala.annotation.tailrec
-  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: Time) : Option[R] = {
+  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: FiniteDuration) : Option[R] = {
     val resource = getResource
 
     if (resource.isEmpty && tries <= 0) {
-      Thread.sleep(timeStep.inSeconds * 1000)
+      Thread.sleep(timeStep.toMillis)
       waitForResource(getResource, tries - 1, timeStep)
     } else resource
   }
@@ -192,12 +205,16 @@ case object utils {
 
 
 [main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
-[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
 [main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
 [main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/logger.scala]: logger.scala.md
 [main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
-[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/manager.scala]: manager.scala.md
+[main/scala/ohnosequences/loquat/terminator.scala]: terminator.scala.md
 [main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
-[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
-[test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
-[test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md
+[main/scala/ohnosequences/loquat/worker.scala]: worker.scala.md
+[test/scala/ohnosequences/loquat/test/config.scala]: ../../../../test/scala/ohnosequences/loquat/test/config.scala.md
+[test/scala/ohnosequences/loquat/test/data.scala]: ../../../../test/scala/ohnosequences/loquat/test/data.scala.md
+[test/scala/ohnosequences/loquat/test/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/test/dataProcessing.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataProcessing.scala.md
+[test/scala/ohnosequences/loquat/test/md5.scala]: ../../../../test/scala/ohnosequences/loquat/test/md5.scala.md

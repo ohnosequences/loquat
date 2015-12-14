@@ -2,7 +2,7 @@
 ```scala
 package ohnosequences.loquat
 
-import dataProcessing._, configs._, utils._
+import utils._
 
 import ohnosequences.statika.bundles._
 
@@ -52,14 +52,15 @@ abstract class Loquat[
 
 
 
-protected[loquat] case object LoquatOps extends LazyLogging {
+private[loquat]
+case object LoquatOps extends LazyLogging {
 
   def deploy(
     config: AnyLoquatConfig,
     user: LoquatUser,
     managerUserScript: String
   ): Unit = {
-    logger.info(s"Deploying loquat: ${config.loquatName} v${config.loquatVersion}")
+    logger.info(s"Deploying loquat: ${config.loquatId}")
 
     if(user.validate.nonEmpty)
       logger.error("User validation failed. Fix it and try to deploy again.")
@@ -110,7 +111,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
             .map { asGroup =>
               aws.as.createAutoScalingGroup(asGroup)
               // TODO: make use of the managerGroup status tag
-              utils.tagAutoScalingGroup(aws.as, asGroup.name, "manager")
+              utils.tagAutoScalingGroup(aws.as, asGroup, StatusTag.preparing)
             }
         ),
         Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(Success(true))
@@ -129,7 +130,7 @@ protected[loquat] case object LoquatOps extends LazyLogging {
     aws: AWSClients,
     reason: AnyTerminationReason
   ): Unit = {
-    logger.info(s"undeploying loquat: ${config.loquatName} v${config.loquatVersion}")
+    logger.info(s"Undeploying loquat: ${config.loquatId}")
 
     val names = config.resourceNames
 
@@ -143,10 +144,6 @@ protected[loquat] case object LoquatOps extends LazyLogging {
 
     Step(s"deleting workers group: ${names.workersGroup}")(
       Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
-    ).execute
-
-    Step(s"deleting the temporary S3 object: ${config.dataMappingsUploaded}")(
-      Try { aws.s3.deleteObject(config.dataMappingsUploaded) }
     ).execute
 
     Step(s"deleting error queue: ${names.errorQueue}")(
@@ -199,12 +196,16 @@ protected[loquat] case object LoquatOps extends LazyLogging {
 
 
 [main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
-[main/scala/ohnosequences/loquat/daemons.scala]: daemons.scala.md
 [main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
 [main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/logger.scala]: logger.scala.md
 [main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
-[main/scala/ohnosequences/loquat/managers.scala]: managers.scala.md
+[main/scala/ohnosequences/loquat/manager.scala]: manager.scala.md
+[main/scala/ohnosequences/loquat/terminator.scala]: terminator.scala.md
 [main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
-[main/scala/ohnosequences/loquat/workers.scala]: workers.scala.md
-[test/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/dataMappings.scala.md
-[test/scala/ohnosequences/loquat/instructions.scala]: ../../../../test/scala/ohnosequences/loquat/instructions.scala.md
+[main/scala/ohnosequences/loquat/worker.scala]: worker.scala.md
+[test/scala/ohnosequences/loquat/test/config.scala]: ../../../../test/scala/ohnosequences/loquat/test/config.scala.md
+[test/scala/ohnosequences/loquat/test/data.scala]: ../../../../test/scala/ohnosequences/loquat/test/data.scala.md
+[test/scala/ohnosequences/loquat/test/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/test/dataProcessing.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataProcessing.scala.md
+[test/scala/ohnosequences/loquat/test/md5.scala]: ../../../../test/scala/ohnosequences/loquat/test/md5.scala.md
