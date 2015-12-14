@@ -24,7 +24,7 @@ trait AnyProcessingContext {
 
   /* user can get the file corresponding to the given data key */
   def inputFile[K <: AnyData](key: K)(implicit
-    isIn: K isOneOf DataSet#Keys#Types#Hola
+    isIn: K isOneOf DataSet#Keys#Types#AllTypes
   ): File = inputDir / key.label
 
   /* or create a file instance in the orking directory */
