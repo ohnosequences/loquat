@@ -2,7 +2,7 @@ package ohnosequences.loquat.test
 
 import ohnosequences.loquat._
 import ohnosequences.awstools._, regions.Region._, ec2._, InstanceType._, autoscaling._
-import ohnosequences.statika._, bundles._, aws._
+import ohnosequences.statika._, aws._
 
 case object config {
 

@@ -12,11 +12,17 @@ case object dataMappings {
 
   val dataMapping = DataMapping(processingBundle)(
     remoteInput =
-      matrix.inS3(input / matrix.label) ::
-      *[AnyDenotation { type Value = S3Resource }],
+      prefix("viva-loquat") ::
+      text("""bluh-blah!!!
+      |foo bar
+      |qux?
+      |¡buh™!
+      |""".stripMargin) ::
+      matrix(input / matrix.label) ::
+      *[AnyDenotation { type Value <: AnyRemoteResource }],
     remoteOutput =
-      transposed.inS3(output / transposed.label) ::
-      *[AnyDenotation { type Value = S3Resource }]
+      transposed(output / transposed.label) ::
+      *[AnyDenotation { type Value <: S3Resource }]
   )
 
 }
