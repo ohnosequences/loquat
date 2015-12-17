@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import ohnosequences.statika.bundles._
+import ohnosequences.statika._
 import ohnosequences.statika.aws._
 
 import ohnosequences.awstools.ec2._

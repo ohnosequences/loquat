@@ -15,8 +15,7 @@ libraryDependencies ++= Seq(
   "com.lihaoyi" %% "upickle" % "0.3.6",
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
-  "ohnosequences" %% "statika"     % "2.0.0-M4",
-  "ohnosequences" %% "aws-statika" % "2.0.0-M7",
+  "ohnosequences" %% "statika"     % "2.0.0-M5",
   "ohnosequences" %% "datasets"    % "0.2.0",
   // amazon:
   "ohnosequences" %% "aws-scala-tools" % "0.16.0",
@@ -37,7 +36,7 @@ fatArtifactSettings
 enablePlugins(BuildInfoPlugin)
 buildInfoPackage := "generated.metadata"
 buildInfoObject  := name.value.split("""\W""").map(_.capitalize).mkString
-buildInfoOptions := Seq(BuildInfoOption.Traits("ohnosequences.statika.bundles.AnyArtifactMetadata"))
+buildInfoOptions := Seq(BuildInfoOption.Traits("ohnosequences.statika.AnyArtifactMetadata"))
 buildInfoKeys    := Seq[BuildInfoKey](
   organization,
   version,

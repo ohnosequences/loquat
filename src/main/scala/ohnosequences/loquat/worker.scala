@@ -2,19 +2,21 @@ package ohnosequences.loquat
 
 import utils._
 
-import ohnosequences.statika.bundles._
-import ohnosequences.statika.instructions._
-import ohnosequences.statika.results._
+import ohnosequences.statika._
 
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3._
 import ohnosequences.awstools.AWSClients
+
 import com.typesafe.scalalogging.LazyLogging
+
 import better.files._
+
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
+
 import upickle.Js
 
 import com.amazonaws.auth.InstanceProfileCredentialsProvider

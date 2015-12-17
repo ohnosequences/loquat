@@ -2,9 +2,7 @@ package ohnosequences.loquat
 
 import utils._
 
-import ohnosequences.statika.bundles._
-import ohnosequences.statika.instructions._
-import ohnosequences.statika.results._
+import ohnosequences.statika._
 
 import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer

@@ -2,9 +2,7 @@ package ohnosequences.loquat
 
 import utils._
 
-import ohnosequences.statika.bundles._
-import ohnosequences.statika.instructions._
-import ohnosequences.statika.results._
+import ohnosequences.statika._
 
 import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
@@ -13,12 +11,17 @@ import scala.concurrent.duration._
 import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.s3._
 import ohnosequences.awstools.sqs
+
 import com.amazonaws.{ services => amzn }
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
+
 import java.util.concurrent._
+
 import scala.collection.JavaConversions._
 import scala.util.Try
+
 import better.files._
+
 
 private[loquat]
 case class TerminationDaemonBundle(

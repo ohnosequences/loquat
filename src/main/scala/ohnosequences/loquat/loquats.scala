@@ -2,13 +2,13 @@ package ohnosequences.loquat
 
 import utils._
 
-import ohnosequences.statika.bundles._
+import ohnosequences.statika._
 
 import ohnosequences.awstools.AWSClients
 
 import com.typesafe.scalalogging.LazyLogging
 
-import scala.util._
+import scala.util.Try
 
 
 trait AnyLoquat { loquat =>
@@ -112,10 +112,13 @@ case object LoquatOps extends LazyLogging {
               utils.tagAutoScalingGroup(aws.as, asGroup, StatusTag.preparing)
             }
         ),
-        Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(Success(true))
-      ).foldLeft[Try[_]](
-        { logger.info("Creating resources..."); Success(true) }
-      ) { (result: Try[_], next: Step[_]) =>
+        Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(
+          util.Success(true)
+        )
+      ).foldLeft[Try[_]] {
+        logger.info("Creating resources...")
+          util.Success(true)
+      } { (result: Try[_], next: Step[_]) =>
         result.flatMap(_ => next.execute)
       }
 
