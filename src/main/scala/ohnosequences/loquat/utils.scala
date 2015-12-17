@@ -22,11 +22,12 @@ case object utils {
   import java.util.concurrent._
 
 
-  type DataSetLocations[D <: AnyDataSet, L <: AnyDataLocation] =
-    D#Raw with AnyKList { type Bound = AnyDenotation { type Value = L } }
+  type ResourcesSet[D <: AnyDataSet, R <: AnyDataResource] =
+    D#Raw with AnyKList.withBound[AnyDenotation { type Value <: R }]
+    // { type Bound = AnyDenotation { type Value = R } }
 
-  def toMap[V <: AnyDataLocation](l: AnyKList.Of[AnyDenotation { type Value <: V }]): Map[String, V#Location] =
-    l.asList.map{ d => (d.tpe.label, d.value.location) }.toMap
+  def toMap[V <: AnyDataResource](l: AnyKList.Of[AnyDenotation { type Value <: V }]): Map[String, V] =
+    l.asList.map{ d => (d.tpe.label, d.value) }.toMap
 
 
   trait AnyStep extends LazyLogging

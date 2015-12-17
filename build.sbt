@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
   "ohnosequences" %% "statika"     % "2.0.0-M5",
-  "ohnosequences" %% "datasets"    % "0.2.0",
+  "ohnosequences" %% "datasets"    % "0.3.0-SNAPSHOT",
   // amazon:
   "ohnosequences" %% "aws-scala-tools" % "0.16.0",
   // files:
@@ -45,6 +45,5 @@ buildInfoKeys    := Seq[BuildInfoKey](
 )
 
 //// Uncomment for testing: ////
-
-// // For including test code in the fat artifact:
-// unmanagedSourceDirectories in Compile += (scalaSource in Test).value
+// For including test code in the fat artifact:
+unmanagedSourceDirectories in Compile += (scalaSource in Test).value

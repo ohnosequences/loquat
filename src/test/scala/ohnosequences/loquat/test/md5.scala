@@ -2,7 +2,7 @@
 //
 // import ohnosequences.loquat._, test.data._
 // import ohnosequences.statika.instructions._
-// import ohnosequences.datasets._, FileDataLocation._
+// import ohnosequences.datasets._, FileResource._
 // import ohnosequences.cosas._, klists._, types._, records._
 // import better.files._
 //

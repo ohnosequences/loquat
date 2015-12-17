@@ -43,7 +43,7 @@ trait AnyDataProcessingBundle extends AnyBundle {
   type Output <: AnyDataSet
   val  output: Output
 
-  type OutputFiles = DataSetLocations[Output, FileDataLocation]
+  type OutputFiles = ResourcesSet[Output, FileResource]
 
   // this is where you define what to do
   def process(context: ProcessingContext[Input]): AnyInstructions { type Out <: OutputFiles }
@@ -53,7 +53,9 @@ trait AnyDataProcessingBundle extends AnyBundle {
     process(ProcessingContext[Input](workingDir, inputDir))
       .run(workingDir.toJava) match {
         case Failure(tr) => Failure(tr)
-        case Success(tr, of) => Success(tr, toMap(of))
+        case Success(tr, of) => Success(tr, 
+          toMap(of).map { case (k, v) => (k, v.resource) }
+        )
       }
   }
 

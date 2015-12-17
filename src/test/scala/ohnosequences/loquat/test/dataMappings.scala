@@ -1,7 +1,7 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.awstools.s3._
-import ohnosequences.datasets._, S3DataLocation._
+import ohnosequences.datasets._, S3Resource._
 import ohnosequences.cosas._, klists._, types._
 import ohnosequences.loquat._, test.data._, test.dataProcessing._
 
@@ -12,11 +12,17 @@ case object dataMappings {
 
   val dataMapping = DataMapping(processingBundle)(
     remoteInput =
-      matrix.inS3(input / matrix.label) ::
-      *[AnyDenotation { type Value = S3DataLocation }],
+      prefix("viva-loquat") ::
+      text("""bluh-blah!!!
+      |foo bar
+      |qux?
+      |¡buh™!
+      |""".stripMargin) ::
+      matrix(input / matrix.label) ::
+      *[AnyDenotation { type Value <: AnyRemoteResource }],
     remoteOutput =
-      transposed.inS3(output / transposed.label) ::
-      *[AnyDenotation { type Value = S3DataLocation }]
+      transposed(output / transposed.label) ::
+      *[AnyDenotation { type Value <: S3Resource }]
   )
 
 }

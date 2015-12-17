@@ -18,10 +18,10 @@ trait AnyDataMapping {
 
   /* These are records with references to the remote locations of
      where to get inputs and where to put outputs of the dataMapping */
-  type RemoteInput = DataSetLocations[DataProcessing#Input, S3DataLocation]
+  type RemoteInput = ResourcesSet[DataProcessing#Input, AnyRemoteResource]
   val  remoteInput: RemoteInput
 
-  type RemoteOutput = DataSetLocations[DataProcessing#Output, S3DataLocation]
+  type RemoteOutput = ResourcesSet[DataProcessing#Output, S3Resource]
   val  remoteOutput: RemoteOutput
 
 }
@@ -29,8 +29,8 @@ trait AnyDataMapping {
 case class DataMapping[
   DP <: AnyDataProcessingBundle
 ](val dataProcessing: DP)(
-  val remoteInput: DataSetLocations[DP#Input, S3DataLocation],
-  val remoteOutput: DataSetLocations[DP#Output, S3DataLocation]
+  val remoteInput: ResourcesSet[DP#Input, AnyRemoteResource],
+  val remoteOutput: ResourcesSet[DP#Output, S3Resource]
 ) extends AnyDataMapping {
 
   type DataProcessing = DP
@@ -40,9 +40,8 @@ case class DataMapping[
 case class ProcessingResult(id: String, message: String)
 
 /* This is easy to parse/serialize, but it's only for internal use. */
-private[loquat]
-case class SimpleDataMapping(
+private[loquat] case class SimpleDataMapping(
   val id: String,
-  val inputs: Map[String, AnyS3Address],
-  val outputs: Map[String, AnyS3Address]
+  val inputs: Map[String, AnyRemoteResource],
+  val outputs: Map[String, S3Resource]
 )
