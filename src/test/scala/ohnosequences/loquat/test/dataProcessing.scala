@@ -3,7 +3,7 @@ package ohnosequences.loquat.test
 import ohnosequences.datasets._
 import ohnosequences.loquat._, test.data._
 import ohnosequences.statika.instructions._
-import ohnosequences.datasets._, FileDataLocation._
+import ohnosequences.datasets._, FileResource._
 import ohnosequences.cosas._, klists._, types._, records._
 import better.files._
 
@@ -30,7 +30,7 @@ case object dataProcessing {
       } -&-
       success("transposed",
         transposed.inFile(outFile) ::
-        *[AnyDenotation { type Value = FileDataLocation }]
+        *[AnyDenotation { type Value = FileResource }]
       )
     }
   }
