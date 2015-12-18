@@ -15,8 +15,8 @@ case object config {
     // TODO: create a role for testing loquat
     val iamRoleName: String = "loquat.testing"
 
-    type AMIEnv = amznAMIEnv[defaultAMI.type]
-    val  amiEnv = amznAMIEnv(defaultAMI): AMIEnv
+    type AMI = defaultAMI.type
+    lazy val ami: AMI = defaultAMI
 
     val metadata: AnyArtifactMetadata = generated.metadata.Loquat
 

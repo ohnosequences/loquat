@@ -7,8 +7,6 @@ import ohnosequences.statika._
 import com.typesafe.scalalogging.LazyLogging
 
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
-import ohnosequences.awstools.AWSClients
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -40,7 +38,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     TerminationDaemonBundle(config, scheduler)
   )
 
-  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
+  lazy val aws = instanceAWSClients(config)
 
   def uploadInitialDataMappings(dataMappings: List[AnyDataMapping]): Try[Unit] = {
     val managerStatus = aws.as.getTagValue(config.resourceNames.managerGroup, StatusTag.label)

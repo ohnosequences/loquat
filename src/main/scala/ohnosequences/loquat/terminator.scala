@@ -8,12 +8,10 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.s3._
 import ohnosequences.awstools.sqs
 
 import com.amazonaws.{ services => amzn }
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
 
 import java.util.concurrent._
 
@@ -29,7 +27,7 @@ case class TerminationDaemonBundle(
   val scheduler: Scheduler
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
+  lazy val aws = instanceAWSClients(config)
 
   private val successResults = scala.collection.mutable.HashMap[String, String]()
   private val failedResults = scala.collection.mutable.HashMap[String, String]()

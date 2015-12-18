@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
   "ohnosequences" %% "statika"     % "2.0.0-M5",
-  "ohnosequences" %% "datasets"    % "0.3.0-SNAPSHOT",
+  "ohnosequences" %% "datasets"    % "0.3.0",
   // amazon:
   "ohnosequences" %% "aws-scala-tools" % "0.16.0",
   // files:
