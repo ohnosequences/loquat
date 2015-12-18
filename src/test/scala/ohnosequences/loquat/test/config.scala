@@ -9,14 +9,14 @@ case object config {
   val defaultAMI = AmazonLinuxAMI(Ireland, HVM, InstanceStore)
 
   case object testConfig extends AnyLoquatConfig { config =>
-    val bucketName = "loquat.testing"
     val loquatName = "experimental"
 
     // TODO: create a role for testing loquat
-    val iamRoleName: String = "loquat.testing"
+    val iamRoleName = "loquat.testing"
+    val logsBucketName = "loquat.testing"
 
-    type AMI = defaultAMI.type
-    lazy val ami: AMI = defaultAMI
+    // type AMI = defaultAMI.type
+    // lazy val ami: AMI = defaultAMI
 
     val metadata: AnyArtifactMetadata = generated.metadata.Loquat
 

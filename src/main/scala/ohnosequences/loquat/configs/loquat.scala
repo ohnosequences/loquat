@@ -16,30 +16,20 @@ abstract class AnyLoquatConfig extends AnyConfig {
   // TODO: limit allowed symbols and check on validation
   val loquatName: String
 
-  /* Metadata generated for your loquat project */
-  val metadata: AnyArtifactMetadata
-
-  /* AMI that will be used for manager and worker instances */
-  // NOTE: we need the AMI type here for the manager/worker compats
-  type AMI <: AnyAmazonLinuxAMI
-  val  ami: AMI
-
   /* IAM role that will be used by the autoscaling groups */
   val iamRoleName: String
 
   /* An S3 bucket for saving logs */
-  val bucketName: String
+  val logsBucketName: String
 
-  type ManagerConfig <: AnyManagerConfig
-  val  managerConfig: ManagerConfig
+  /* Metadata generated for your loquat project */
+  val metadata: AnyArtifactMetadata
 
-  type WorkersConfig <: AnyWorkersConfig
-  val  workersConfig: WorkersConfig
+  val managerConfig: AnyManagerConfig
+  val workersConfig: AnyWorkersConfig
 
-  /* Termination conditions */
   val terminationConfig: TerminationConfig
 
-  /* List of tiny or big dataMappings */
   val dataMappings: List[AnyDataMapping]
 
 
@@ -47,20 +37,17 @@ abstract class AnyLoquatConfig extends AnyConfig {
   /* Here follow all the values that are dependent on those defined on top */
   lazy val configLabel: String = s"${loquatName} config"
 
+  lazy val ami: AnyAmazonLinuxAMI = managerConfig.instanceSpecs.ami
+  lazy val amiEnv: AnyLinuxAMIEnvironment = amznAMIEnv(ami)
   lazy val region: Region = ami.region
 
-  type AMIEnv = amznAMIEnv[AMI]
-  lazy val amiEnv: AMIEnv = amznAMIEnv(ami)
-
-  // FIXME: put this constant somewhere else
   final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
 
-  // FIXME: should check that the url string parses to an object address
   lazy final val fatArtifactS3Object: S3Object = {
     val s3url = """s3://(.+)/(.+)""".r
     metadata.artifactUrl match {
       case s3url(bucket, key) => S3Object(bucket, key)
-      case _ => throw new Error("Wrong fat jar url, it should be published to S3")
+      case _ => throw new Error("Wrong fat jar url, it should be an S3 address")
     }
   }
 
@@ -69,7 +56,7 @@ abstract class AnyLoquatConfig extends AnyConfig {
   lazy final val artifactVersion: String = metadata.version.replace(".", "-").toLowerCase
   lazy final val loquatId: String = s"${loquatName}-${artifactName}-${artifactVersion}"
 
-  lazy final val resourceNames: ResourceNames = ResourceNames(loquatId, bucketName)
+  lazy final val resourceNames: ResourceNames = ResourceNames(loquatId, logsBucketName)
 
 
 

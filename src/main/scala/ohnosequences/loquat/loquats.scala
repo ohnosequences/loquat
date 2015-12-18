@@ -58,8 +58,6 @@ case object LoquatOps extends LazyLogging {
     user: LoquatUser,
     managerUserScript: String
   ): Unit = {
-    logger.info(s"Deploying loquat: ${config.loquatId}")
-
 
     if (Try( user.localCredentials.getCredentials ).isFailure) {
       logger.error(s"Couldn't load local credentials: ${user.localCredentials}")
@@ -81,6 +79,9 @@ case object LoquatOps extends LazyLogging {
         user.keypairName,
         config.iamRoleName
       )
+
+      logger.info(s"Deploying loquat: ${config.loquatId}")
+
 
       Seq(
         Step( s"Creating input queue: ${names.inputQueue}" )(

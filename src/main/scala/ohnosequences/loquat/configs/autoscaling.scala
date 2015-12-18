@@ -9,7 +9,7 @@ trait AnyAutoScalingConfig extends AnyConfig { conf =>
 
   val subConfigs: Seq[AnyConfig] = Seq()
 
-  type InstanceSpecs <: AnyInstanceSpecs
+  type InstanceSpecs <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI }
   val  instanceSpecs: InstanceSpecs
 
   type PurchaseModel <: AnyPurchaseModel
@@ -74,7 +74,7 @@ trait AnyManagerConfig extends AnyAutoScalingConfig {
 }
 
 case class ManagerConfig[
-  IS <: AnyInstanceSpecs,
+  IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI },
   PM <: AnyPurchaseModel
 ](instanceSpecs: IS,
   purchaseModel: PM,
@@ -91,7 +91,7 @@ case class ManagerConfig[
 trait AnyWorkersConfig extends AnyAutoScalingConfig
 
 case class WorkersConfig[
-  IS <: AnyInstanceSpecs,
+  IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI },
   PM <: AnyPurchaseModel
 ](instanceSpecs: IS,
   purchaseModel: PM,
