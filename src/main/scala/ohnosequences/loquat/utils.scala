@@ -10,7 +10,9 @@ case object utils {
   import ohnosequences.awstools.ec2._
   import ohnosequences.awstools.s3._
   import ohnosequences.awstools.autoscaling.{ AutoScaling, AutoScalingGroup }
+  import ohnosequences.awstools.AWSClients
 
+  import com.amazonaws.auth.InstanceProfileCredentialsProvider
   import com.amazonaws.services.s3.transfer._
   import com.amazonaws.services.s3.model.{ S3Object => _, _ }
   import com.amazonaws.event._
@@ -29,6 +31,11 @@ case object utils {
   def toMap[V <: AnyDataResource](l: AnyKList.Of[AnyDenotation { type Value <: V }]): Map[String, V] =
     l.asList.map{ d => (d.tpe.label, d.value) }.toMap
 
+
+  def instanceAWSClients(config: AnyLoquatConfig) = AWSClients.create(
+    credentialsProvider = new InstanceProfileCredentialsProvider(),
+    region = config.region
+  )
 
   trait AnyStep extends LazyLogging
   case class Step[T](msg: String)(action: => Try[T]) extends AnyStep {

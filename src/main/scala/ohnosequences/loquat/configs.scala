@@ -353,7 +353,6 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
   // TODO: add the artifact check somewhere else
   def validationErrors: Seq[String] = Seq()
-  //   val s3  = S3.create(creds)
   //   val artifactErr =
   //     if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
   //     else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")

@@ -8,9 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.s3._
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import java.util.concurrent._
 import scala.util.Try
 import better.files._
@@ -22,7 +20,7 @@ case class LogUploaderBundle(
   val scheduler: Scheduler
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
+  lazy val aws = instanceAWSClients(config)
 
   val logFile = file"/root/log.txt"
   val bucket = config.resourceNames.bucket

@@ -9,7 +9,6 @@ import ohnosequences.datasets._
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3._
-import ohnosequences.awstools.AWSClients
 
 import com.typesafe.scalalogging.LazyLogging
 
@@ -21,7 +20,6 @@ import scala.util.Try
 
 import upickle.Js
 
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.s3.transfer._
 import com.amazonaws.services.s3.model.ObjectMetadata
 
@@ -64,7 +62,7 @@ class DataProcessor(
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
 
-  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
+  lazy val aws = instanceAWSClients(config)
 
   // FIXME: don't use Option.get
   val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get

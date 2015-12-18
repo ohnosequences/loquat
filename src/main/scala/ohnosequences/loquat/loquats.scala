@@ -34,7 +34,7 @@ trait AnyLoquat { loquat =>
   final def undeploy(user: LoquatUser): Unit =
     LoquatOps.undeploy(
       config,
-      AWSClients.create(user.localCredentials),
+      AWSClients.create(user.localCredentials, config.region),
       TerminateManually
     )
 }
@@ -65,7 +65,7 @@ case object LoquatOps extends LazyLogging {
     else if (config.validate.nonEmpty)
       logger.error("Config validation failed. Fix config and try to deploy again.")
     else {
-      val aws = AWSClients.create(user.localCredentials)
+      val aws = AWSClients.create(user.localCredentials, config.region)
       val names = config.resourceNames
 
       val managerGroup = config.managerConfig.autoScalingGroup(
