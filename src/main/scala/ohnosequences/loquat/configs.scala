@@ -3,6 +3,7 @@ package ohnosequences.loquat
 import ohnosequences.statika._
 import ohnosequences.statika.aws._
 
+import ohnosequences.awstools.regions._
 import ohnosequences.awstools.ec2._
 import ohnosequences.awstools.s3._
 import ohnosequences.awstools.autoscaling._
@@ -294,11 +295,13 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
   /* AMI that will be used for manager and worker instances */
   // NOTE: we need the AMI type here for the manager/worker compats
-  type AMIEnv <: AnyLinuxAMIEnvironment
-  val  amiEnv: AMIEnv
+  type AMI <: AnyAmazonLinuxAMI
+  val  ami: AMI
 
-  /* IAM rolse that will be used by the autoscaling groups */
+  /* IAM role that will be used by the autoscaling groups */
   val iamRoleName: String
+
+  /* An S3 bucket for saving logs */
   val bucketName: String
 
   type ManagerConfig <: AnyManagerConfig
@@ -313,10 +316,14 @@ abstract class AnyLoquatConfig extends AnyConfig {
   /* List of tiny or big dataMappings */
   val dataMappings: List[AnyDataMapping]
 
-  // TODO: AWS region should be also configurable
 
 
   /* Here follow all the values that are dependent on those defined on top */
+
+  lazy val region: Region = ami.region
+
+  type AMIEnv = amznAMIEnv[AMI]
+  lazy val amiEnv: AMIEnv = amznAMIEnv(ami)
 
   // FIXME: put this constant somewhere else
   final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
