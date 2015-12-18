@@ -2,6 +2,9 @@ package ohnosequences.loquat
 
 import scala.concurrent.duration._
 
+import ohnosequences.awstools.AWSClients
+
+
 trait AnyTerminationReason {
   def check: Boolean
   def msg: String
@@ -64,9 +67,9 @@ case class TerminationConfig(
   taskProcessingTimeout: Option[FiniteDuration] = None,
   // maximum time for everything
   globalTimeout: Option[FiniteDuration] = None
-) extends Config() {
+) extends Config("Termination config")() {
 
-  def validationErrors: Seq[String] = {
+  def validationErrors(aws: AWSClients): Seq[String] = {
     val treshholdErr = errorsThreshold match {
       case Some(n) if n <= 0 => Seq(s"Errors threshold has to be positive: ${n}")
       case _ => Seq()

@@ -1,5 +1,6 @@
 package ohnosequences.loquat
 
+import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.ec2.EC2
 
 import com.amazonaws.auth.AWSCredentialsProvider
@@ -15,26 +16,20 @@ case class LoquatUser(
   val localCredentials: AWSCredentialsProvider,
   /* keypair name for connecting to the loquat instances */
   val keypairName: String
-) extends Config() {
+) extends Config("User config")() {
 
   def   deploy[L <: AnyLoquat](l: L): Unit = l.deploy(this)
   def undeploy[L <: AnyLoquat](l: L): Unit = l.undeploy(this)
 
-  def validationErrors: Seq[String] = {
+  def validationErrors(aws: AWSClients): Seq[String] = {
+
     val emailErr =
       if (email.contains('@')) Seq()
       else Seq(s"User email [${email}] has invalid format")
 
     emailErr ++ {
-      if (Try( localCredentials.getCredentials ).isFailure)
-        Seq(s"Couldn't load your local credentials: ${localCredentials}")
-        // TODO: add account permissions validation
-      else {
-        // FIXME: this should use region:
-        val ec2 = EC2.create(localCredentials)
-        if(ec2.isKeyPairExists(keypairName)) Seq()
-        else Seq(s"key pair: ${keypairName} doesn't exists")
-      }
+      if(aws.ec2.isKeyPairExists(keypairName)) Seq()
+      else Seq(s"key pair: ${keypairName} doesn't exists")
     }
   }
 }

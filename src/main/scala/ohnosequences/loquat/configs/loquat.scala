@@ -3,6 +3,7 @@ package ohnosequences.loquat
 import ohnosequences.statika.AnyArtifactMetadata
 import ohnosequences.statika.aws._
 
+import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.regions.Region
 import ohnosequences.awstools.ec2.AnyAmazonLinuxAMI
 import ohnosequences.awstools.s3.S3Object
@@ -44,6 +45,7 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
 
   /* Here follow all the values that are dependent on those defined on top */
+  lazy val configLabel: String = s"${loquatName} config"
 
   lazy val region: Region = ami.region
 
@@ -76,10 +78,9 @@ abstract class AnyLoquatConfig extends AnyConfig {
     workersConfig
   )
 
-  // TODO: add the artifact check somewhere else
-  def validationErrors: Seq[String] = Seq()
-  //   val artifactErr =
-  //     if (s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
-  //     else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
-  // }
+  def validationErrors(aws: AWSClients): Seq[String] = {
+    if (aws.s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
+    else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+  }
+
 }

@@ -2,9 +2,12 @@ package ohnosequences.loquat
 
 import ohnosequences.awstools.ec2._
 import ohnosequences.awstools.autoscaling._
+import ohnosequences.awstools.AWSClients
 
 
-trait AnyAutoScalingConfig extends Config() { conf =>
+trait AnyAutoScalingConfig extends AnyConfig { conf =>
+
+  val subConfigs: Seq[AnyConfig] = Seq()
 
   type InstanceSpecs <: AnyInstanceSpecs
   val  instanceSpecs: InstanceSpecs
@@ -20,7 +23,7 @@ trait AnyAutoScalingConfig extends Config() { conf =>
   // TODO: use some better type for this
   val deviceMapping: Map[String, String]
 
-  def validationErrors: Seq[String] = {
+  def validationErrors(aws: AWSClients): Seq[String] = {
 
     val groupSizeErros: Seq[String] = {
       if ( groupSize.min < 0 ) Seq(s"Minimal autoscaling group size has to be non-negative: ${groupSize.min}")
@@ -77,6 +80,7 @@ case class ManagerConfig[
   purchaseModel: PM,
   availabilityZones: List[String] = List()
 ) extends AnyManagerConfig {
+  val configLabel = "Manager config"
 
   type InstanceSpecs = IS
   type PurchaseModel = PM
@@ -96,6 +100,7 @@ case class WorkersConfig[
   // TODO: use some better type for this
   deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
 ) extends AnyWorkersConfig {
+  val configLabel = "Workers config"
 
   type InstanceSpecs = IS
   type PurchaseModel = PM

@@ -60,12 +60,20 @@ case object LoquatOps extends LazyLogging {
   ): Unit = {
     logger.info(s"Deploying loquat: ${config.loquatId}")
 
-    if(user.validate.nonEmpty)
-      logger.error("User validation failed. Fix it and try to deploy again.")
-    else if (config.validate.nonEmpty)
-      logger.error("Config validation failed. Fix config and try to deploy again.")
-    else {
+
+    if (Try( user.localCredentials.getCredentials ).isFailure) {
+      logger.error(s"Couldn't load local credentials: ${user.localCredentials}")
+    } else {
       val aws = AWSClients.create(user.localCredentials, config.region)
+
+      if(user.validateWithLogging(aws).nonEmpty) {
+        logger.error("User validation failed. Fix it and try to deploy again.")
+        return
+      } else if (config.validateWithLogging(aws).nonEmpty) {
+        logger.error("Config validation failed. Fix config and try to deploy again.")
+        return
+      }
+
       val names = config.resourceNames
 
       val managerGroup = config.managerConfig.autoScalingGroup(
