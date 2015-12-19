@@ -204,10 +204,10 @@ class DataProcessor(
                 file,
                 s3Address,
                 Map(
-                  "artifactOrg"     -> config.metadata.organization,
-                  "artifactName"    -> config.metadata.artifact,
-                  "artifactVersion" -> config.metadata.version,
-                  "artifactUrl"     -> config.metadata.artifactUrl
+                  "artifact-org"     -> config.metadata.organization,
+                  "artifact-name"    -> config.metadata.artifact,
+                  "artifact-version" -> config.metadata.version,
+                  "artifact-url"     -> config.metadata.artifactUrl
                 )
               )
             }
