@@ -18,6 +18,7 @@ case class LoquatUser(
   val keypairName: String
 ) extends Config("User config")() {
 
+  def    check[L <: AnyLoquat](l: L): Unit = l.check(this)
   def   deploy[L <: AnyLoquat](l: L): Unit = l.deploy(this)
   def undeploy[L <: AnyLoquat](l: L): Unit = l.undeploy(this)
 
@@ -33,11 +34,4 @@ case class LoquatUser(
     }
   }
 
-  def check(config: AnyLoquatConfig): Unit = {
-
-    val aws = AWSClients.create(localCredentials, config.region)
-
-    if (config.validateWithLogging(aws).isEmpty)
-      logger.info("The config seems to be fine!")
-  }
 }

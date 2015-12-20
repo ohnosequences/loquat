@@ -30,6 +30,7 @@ trait AnyLoquat { loquat =>
 
   case object managerCompat extends CompatibleWithPrefix(fullName)(config.amiEnv, manager, config.metadata)
 
+  final def check(user: LoquatUser): Unit = LoquatOps.check(config, user)
   final def deploy(user: LoquatUser): Unit = LoquatOps.deploy(config, user, managerCompat.userScript)
   final def undeploy(user: LoquatUser): Unit =
     LoquatOps.undeploy(
@@ -53,85 +54,97 @@ abstract class Loquat[
 private[loquat]
 case object LoquatOps extends LazyLogging {
 
+  def check(
+    config: AnyLoquatConfig,
+    user: LoquatUser
+  ): Either[String, AWSClients] = {
+
+    if (Try( user.localCredentials.getCredentials ).isFailure) {
+      Left(s"Couldn't load local credentials: ${user.localCredentials}")
+    } else {
+      val aws = AWSClients.create(user.localCredentials, config.region)
+
+      if(user.validateWithLogging(aws).nonEmpty) Left("User validation failed")
+      else if (config.validateWithLogging(aws).nonEmpty) Left("Config validation failed")
+      else Right(aws)
+    }
+
+  }
+
+
   def deploy(
     config: AnyLoquatConfig,
     user: LoquatUser,
     managerUserScript: String
   ): Unit = {
 
-    if (Try( user.localCredentials.getCredentials ).isFailure) {
-      logger.error(s"Couldn't load local credentials: ${user.localCredentials}")
-    } else {
-      val aws = AWSClients.create(user.localCredentials, config.region)
+    LoquatOps.check(config, user) match {
+      case Left(msg) => logger.error(msg)
+      case Right(aws) => {
 
-      if(user.validateWithLogging(aws).nonEmpty) {
-        logger.error("User validation failed. Fix it and try to deploy again.")
-        return
-      } else if (config.validateWithLogging(aws).nonEmpty) {
-        logger.error("Config validation failed. Fix config and try to deploy again.")
-        return
-      }
+        val names = config.resourceNames
 
-      val names = config.resourceNames
+        val managerGroup = config.managerConfig.autoScalingGroup(
+          config.resourceNames.managerGroup,
+          user.keypairName,
+          config.iamRoleName
+        )
 
-      val managerGroup = config.managerConfig.autoScalingGroup(
-        config.resourceNames.managerGroup,
-        user.keypairName,
-        config.iamRoleName
-      )
-
-      logger.info(s"Deploying loquat: ${config.loquatId}")
+        logger.info(s"Deploying loquat: ${config.loquatId}")
 
 
-      Seq(
-        Step( s"Creating input queue: ${names.inputQueue}" )(
-          Try { aws.sqs.createQueue(names.inputQueue) }
-        ),
-        Step( s"Creating output queue: ${names.outputQueue}" )(
-          Try { aws.sqs.createQueue(names.outputQueue) }
-        ),
-        Step( s"Creating error queue: ${names.errorQueue}" )(
-          Try { aws.sqs.createQueue(names.errorQueue) }
-        ),
-        Step( s"Checking the bucket: ${names.bucket}" )(
-          Try {
-            if(aws.s3.bucketExists(names.bucket)) {
-              logger.info(s"Bucket [${names.bucket}] already exists.")
-            } else {
-              logger.info(s"Bucket [${names.bucket}] doesn't exists. Trying to create it.")
-              aws.s3.createBucket(names.bucket)
-            }
-          }
-        ),
-        Step( s"Creating notification topic: ${names.notificationTopic}" )(
-          Try { aws.sns.createTopic(names.notificationTopic) }
-            .map { topic =>
-              if (!topic.isEmailSubscribed(user.email.toString)) {
-                logger.info(s"Subscribing [${user.email}] to the notification topic")
-                topic.subscribeEmail(user.email.toString)
-                logger.info("Check your email and confirm subscription")
+        Seq(
+          Step( s"Creating input queue: ${names.inputQueue}" )(
+            Try { aws.sqs.createQueue(names.inputQueue) }
+          ),
+          Step( s"Creating output queue: ${names.outputQueue}" )(
+            Try { aws.sqs.createQueue(names.outputQueue) }
+          ),
+          Step( s"Creating error queue: ${names.errorQueue}" )(
+            Try { aws.sqs.createQueue(names.errorQueue) }
+          ),
+          Step( s"Checking the bucket: ${names.bucket}" )(
+            Try {
+              if(aws.s3.bucketExists(names.bucket)) {
+                logger.info(s"Bucket [${names.bucket}] already exists.")
+              } else {
+                logger.info(s"Bucket [${names.bucket}] doesn't exists. Trying to create it.")
+                aws.s3.createBucket(names.bucket)
               }
             }
-        ),
-        Step( s"Creating manager group: ${managerGroup.name}" )(
-          Try { aws.as.fixAutoScalingGroupUserData(managerGroup, managerUserScript) }
-            .map { asGroup =>
-              aws.as.createAutoScalingGroup(asGroup)
-              // TODO: make use of the managerGroup status tag
-              utils.tagAutoScalingGroup(aws.as, asGroup, StatusTag.preparing)
-            }
-        ),
-        Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(
-          util.Success(true)
-        )
-      ).foldLeft[Try[_]] {
-        logger.info("Creating resources...")
-          util.Success(true)
-      } { (result: Try[_], next: Step[_]) =>
-        result.flatMap(_ => next.execute)
+          ),
+          Step( s"Creating notification topic: ${names.notificationTopic}" )(
+            Try { aws.sns.createTopic(names.notificationTopic) }
+              .map { topic =>
+                if (!topic.isEmailSubscribed(user.email.toString)) {
+                  logger.info(s"Subscribing [${user.email}] to the notification topic")
+                  topic.subscribeEmail(user.email.toString)
+                  logger.info("Check your email and confirm subscription")
+                }
+              }
+          ),
+          Step( s"Creating manager group: ${managerGroup.name}" )(
+            Try { aws.as.fixAutoScalingGroupUserData(managerGroup, managerUserScript) }
+              .map { asGroup =>
+                aws.as.createAutoScalingGroup(asGroup)
+                // TODO: make use of the managerGroup status tag
+                utils.tagAutoScalingGroup(aws.as, asGroup, StatusTag.preparing)
+              }
+          ),
+          Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(
+            util.Success(true)
+          )
+        ).foldLeft[Try[_]] {
+          logger.info("Creating resources...")
+            util.Success(true)
+        } { (result: Try[_], next: Step[_]) =>
+          result.flatMap(_ => next.execute)
+        }
+
       }
 
     }
+
   }
 
 
