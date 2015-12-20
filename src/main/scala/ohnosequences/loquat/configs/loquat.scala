@@ -14,6 +14,8 @@ import ohnosequences.datasets._
 
 import better.files._
 
+import scala.util.Try
+
 
 /* Configuration for loquat */
 abstract class AnyLoquatConfig extends AnyConfig {
@@ -75,40 +77,25 @@ abstract class AnyLoquatConfig extends AnyConfig {
       Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
     else {
 
-      val allInputs: List[Map[String, AnyS3Address]] = dataMappings map { dataMapping =>
+      dataMappings flatMap { dataMapping =>
 
-        val inputs: Map[String, AnyS3Address] =
-          toMap(dataMapping.remoteInput).foldLeft(Map[String, AnyS3Address]()) { (acc, x) =>
-            x match {
-              case (key, S3Resource(address)) => acc + (key -> address)
-              case _ => acc
-            }
+        val inputs: Map[String, AnyRemoteResource] = toMap(dataMapping.remoteInput)
+
+        // if an input object doesn't exist, we return an arror message
+        inputs flatMap {
+          case (key, S3Resource(s3address)) => {
+            // TODO: check that it works for S3Folders fine
+            val exists: Boolean = Try(
+              aws.s3.s3.getObjectMetadata(s3address.bucket, s3address.key)
+            ).isSuccess
+
+            if (exists) None
+            else Some(s"Input object [${key}] does not exists at the address: [${s3address.url}]")
           }
-
-        inputs
-      }
-
-      import scala.util.Try
-
-      val inputsCheck: Seq[String] = allInputs flatMap { inputs =>
-
-        inputs flatMap { case (key, address) =>
-
-          val exists: Boolean = Try {
-            aws.s3.s3.getObjectMetadata(address.bucket, address.key)
-          }.isSuccess
-
-          if (exists) None
-          else Some(
-            s"Input object [${key}] does not exists at the address: [${address.url}]"
-          )
-
+          case _ => None
         }
       }
-
-      inputsCheck
     }
-
   }
 
 }
