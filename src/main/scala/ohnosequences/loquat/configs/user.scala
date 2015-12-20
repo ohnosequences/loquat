@@ -18,6 +18,7 @@ case class LoquatUser(
   val keypairName: String
 ) extends Config("User config")() {
 
+  def    check[L <: AnyLoquat](l: L): Unit = l.check(this)
   def   deploy[L <: AnyLoquat](l: L): Unit = l.deploy(this)
   def undeploy[L <: AnyLoquat](l: L): Unit = l.undeploy(this)
 
@@ -32,4 +33,5 @@ case class LoquatUser(
       else Seq(s"key pair: ${keypairName} doesn't exists")
     }
   }
+
 }

@@ -37,7 +37,7 @@ case object config {
       terminateAfterInitialDataMappings = true
     )
 
-    val N = 100
+    val N = 10
     val dataMappings: List[AnyDataMapping] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
   }
 
