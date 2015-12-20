@@ -32,4 +32,12 @@ case class LoquatUser(
       else Seq(s"key pair: ${keypairName} doesn't exists")
     }
   }
+
+  def check(config: AnyLoquatConfig): Unit = {
+
+    val aws = AWSClients.create(localCredentials, config.region)
+
+    if (config.validateWithLogging(aws).isEmpty)
+      logger.info("The config seems to be fine!")
+  }
 }

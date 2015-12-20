@@ -1,12 +1,16 @@
 package ohnosequences.loquat
 
+import utils._
+
 import ohnosequences.statika.AnyArtifactMetadata
 import ohnosequences.statika.aws._
 
 import ohnosequences.awstools.AWSClients
 import ohnosequences.awstools.regions.Region
 import ohnosequences.awstools.ec2.AnyAmazonLinuxAMI
-import ohnosequences.awstools.s3.S3Object
+import ohnosequences.awstools.s3._
+
+import ohnosequences.datasets._
 
 import better.files._
 
@@ -66,8 +70,45 @@ abstract class AnyLoquatConfig extends AnyConfig {
   )
 
   def validationErrors(aws: AWSClients): Seq[String] = {
-    if (aws.s3.objectExists(fatArtifactS3Object).isSuccess) Seq()
-    else Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+
+    if (aws.s3.objectExists(fatArtifactS3Object).isFailure)
+      Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+    else {
+
+      val allInputs: List[Map[String, AnyS3Address]] = dataMappings map { dataMapping =>
+
+        val inputs: Map[String, AnyS3Address] =
+          toMap(dataMapping.remoteInput).foldLeft(Map[String, AnyS3Address]()) { (acc, x) =>
+            x match {
+              case (key, S3Resource(address)) => acc + (key -> address)
+              case _ => acc
+            }
+          }
+
+        inputs
+      }
+
+      import scala.util.Try
+
+      val inputsCheck: Seq[String] = allInputs flatMap { inputs =>
+
+        inputs flatMap { case (key, address) =>
+
+          val exists: Boolean = Try {
+            aws.s3.s3.getObjectMetadata(address.bucket, address.key)
+          }.isSuccess
+
+          if (exists) None
+          else Some(
+            s"Input object [${key}] does not exists at the address: [${address.url}]"
+          )
+
+        }
+      }
+
+      inputsCheck
+    }
+
   }
 
 }

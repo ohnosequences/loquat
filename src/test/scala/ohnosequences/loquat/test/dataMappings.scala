@@ -18,7 +18,7 @@ case object dataMappings {
       |qux?
       |¡buh™!
       |""".stripMargin) ::
-      matrix(input / matrix.label) ::
+      matrix(input / matrix.label / "foo") ::
       *[AnyDenotation { type Value <: AnyRemoteResource }],
     remoteOutput =
       transposed(output / transposed.label) ::
