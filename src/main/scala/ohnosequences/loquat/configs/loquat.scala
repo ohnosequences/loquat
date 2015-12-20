@@ -90,7 +90,7 @@ abstract class AnyLoquatConfig extends AnyConfig {
             ).isSuccess
 
             if (exists) None
-            else Some(s"Input object [${key}] does not exists at the address: [${s3address.url}]")
+            else Some(s"Input object [${key}] doesn't exist at the address: [${s3address.url}]")
           }
           case _ => None
         }
