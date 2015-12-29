@@ -1,0 +1,8 @@
+Milestone release. See notes for 2.0.0.
+
+- #35 add artifact org to S3 object metadata
+- #22 support different AWS regions
+- update to datasets `0.3.0`
+- #28 `String`s as input data
+- #40 check input S3 object existence 
+- #17 simplify configuration

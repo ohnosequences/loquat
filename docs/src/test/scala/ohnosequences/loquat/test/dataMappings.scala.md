@@ -3,7 +3,7 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.awstools.s3._
-import ohnosequences.datasets._, S3DataLocation._
+import ohnosequences.datasets._, S3Resource._
 import ohnosequences.cosas._, klists._, types._
 import ohnosequences.loquat._, test.data._, test.dataProcessing._
 
@@ -14,11 +14,17 @@ case object dataMappings {
 
   val dataMapping = DataMapping(processingBundle)(
     remoteInput =
-      matrix.inS3(input / matrix.label) ::
-      *[AnyDenotation { type Value = S3DataLocation }],
+      prefix("viva-loquat") ::
+      text("""bluh-blah!!!
+      |foo bar
+      |qux?
+      |¡buh™!
+      |""".stripMargin) ::
+      matrix(input / matrix.label) ::
+      *[AnyDenotation { type Value <: AnyRemoteResource }],
     remoteOutput =
-      transposed.inS3(output / transposed.label) ::
-      *[AnyDenotation { type Value = S3DataLocation }]
+      transposed(output / transposed.label) ::
+      *[AnyDenotation { type Value <: S3Resource }]
   )
 
 }
@@ -28,17 +34,22 @@ case object dataMappings {
 
 
 
-[main/scala/ohnosequences/loquat/configs.scala]: ../../../../../main/scala/ohnosequences/loquat/configs.scala.md
-[main/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../../main/scala/ohnosequences/loquat/dataMappings.scala.md
-[main/scala/ohnosequences/loquat/dataProcessing.scala]: ../../../../../main/scala/ohnosequences/loquat/dataProcessing.scala.md
-[main/scala/ohnosequences/loquat/logger.scala]: ../../../../../main/scala/ohnosequences/loquat/logger.scala.md
-[main/scala/ohnosequences/loquat/loquats.scala]: ../../../../../main/scala/ohnosequences/loquat/loquats.scala.md
-[main/scala/ohnosequences/loquat/manager.scala]: ../../../../../main/scala/ohnosequences/loquat/manager.scala.md
-[main/scala/ohnosequences/loquat/terminator.scala]: ../../../../../main/scala/ohnosequences/loquat/terminator.scala.md
-[main/scala/ohnosequences/loquat/utils.scala]: ../../../../../main/scala/ohnosequences/loquat/utils.scala.md
-[main/scala/ohnosequences/loquat/worker.scala]: ../../../../../main/scala/ohnosequences/loquat/worker.scala.md
-[test/scala/ohnosequences/loquat/test/config.scala]: config.scala.md
-[test/scala/ohnosequences/loquat/test/data.scala]: data.scala.md
-[test/scala/ohnosequences/loquat/test/dataMappings.scala]: dataMappings.scala.md
 [test/scala/ohnosequences/loquat/test/dataProcessing.scala]: dataProcessing.scala.md
 [test/scala/ohnosequences/loquat/test/md5.scala]: md5.scala.md
+[test/scala/ohnosequences/loquat/test/dataMappings.scala]: dataMappings.scala.md
+[test/scala/ohnosequences/loquat/test/data.scala]: data.scala.md
+[test/scala/ohnosequences/loquat/test/config.scala]: config.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: ../../../../../main/scala/ohnosequences/loquat/dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/terminator.scala]: ../../../../../main/scala/ohnosequences/loquat/terminator.scala.md
+[main/scala/ohnosequences/loquat/configs/user.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/user.scala.md
+[main/scala/ohnosequences/loquat/configs/resources.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/resources.scala.md
+[main/scala/ohnosequences/loquat/configs/general.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/general.scala.md
+[main/scala/ohnosequences/loquat/configs/autoscaling.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/termination.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/termination.scala.md
+[main/scala/ohnosequences/loquat/configs/loquat.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/loquat.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: ../../../../../main/scala/ohnosequences/loquat/loquats.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: ../../../../../main/scala/ohnosequences/loquat/utils.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: ../../../../../main/scala/ohnosequences/loquat/dataMappings.scala.md
+[main/scala/ohnosequences/loquat/worker.scala]: ../../../../../main/scala/ohnosequences/loquat/worker.scala.md
+[main/scala/ohnosequences/loquat/logger.scala]: ../../../../../main/scala/ohnosequences/loquat/logger.scala.md
+[main/scala/ohnosequences/loquat/manager.scala]: ../../../../../main/scala/ohnosequences/loquat/manager.scala.md
