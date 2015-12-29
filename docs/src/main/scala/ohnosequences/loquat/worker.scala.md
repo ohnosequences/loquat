@@ -4,22 +4,24 @@ package ohnosequences.loquat
 
 import utils._
 
-import ohnosequences.statika.bundles._
-import ohnosequences.statika.instructions._
-import ohnosequences.statika.results._
+import ohnosequences.statika._
+
+import ohnosequences.datasets._
 
 import ohnosequences.awstools.sqs.Message
 import ohnosequences.awstools.sqs.Queue
 import ohnosequences.awstools.s3._
-import ohnosequences.awstools.AWSClients
+
 import com.typesafe.scalalogging.LazyLogging
+
 import better.files._
+
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
+
 import upickle.Js
 
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.s3.transfer._
 import com.amazonaws.services.s3.model.ObjectMetadata
 
@@ -62,7 +64,7 @@ class DataProcessor(
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
 
-  lazy val aws: AWSClients = AWSClients.create(new InstanceProfileCredentialsProvider())
+  lazy val aws = instanceAWSClients(config)
 
   // FIXME: don't use Option.get
   val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
@@ -142,40 +144,50 @@ class DataProcessor(
   private def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
     try {
       if(workingDir.exists) {
-        logger.info("deleting working directory: " + workingDir.path)
+        logger.debug("Deleting working directory: " + workingDir.path)
         workingDir.delete(true)
       }
-      logger.info("creating working directory: " + workingDir.path)
+      logger.info("Creating working directory: " + workingDir.path)
       workingDir.createDirectories()
 
       val inputDir = workingDir / "input"
-      logger.info("creating input directory: " + workingDir.path)
+      logger.debug("Creating input directory: " + workingDir.path)
       inputDir.createDirectories()
 
       val outputDir = workingDir / "output"
-      logger.info("creating output directory: " + workingDir.path)
+      logger.debug("Creating output directory: " + workingDir.path)
       outputDir.createDirectories()
 
 
       val transferManager = new TransferManager(aws.s3.s3)
 
-      logger.info("downloading dataMapping input")
-      val inputFilesMap: Map[String, File] = dataMapping.inputs.map {
-        case (name, s3Address) =>
-          logger.info("trying to create input object: " + name)
-          // FIXME: this shouldn't ignore the returned Try
-          val destination: File = transferManager.download(s3Address, inputDir / name).get
-          (name -> destination)
+      logger.info("Preparing dataMapping input")
+      val inputFilesMap: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
+
+        logger.debug(s"Trying to create input object: [${name}] from [${resource}]")
+
+        resource match {
+          case MessageResource(msg) => {
+            val destination: File = inputDir / name
+            destination.createIfNotExists().overwrite(msg)
+            (name -> destination)
+          }
+          case S3Resource(s3Address) => {
+            // FIXME: this shouldn't ignore the returned Try
+            val destination: File = transferManager.download(s3Address, inputDir / name).get
+            (name -> destination)
+          }
+        }
       }
 
-      logger.info("processing data in: " + workingDir.path)
+      logger.info("Processing data in: " + workingDir.path)
       val result = instructionsBundle.runProcess(workingDir, inputDir)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
 
       result match {
         case Failure(tr) => {
-          logger.error(s"script finished with non zero code: ${result}. publishing it to the error queue.")
+          logger.error(s"Script finished with non zero code: ${result}. publishing it to the error queue.")
           errorQueue.sendMessage(upickle.default.write(resultDescription))
           result
         }
@@ -183,38 +195,39 @@ class DataProcessor(
           // FIXME: do it more careful
           val outputMap: Map[File, AnyS3Address] =
             outputFileMap.map { case (name, file) =>
-              file -> dataMapping.outputs(name)
+              file -> dataMapping.outputs(name).resource
             }
           // TODO: simplify this huge if-else statement
           if (outputMap.keys.forall(_.exists)) {
 
             val uploadTries = outputMap map { case (file, s3Address) =>
-              logger.info(s"publishing output object: ${file} -> ${s3Address}")
+              logger.info(s"Publishing output object: ${file} -> ${s3Address}")
               transferManager.upload(
                 file,
                 s3Address,
                 Map(
-                  "artifactName"    -> config.metadata.artifact,
-                  "artifactVersion" -> config.metadata.version,
-                  "artifactUrl"     -> config.metadata.artifactUrl
+                  "artifact-org"     -> config.metadata.organization,
+                  "artifact-name"    -> config.metadata.artifact,
+                  "artifact-version" -> config.metadata.version,
+                  "artifact-url"     -> config.metadata.artifactUrl
                 )
               )
             }
 
             // TODO: check whether we can fold Try's here somehow
             if (uploadTries.forall(_.isSuccess)) {
-              logger.info("finished uploading output files. publishing message to the output queue.")
+              logger.info("Finished uploading output files. publishing message to the output queue.")
               outputQueue.sendMessage(upickle.default.write(resultDescription))
               result //-&- success(s"task [${dataMapping.id}] is successfully finished", ())
             } else {
-              logger.error(s"some uploads failed: ${uploadTries.filter(_.isFailure)}")
+              logger.error(s"Some uploads failed: ${uploadTries.filter(_.isFailure)}")
               tr +: Failure(Seq("failed to upload output files"))
             }
 
           } else {
 
             val missingFiles = outputMap.keys.filterNot(_.exists).map(_.path)
-            logger.error(s"some output files don't exist: ${missingFiles}")
+            logger.error(s"Some output files don't exist: ${missingFiles}")
             tr +: Failure(Seq(s"Couldn't upload results, because some output files don't exist: ${missingFiles}"))
 
           }
@@ -222,7 +235,7 @@ class DataProcessor(
       }
     } catch {
       case t: Throwable => {
-        logger.error("fatal failure during dataMapping processing", t)
+        logger.error("Fatal failure during dataMapping processing", t)
         Failure(Seq(t.getMessage))
       }
     }
@@ -253,7 +266,7 @@ class DataProcessor(
 
         // FIXME: check this. what happens if result has failures?
         if (dataMappingResult.isSuccessful) {
-          logger.info("result was successful. deleting message from the input queue")
+          logger.info("Result was successful. deleting message from the input queue")
           inputQueue.deleteMessage(message)
         }
 
@@ -274,17 +287,22 @@ class DataProcessor(
 
 
 
-[main/scala/ohnosequences/loquat/configs.scala]: configs.scala.md
-[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
-[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
-[main/scala/ohnosequences/loquat/logger.scala]: logger.scala.md
-[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
-[main/scala/ohnosequences/loquat/manager.scala]: manager.scala.md
-[main/scala/ohnosequences/loquat/terminator.scala]: terminator.scala.md
-[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
-[main/scala/ohnosequences/loquat/worker.scala]: worker.scala.md
-[test/scala/ohnosequences/loquat/test/config.scala]: ../../../../test/scala/ohnosequences/loquat/test/config.scala.md
-[test/scala/ohnosequences/loquat/test/data.scala]: ../../../../test/scala/ohnosequences/loquat/test/data.scala.md
-[test/scala/ohnosequences/loquat/test/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataMappings.scala.md
 [test/scala/ohnosequences/loquat/test/dataProcessing.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataProcessing.scala.md
 [test/scala/ohnosequences/loquat/test/md5.scala]: ../../../../test/scala/ohnosequences/loquat/test/md5.scala.md
+[test/scala/ohnosequences/loquat/test/dataMappings.scala]: ../../../../test/scala/ohnosequences/loquat/test/dataMappings.scala.md
+[test/scala/ohnosequences/loquat/test/data.scala]: ../../../../test/scala/ohnosequences/loquat/test/data.scala.md
+[test/scala/ohnosequences/loquat/test/config.scala]: ../../../../test/scala/ohnosequences/loquat/test/config.scala.md
+[main/scala/ohnosequences/loquat/dataProcessing.scala]: dataProcessing.scala.md
+[main/scala/ohnosequences/loquat/terminator.scala]: terminator.scala.md
+[main/scala/ohnosequences/loquat/configs/user.scala]: configs/user.scala.md
+[main/scala/ohnosequences/loquat/configs/resources.scala]: configs/resources.scala.md
+[main/scala/ohnosequences/loquat/configs/general.scala]: configs/general.scala.md
+[main/scala/ohnosequences/loquat/configs/autoscaling.scala]: configs/autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/termination.scala]: configs/termination.scala.md
+[main/scala/ohnosequences/loquat/configs/loquat.scala]: configs/loquat.scala.md
+[main/scala/ohnosequences/loquat/loquats.scala]: loquats.scala.md
+[main/scala/ohnosequences/loquat/utils.scala]: utils.scala.md
+[main/scala/ohnosequences/loquat/dataMappings.scala]: dataMappings.scala.md
+[main/scala/ohnosequences/loquat/worker.scala]: worker.scala.md
+[main/scala/ohnosequences/loquat/logger.scala]: logger.scala.md
+[main/scala/ohnosequences/loquat/manager.scala]: manager.scala.md
