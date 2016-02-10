@@ -25,11 +25,15 @@ case object utils {
 
 
   type ResourcesSet[D <: AnyDataSet, R <: AnyDataResource] =
-    D#Raw with AnyKList.withBound[AnyDenotation { type Value <: R }]
-    // { type Bound = AnyDenotation { type Value = R } }
+    D#Keys#Raw { type Bound = AnyDenotation { type Value <: R } }
+    // with AnyKList.withBound[AnyDenotation { type Value <: R }]
 
-  def toMap[V <: AnyDataResource](l: AnyKList.Of[AnyDenotation { type Value <: V }]): Map[String, V] =
-    l.asList.map{ d => (d.tpe.label, d.value) }.toMap
+
+  // def toMap[V <: AnyDataResource](l: AnyKList.Of[AnyDenotation { type Value <: V }]): Map[String, V] =
+  //   l.asList.map{ d => (d.tpe.label, d.value) }.toMap
+
+  def toMap[V <: AnyDataResource](l: Map[AnyData, V]): Map[String, V] =
+    l.map{ case (d, v) => (d.tpe.label, v) }
 
 
   def instanceAWSClients(config: AnyLoquatConfig) = AWSClients.create(

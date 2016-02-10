@@ -79,18 +79,18 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
       dataMappings flatMap { dataMapping =>
 
-        val inputs: Map[String, AnyRemoteResource] = toMap(dataMapping.remoteInput)
+        // val inputs: Map[String, AnyRemoteResource] = toMap(dataMapping.remoteInput)
 
         // if an input object doesn't exist, we return an arror message
-        inputs flatMap {
-          case (key, S3Resource(s3address)) => {
+        dataMapping.remoteInput flatMap {
+          case (dataKey, S3Resource(s3address)) => {
             // TODO: check that it works for S3Folders fine
             val exists: Boolean = Try(
               aws.s3.s3.getObjectMetadata(s3address.bucket, s3address.key)
             ).isSuccess
 
             if (exists) None
-            else Some(s"Input object [${key}] doesn't exist at the address: [${s3address.url}]")
+            else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address.url}]")
           }
           case _ => None
         }

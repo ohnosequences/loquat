@@ -20,13 +20,11 @@ case object config {
 
     val metadata: AnyArtifactMetadata = generated.metadata.Loquat
 
-    type ManagerConfig = AnyManagerConfig
     val  managerConfig = ManagerConfig(
       InstanceSpecs(defaultAMI, m3.medium),
       purchaseModel = Spot(maxPrice = Some(0.1))
     )
 
-    type WorkersConfig = AnyWorkersConfig
     val workersConfig = WorkersConfig(
       instanceSpecs = InstanceSpecs(defaultAMI, m3.medium),
       purchaseModel = Spot(maxPrice = Some(0.1)),
