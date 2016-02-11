@@ -82,6 +82,10 @@ abstract class AnyLoquatConfig extends AnyConfig {
       Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
     else if(checkInputObjects) {
 
+      logger.info("Checking input S3 objects existence")
+
+      print("[")
+
       dataMappings flatMap { dataMapping =>
 
         // if an input object doesn't exist, we return an arror message
@@ -92,6 +96,9 @@ abstract class AnyLoquatConfig extends AnyConfig {
               aws.s3.s3.getObjectMetadata(s3address.bucket, s3address.key)
             ).isSuccess
 
+            if (exists) print("+") else print("-")
+            // logger.debug(s"[${dataMapping.id}]: [${dataKey.label}] -> [${s3address.url}] ${if(exists) "exists" else "DOESN'T exist!"}")
+
             if (exists) None
             else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address.url}]")
           }
@@ -99,6 +106,9 @@ abstract class AnyLoquatConfig extends AnyConfig {
           case _ => None
         }
       }
+
+      println("]")
+
     } else Seq()
   }
 
