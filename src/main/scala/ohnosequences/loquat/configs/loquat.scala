@@ -12,6 +12,8 @@ import ohnosequences.awstools.s3._
 
 import ohnosequences.datasets._
 
+import ohnosequences.cosas._, types._
+
 import better.files._
 
 import scala.util.Try
@@ -37,6 +39,9 @@ abstract class AnyLoquatConfig extends AnyConfig {
   val terminationConfig: TerminationConfig
 
   val dataMappings: List[AnyDataMapping]
+
+  /* This setting switches the check of existence of the input S3 objects */
+  val checkInputObjects: Boolean
 
 
 
@@ -75,11 +80,9 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
     if (aws.s3.objectExists(fatArtifactS3Object).isFailure)
       Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
-    else {
+    else if(checkInputObjects) {
 
       dataMappings flatMap { dataMapping =>
-
-        // val inputs: Map[String, AnyRemoteResource] = toMap(dataMapping.remoteInput)
 
         // if an input object doesn't exist, we return an arror message
         dataMapping.remoteInput flatMap {
@@ -92,10 +95,11 @@ abstract class AnyLoquatConfig extends AnyConfig {
             if (exists) None
             else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address.url}]")
           }
+          // if the mapping is not an S3Resource, we don't check
           case _ => None
         }
       }
-    }
+    } else Seq()
   }
 
 }
