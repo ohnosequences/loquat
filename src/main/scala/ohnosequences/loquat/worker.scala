@@ -160,7 +160,7 @@ class DataProcessor(
       val transferManager = new TransferManager(aws.s3.s3)
 
       logger.info("Preparing dataMapping input")
-      val inputFilesMap: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
+      val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
 
         logger.debug(s"Trying to create input object: [${name}] from [${resource}]")
 
@@ -179,7 +179,7 @@ class DataProcessor(
       }
 
       logger.info("Processing data in: " + workingDir.path)
-      val result = instructionsBundle.runProcess(workingDir, inputDir)
+      val result = instructionsBundle.runProcess(workingDir, inputFiles)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
 
