@@ -20,13 +20,11 @@ case object config {
 
     val metadata: AnyArtifactMetadata = generated.metadata.Loquat
 
-    type ManagerConfig = AnyManagerConfig
     val  managerConfig = ManagerConfig(
       InstanceSpecs(defaultAMI, m3.medium),
       purchaseModel = Spot(maxPrice = Some(0.1))
     )
 
-    type WorkersConfig = AnyWorkersConfig
     val workersConfig = WorkersConfig(
       instanceSpecs = InstanceSpecs(defaultAMI, m3.medium),
       purchaseModel = Spot(maxPrice = Some(0.1)),
@@ -39,6 +37,8 @@ case object config {
 
     val N = 10
     val dataMappings: List[AnyDataMapping] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
+
+    val checkInputObjects = true
   }
 
   case object testLoquat extends Loquat(testConfig, test.dataProcessing.processingBundle)

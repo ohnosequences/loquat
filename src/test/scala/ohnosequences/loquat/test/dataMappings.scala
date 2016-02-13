@@ -10,19 +10,19 @@ case object dataMappings {
   val input = S3Folder("loquat.testing", "input")
   val output = S3Folder("loquat.testing", "output")
 
-  val dataMapping = DataMapping(processingBundle)(
-    remoteInput =
-      prefix("viva-loquat") ::
-      text("""bluh-blah!!!
+  val dataMapping = DataMapping("foo")(
+    remoteInput = Map(
+      prefix -> MessageResource("viva-loquat"),
+      text -> MessageResource("""bluh-blah!!!
       |foo bar
       |qux?
       |¡buh™!
-      |""".stripMargin) ::
-      matrix(input / matrix.label) ::
-      *[AnyDenotation { type Value <: AnyRemoteResource }],
-    remoteOutput =
-      transposed(output / transposed.label) ::
-      *[AnyDenotation { type Value <: S3Resource }]
+      |""".stripMargin),
+      matrix -> S3Resource(input / matrix.label)
+    ),
+    remoteOutput = Map(
+      transposed -> S3Resource(output / transposed.label)
+    )
   )
 
 }

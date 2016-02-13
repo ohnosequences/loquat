@@ -53,8 +53,8 @@ trait AnyDataProcessingBundle extends AnyBundle {
     process(ProcessingContext[Input](workingDir, inputDir))
       .run(workingDir.toJava) match {
         case Failure(tr) => Failure(tr)
-        case Success(tr, of) => Success(tr, 
-          toMap(of).map { case (k, v) => (k, v.resource) }
+        case Success(tr, of) => Success(tr,
+          of.asList.map { d => (d.tpe.label, d.value.resource) }.toMap
         )
       }
   }
