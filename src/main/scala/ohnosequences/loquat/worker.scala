@@ -79,8 +79,8 @@ class DataProcessor(
 
     while(message.isEmpty) {
       logger.info("Data processor is waiting for new data")
-      instance.foreach(_.createTag(StatusTag.idle))
-      Thread.sleep(5.seconds.toMillis)
+      // instance.foreach(_.createTag(StatusTag.idle))
+      Thread.sleep(10.seconds.toMillis)
       message = queue.receiveMessage
     }
 
@@ -134,7 +134,7 @@ class DataProcessor(
 
   def terminateWorker(): Unit = {
     stopped = true
-    instance.foreach(_.createTag(StatusTag.terminating))
+    // instance.foreach(_.createTag(StatusTag.terminating))
     logger.info("Terminating instance")
     instance.foreach(_.terminate)
   }
@@ -247,7 +247,7 @@ class DataProcessor(
       try {
         val message = waitForDataMapping(inputQueue)
 
-        instance.foreach(_.createTag(StatusTag.processing))
+        // instance.foreach(_.createTag(StatusTag.processing))
         logger.info("DataProcessor: received message " + message)
         val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
 
