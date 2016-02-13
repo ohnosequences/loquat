@@ -82,11 +82,11 @@ abstract class AnyLoquatConfig extends AnyConfig {
       Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
     else if(checkInputObjects) {
 
-      logger.info("Checking input S3 objects existence")
+      logger.info("Checking input S3 objects existence...")
 
       print("[")
 
-      dataMappings flatMap { dataMapping =>
+      val errors: Seq[String] = dataMappings flatMap { dataMapping =>
 
         // if an input object doesn't exist, we return an arror message
         dataMapping.remoteInput flatMap {
@@ -108,6 +108,8 @@ abstract class AnyLoquatConfig extends AnyConfig {
       }
 
       println("]")
+
+      errors
 
     } else Seq()
   }
