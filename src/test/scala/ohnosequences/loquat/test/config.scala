@@ -28,17 +28,17 @@ case object config {
     val workersConfig = WorkersConfig(
       instanceSpecs = InstanceSpecs(defaultAMI, m3.medium),
       purchaseModel = Spot(maxPrice = Some(0.1)),
-      groupSize = AutoScalingGroupSize(0, 1, 1)
+      groupSize = AutoScalingGroupSize(0, 10, 20)
     )
 
     val terminationConfig = TerminationConfig(
       terminateAfterInitialDataMappings = true
     )
 
-    val N = 10
+    val N = 5000
     val dataMappings: List[AnyDataMapping] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
 
-    val checkInputObjects = true
+    val checkInputObjects = false
   }
 
   case object testLoquat extends Loquat(testConfig, test.dataProcessing.processingBundle)
