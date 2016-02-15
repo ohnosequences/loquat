@@ -13,8 +13,8 @@ import upickle.Js
 
 trait AnyDataMapping {
 
-  // This id is just to distinguish data mappings, it is not functional
-  val id: String
+  // This label is just to distinguish data mappings, it is not an ID
+  val label: String
 
   type RemoteInput = Map[AnyData, AnyRemoteResource]
   val  remoteInput: RemoteInput
@@ -24,7 +24,7 @@ trait AnyDataMapping {
 
 }
 
-case class DataMapping(val id: String)(
+case class DataMapping(val label: String)(
   val remoteInput:  Map[AnyData, AnyRemoteResource],
   val remoteOutput: Map[AnyData, S3Resource]
 ) extends AnyDataMapping
