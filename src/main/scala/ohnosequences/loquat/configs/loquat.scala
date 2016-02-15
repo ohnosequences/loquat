@@ -17,6 +17,7 @@ import ohnosequences.cosas._, types._
 import better.files._
 
 import scala.util.Try
+import collection.JavaConversions._
 
 
 /* Configuration for loquat */
@@ -91,10 +92,9 @@ abstract class AnyLoquatConfig extends AnyConfig {
         // if an input object doesn't exist, we return an arror message
         dataMapping.remoteInput flatMap {
           case (dataKey, S3Resource(s3address)) => {
-            // TODO: check that it works for S3Folders fine
             val exists: Boolean = Try(
-              aws.s3.s3.getObjectMetadata(s3address.bucket, s3address.key)
-            ).isSuccess
+              aws.s3.s3.listObjects(s3address.bucket, s3address.key).getObjectSummaries
+            ).filter{ _.length > 0 }.isSuccess
 
             if (exists) print("+") else print("-")
             // logger.debug(s"[${dataMapping.id}]: [${dataKey.label}] -> [${s3address.url}] ${if(exists) "exists" else "DOESN'T exist!"}")
