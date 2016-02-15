@@ -60,7 +60,6 @@ case class TerminationDaemonBundle(
     }
     logger.debug(s"Success results: ${successResults.size}")
 
-    // logger.debug(s"Failure results: ${failedResults.size} (before polling)")
     aws.sqs.getQueueByName(config.resourceNames.errorQueue) match {
       case None => logger.error(s"Couldn't access error queue: ${config.resourceNames.errorQueue}")
       case Some(errorQueue) =>
@@ -110,6 +109,8 @@ case class TerminationDaemonBundle(
 
   def receiveProcessingResults(queue: sqs.Queue): Try[List[ProcessingResult]] = {
 
+    val pollingDeadline: Deadline = 20.seconds.fromNow
+
     /* Note that this request does so called short-polling, see the [Amazon documentation](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/sqs/model/ReceiveMessageRequest.html).
        Long polling doesn't work here, because it returns too many responses with the same messages (so it's not clear when you can stop polling).
     */
@@ -127,11 +128,7 @@ case class TerminationDaemonBundle(
     */
     def pollQueue: List[String] = {
 
-      // val timeout: Deadline = 20.seconds.fromNow
-      // val timeout: FiniteDuration = 30.seconds
-      // logger.debug(s">>> Started polling")
-      // val startTime: FiniteDuration = System.currentTimeMillis.millis
-      // def timeSpent: FiniteDuration = System.currentTimeMillis.millis - startTime
+      // logger.debug(s">>> Started polling ${queue.name}")
 
       @scala.annotation.tailrec
         def pollQueue_rec(
@@ -141,25 +138,17 @@ case class TerminationDaemonBundle(
           Thread.sleep(300)
           val response = getMessageBodies()
 
-          // logger.debug(s"Polling took ${timeSpent.toSeconds} seconds")
-          // if (timeout.isOverdue()) {
-          // if (timeSpent > timeout) {
-          //   // logger.debug(s"Polling took more than ${timeout.toSeconds} seconds. Stopping!")
-          //   acc.toList
-          // } else {
-          if (response.isEmpty) {
-            if (tries > 5) {
-              acc.toList
-            } else {
+          if (pollingDeadline.isOverdue) acc.toList
+          else if (response.isEmpty) {
+            if (tries > 5) acc.toList
+            else
               pollQueue_rec(acc ++= response, tries + 1)
-            }
-          } else {
+          } else
             pollQueue_rec(acc ++= response, 0)
-          }
         }
 
       val result = pollQueue_rec(scala.collection.mutable.ListBuffer(), 0)
-      // logger.debug(s"<<< Finished polling. got [$result.length] messages")
+      // logger.debug(s"<<< Finished polling. got ${result.length} messages")
       result
     }
 
