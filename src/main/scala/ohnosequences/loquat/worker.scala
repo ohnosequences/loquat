@@ -162,7 +162,7 @@ class DataProcessor(
       logger.info("Preparing dataMapping input")
       val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
 
-        logger.debug(s"Trying to create input object: [${name}] from [${resource}]")
+        logger.debug(s"Trying to create input object [${name}]")
 
         resource match {
           case MessageResource(msg) => {
@@ -199,7 +199,7 @@ class DataProcessor(
           if (outputMap.keys.forall(_.exists)) {
 
             val uploadTries = outputMap map { case (file, s3Address) =>
-              logger.info(s"Publishing output object: ${file} -> ${s3Address}")
+              logger.info(s"Publishing output object: [${file.name}]")
               transferManager.upload(
                 file,
                 s3Address,
