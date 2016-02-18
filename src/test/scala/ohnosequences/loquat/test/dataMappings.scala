@@ -10,7 +10,7 @@ case object dataMappings {
   val input = S3Folder("loquat.testing", "input")
   val output = S3Folder("loquat.testing", "output")
 
-  val dataMapping = DataMapping("foo")(
+  val dataMapping = DataMapping("foo", processingBundle)(
     remoteInput = Map(
       prefix -> MessageResource("viva-loquat"),
       text -> MessageResource("""bluh-blah!!!

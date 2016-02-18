@@ -16,18 +16,26 @@ trait AnyDataMapping {
   // This label is just to distinguish data mappings, it is not an ID
   val label: String
 
+  type DataProcessing <: AnyDataProcessingBundle
+  val  dataProcessing: DataProcessing
+
+
   type RemoteInput = Map[AnyData, AnyRemoteResource]
   val  remoteInput: RemoteInput
 
   type RemoteOutput = Map[AnyData, S3Resource]
   val  remoteOutput: RemoteOutput
-
 }
 
-case class DataMapping(val label: String)(
-  val remoteInput:  Map[AnyData, AnyRemoteResource],
+case class DataMapping[DP <: AnyDataProcessingBundle](
+  val label: String,
+  val dataProcessing: DP
+)(val remoteInput:  Map[AnyData, AnyRemoteResource],
   val remoteOutput: Map[AnyData, S3Resource]
-) extends AnyDataMapping
+) extends AnyDataMapping {
+
+  type DataProcessing = DP
+}
 
 
 case class ProcessingResult(id: String, message: String)
