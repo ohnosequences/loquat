@@ -1,0 +1,18 @@
+* Data mappings:
+  - #45: **Changed DataMappings remoteInput/Output from records to _simple Maps_**
+  - Added an option to the config to switch on/off input objects existence check
+  - #44: Renamed DataMapping's id to label
+  - #47: Added a logger message and some kind of progress output for the input objects existence check
+  - #50: Instead of checking input objects object metadata, listing objects with the given prefix
+  - #52: Added a check for missing/non-needed input/output data keys in the datamappings
+
+* Data processing:
+  - #51: Fixed input objects handling by passing the map of (dataKey.label -> fileLocation) from worker to the processing context; this way context.inputFile lookup doesn't rely on conventions and return the actual file location
+
+* Self-termination:
+  - #48: Added a time deadline for SQS polling
+  - Added some logging and exception handling to the polling
+
+* Other fixes:
+  - #49: Removed any worker instance state tagging for now; was causing RequestLimitExceeded on a big autoscaling group with quick tasks
+  - #43: Changed log messages for downloads/uploads
