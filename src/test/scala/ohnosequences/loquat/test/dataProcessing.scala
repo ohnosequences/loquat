@@ -9,8 +9,8 @@ import better.files._
 
 case object dataProcessing {
 
-  case object inputData extends DataSet(prefix :×: text :×: matrix :×: |[AnyData])
-  case object outputData extends DataSet(transposed :×: |[AnyData])
+  case object inputData extends DataSet(|[AnyData])
+  case object outputData extends DataSet(|[AnyData])
 
   case object processingBundle extends DataProcessingBundle()(
     inputData,
@@ -21,19 +21,19 @@ case object dataProcessing {
 
     def process(context: ProcessingContext[Input]): AnyInstructions { type Out <: OutputFiles } = {
 
-      val txt: String = context.inputFile(text).contentAsString
-      val prfx: String = context.inputFile(prefix).contentAsString
+      // val txt: String = context.inputFile(text).contentAsString
+      // val prfx: String = context.inputFile(prefix).contentAsString
 
-      val outFile: File = context / s"${prfx}.transposed.txt"
+      // val outFile: File = (context / s"${prfx}.transposed.txt").createIfNotExists()
 
-      LazyTry {
-        val matrixRows = context.inputFile(matrix).lines
-        val trans = matrixRows.map{ _.reverse }.toList.reverse
-        outFile.createIfNotExists().overwrite(trans.mkString("\n"))
-        outFile.append(txt)
-      } -&-
+      // LazyTry {
+      //   val matrixRows = context.inputFile(matrix).lines
+      //   val trans = matrixRows.map{ _.reverse }.toList.reverse
+      //   outFile.createIfNotExists().overwrite(trans.mkString("\n"))
+      //   outFile.append(txt)
+      // } -&-
       success("transposed",
-        transposed(outFile) ::
+        // transposed(outFile) ::
         *[AnyDenotation { type Value <: FileResource }]
       )
     }

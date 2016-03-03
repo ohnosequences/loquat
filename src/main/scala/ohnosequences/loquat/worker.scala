@@ -21,7 +21,7 @@ import scala.util.Try
 import upickle.Js
 
 import com.amazonaws.services.s3.transfer._
-import com.amazonaws.services.s3.model.ObjectMetadata
+import com.amazonaws.services.s3.model._
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -163,7 +163,11 @@ class DataProcessor(
           }
           case S3Resource(s3Address) => {
             // FIXME: this shouldn't ignore the returned Try
-            val destination: File = transferManager.download(s3Address, inputDir / name).get
+            // val destination: File = transferManager.download(s3Address, inputDir / name).get
+
+            val destination: File = (inputDir / name).createIfNotExists()
+            val request = new GetObjectRequest(s3Address.bucket, s3Address.key)
+            aws.s3.s3.getObject(request, destination.toJava)
             (name -> destination)
           }
         }
@@ -203,6 +207,7 @@ class DataProcessor(
               )
             }
 
+            transferManager.shutdownNow(false)
             // TODO: check whether we can fold Try's here somehow
             if (uploadTries.forall(_.isSuccess)) {
               logger.info("Finished uploading output files. publishing message to the output queue.")
@@ -269,7 +274,6 @@ class DataProcessor(
           inputQueue.deleteMessage(message)
         }
 
-        transferManager.shutdownNow(false)
       } catch {
         case e: Throwable => {
           logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
