@@ -234,8 +234,6 @@ class DataProcessor(
 
     logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
 
-    val transferManager = new TransferManager(aws.s3.s3)
-
     val workingDir = config.workingDir
 
     logger.info("Creating working directory: " + workingDir.path)
@@ -243,6 +241,8 @@ class DataProcessor(
 
     while(!stopped) {
       try {
+        val transferManager = new TransferManager(aws.s3.s3)
+
         val message = waitForDataMapping(inputQueue)
 
         // instance.foreach(_.createTag(StatusTag.processing))
@@ -269,6 +269,7 @@ class DataProcessor(
           inputQueue.deleteMessage(message)
         }
 
+        transferManager.shutdownNow(false)
       } catch {
         case e: Throwable => {
           logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
@@ -277,8 +278,6 @@ class DataProcessor(
         }
       }
     }
-
-    transferManager.shutdownNow()
   }
 
 }

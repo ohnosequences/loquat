@@ -28,14 +28,14 @@ case object config {
     val workersConfig = WorkersConfig(
       instanceSpecs = InstanceSpecs(defaultAMI, m3.medium),
       purchaseModel = Spot(maxPrice = Some(0.1)),
-      groupSize = AutoScalingGroupSize(0, 10, 20)
+      groupSize = AutoScalingGroupSize(0, 1, 20)
     )
 
     val terminationConfig = TerminationConfig(
       terminateAfterInitialDataMappings = true
     )
 
-    val N = 5000
+    val N = 10000
     val dataMappings: List[AnyDataMapping] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
 
     val checkInputObjects = false
