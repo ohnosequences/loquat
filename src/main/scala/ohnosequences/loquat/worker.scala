@@ -139,27 +139,18 @@ class DataProcessor(
     instance.foreach(_.terminate)
   }
 
-  private def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
+  private def processDataMapping(
+    transferManager: TransferManager,
+    dataMapping: SimpleDataMapping,
+    workingDir: File
+  ): AnyResult = {
+
     try {
-      if(workingDir.exists) {
-        logger.debug("Deleting working directory: " + workingDir.path)
-        workingDir.delete(true)
-      }
-      logger.info("Creating working directory: " + workingDir.path)
-      workingDir.createDirectories()
-
-      val inputDir = workingDir / "input"
-      logger.debug("Creating input directory: " + workingDir.path)
-      inputDir.createDirectories()
-
-      val outputDir = workingDir / "output"
-      logger.debug("Creating output directory: " + workingDir.path)
-      outputDir.createDirectories()
-
-
-      val transferManager = new TransferManager(aws.s3.s3)
 
       logger.info("Preparing dataMapping input")
+
+      val inputDir = workingDir / "input"
+
       val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
 
         logger.debug(s"Trying to create input object [${name}]")
@@ -243,6 +234,13 @@ class DataProcessor(
 
     logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
 
+    val transferManager = new TransferManager(aws.s3.s3)
+
+    val workingDir = config.workingDir
+
+    logger.info("Creating working directory: " + workingDir.path)
+    workingDir.createDirectories()
+
     while(!stopped) {
       try {
         val message = waitForDataMapping(inputQueue)
@@ -252,13 +250,16 @@ class DataProcessor(
         val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
 
         logger.info("DataProcessor processing message")
-
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
-          processDataMapping(dataMapping, config.workingDir)
+          processDataMapping(transferManager, dataMapping, workingDir)
         }
 
+        // NOTE: this is blocking until the Future gets a result
         val dataMappingResult = waitForResult(futureResult, message)
+
+        logger.debug("Clearing working directory: " + workingDir.path)
+        workingDir.clear()
 
         // logger.info(s"time spent on the task [${dataMapping.id}]: ${timeSpent}")
 
@@ -276,6 +277,8 @@ class DataProcessor(
         }
       }
     }
+
+    transferManager.shutdownNow()
   }
 
 }
