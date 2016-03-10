@@ -12,16 +12,16 @@ case object dataMappings {
 
   val dataMapping = DataMapping("foo", processingBundle)(
     remoteInput = Map(
-      // prefix -> MessageResource("viva-loquat"),
-      // text -> MessageResource("""bluh-blah!!!
-      // |foo bar
-      // |qux?
-      // |¡buh™!
-      // |""".stripMargin),
-      // matrix -> S3Resource(input / matrix.label)
+      prefix -> MessageResource("viva-loquat"),
+      text -> MessageResource("""bluh-blah!!!
+      |foo bar
+      |qux?
+      |¡buh™!
+      |""".stripMargin),
+      matrix -> S3Resource(input / matrix.label)
     ),
     remoteOutput = Map(
-      // transposed -> S3Resource(output / transposed.label)
+      transposed -> S3Resource(output / transposed.label)
     )
   )
 
