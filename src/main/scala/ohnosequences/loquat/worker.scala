@@ -232,6 +232,8 @@ class DataProcessor(
     } catch {
       case t: Throwable => {
         logger.error("Fatal failure during dataMapping processing", t)
+        errorQueue.sendMessage(upickle.default.write(t.getMessage))
+        terminateWorker
         Failure(Seq(t.getMessage))
       }
     }
