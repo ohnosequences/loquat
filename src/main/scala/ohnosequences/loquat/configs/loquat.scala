@@ -53,8 +53,6 @@ abstract class AnyLoquatConfig extends AnyConfig {
   lazy val amiEnv: AnyLinuxAMIEnvironment = amznAMIEnv(ami)
   lazy val region: Region = ami.region
 
-  final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
-
   lazy final val fatArtifactS3Object: S3Object = {
     val s3url = """s3://(.+)/(.+)""".r
     metadata.artifactUrl match {

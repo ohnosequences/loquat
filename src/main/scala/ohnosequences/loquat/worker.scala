@@ -62,6 +62,8 @@ class DataProcessor(
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
 
+  final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
+
   lazy val aws = instanceAWSClients(config)
 
   // FIXME: don't use Option.get
@@ -239,7 +241,6 @@ class DataProcessor(
 
     logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
 
-    val workingDir = config.workingDir
 
     logger.info("Creating working directory: " + workingDir.path)
     workingDir.createDirectories()
