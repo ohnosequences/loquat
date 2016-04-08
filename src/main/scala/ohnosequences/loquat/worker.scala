@@ -165,11 +165,7 @@ class DataProcessor(
           }
           case S3Resource(s3Address) => {
             // FIXME: this shouldn't ignore the returned Try
-            // val destination: File = transferManager.download(s3Address, inputDir / name).get
-
-            val destination: File = (inputDir / name).createIfNotExists()
-            val request = new GetObjectRequest(s3Address.bucket, s3Address.key)
-            aws.s3.s3.getObject(request, destination.toJava)
+            val destination: File = transferManager.download(s3Address, inputDir / name).get
             (name -> destination)
           }
         }
@@ -209,7 +205,6 @@ class DataProcessor(
               )
             }
 
-            transferManager.shutdownNow(false)
             // TODO: check whether we can fold Try's here somehow
             if (uploadTries.forall(_.isSuccess)) {
               logger.info("Finished uploading output files. publishing message to the output queue.")
@@ -243,7 +238,6 @@ class DataProcessor(
 
     logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
 
-
     logger.info("Creating working directory: " + workingDir.path)
     workingDir.createDirectories()
 
@@ -269,14 +263,13 @@ class DataProcessor(
         logger.debug("Clearing working directory: " + workingDir.path)
         workingDir.clear()
 
-        // logger.info(s"time spent on the task [${dataMapping.id}]: ${timeSpent}")
-
         // FIXME: check this. what happens if result has failures?
         if (dataMappingResult.isSuccessful) {
           logger.info("Result was successful. deleting message from the input queue")
           inputQueue.deleteMessage(message)
         }
 
+        transferManager.shutdownNow(false)
       } catch {
         case e: Throwable => {
           logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
