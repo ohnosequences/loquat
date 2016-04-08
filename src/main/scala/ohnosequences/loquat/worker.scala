@@ -21,7 +21,7 @@ import scala.util.Try
 import upickle.Js
 
 import com.amazonaws.services.s3.transfer._
-import com.amazonaws.services.s3.model.ObjectMetadata
+import com.amazonaws.services.s3.model._
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -61,6 +61,8 @@ class DataProcessor(
   val config: AnyLoquatConfig,
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
+
+  final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
 
   lazy val aws = instanceAWSClients(config)
 
@@ -139,27 +141,18 @@ class DataProcessor(
     instance.foreach(_.terminate)
   }
 
-  private def processDataMapping(dataMapping: SimpleDataMapping, workingDir: File): AnyResult = {
+  private def processDataMapping(
+    transferManager: TransferManager,
+    dataMapping: SimpleDataMapping,
+    workingDir: File
+  ): AnyResult = {
+
     try {
-      if(workingDir.exists) {
-        logger.debug("Deleting working directory: " + workingDir.path)
-        workingDir.delete(true)
-      }
-      logger.info("Creating working directory: " + workingDir.path)
-      workingDir.createDirectories()
-
-      val inputDir = workingDir / "input"
-      logger.debug("Creating input directory: " + workingDir.path)
-      inputDir.createDirectories()
-
-      val outputDir = workingDir / "output"
-      logger.debug("Creating output directory: " + workingDir.path)
-      outputDir.createDirectories()
-
-
-      val transferManager = new TransferManager(aws.s3.s3)
 
       logger.info("Preparing dataMapping input")
+
+      val inputDir = workingDir / "input"
+
       val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
 
         logger.debug(s"Trying to create input object [${name}]")
@@ -234,6 +227,8 @@ class DataProcessor(
     } catch {
       case t: Throwable => {
         logger.error("Fatal failure during dataMapping processing", t)
+        errorQueue.sendMessage(upickle.default.write(t.getMessage))
+        terminateWorker
         Failure(Seq(t.getMessage))
       }
     }
@@ -243,8 +238,13 @@ class DataProcessor(
 
     logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
 
+    logger.info("Creating working directory: " + workingDir.path)
+    workingDir.createDirectories()
+
     while(!stopped) {
       try {
+        val transferManager = new TransferManager(aws.s3.s3)
+
         val message = waitForDataMapping(inputQueue)
 
         // instance.foreach(_.createTag(StatusTag.processing))
@@ -252,15 +252,16 @@ class DataProcessor(
         val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
 
         logger.info("DataProcessor processing message")
-
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
-          processDataMapping(dataMapping, config.workingDir)
+          processDataMapping(transferManager, dataMapping, workingDir)
         }
 
+        // NOTE: this is blocking until the Future gets a result
         val dataMappingResult = waitForResult(futureResult, message)
 
-        // logger.info(s"time spent on the task [${dataMapping.id}]: ${timeSpent}")
+        logger.debug("Clearing working directory: " + workingDir.path)
+        workingDir.clear()
 
         // FIXME: check this. what happens if result has failures?
         if (dataMappingResult.isSuccessful) {
@@ -268,6 +269,7 @@ class DataProcessor(
           inputQueue.deleteMessage(message)
         }
 
+        transferManager.shutdownNow(false)
       } catch {
         case e: Throwable => {
           logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")

@@ -24,7 +24,7 @@ case object dataProcessing {
       val txt: String = context.inputFile(text).contentAsString
       val prfx: String = context.inputFile(prefix).contentAsString
 
-      val outFile: File = context / s"${prfx}.transposed.txt"
+      val outFile: File = (context / s"${prfx}.transposed.txt").createIfNotExists()
 
       LazyTry {
         val matrixRows = context.inputFile(matrix).lines
