@@ -191,18 +191,25 @@ class DataProcessor(
           // TODO: simplify this huge if-else statement
           if (outputMap.keys.forall(_.exists)) {
 
-            val uploadTries = outputMap map { case (file, s3Address) =>
-              logger.info(s"Publishing output object: [${file.name}]")
-              transferManager.upload(
-                file,
-                s3Address,
-                Map(
-                  "artifact-org"     -> config.metadata.organization,
-                  "artifact-name"    -> config.metadata.artifact,
-                  "artifact-version" -> config.metadata.version,
-                  "artifact-url"     -> config.metadata.artifactUrl
+            val uploadTries = outputMap flatMap { case (file, s3Address) =>
+              if (file.isEmpty) {
+                logger.info(s"Output file [${file.name}] is empty. Skipping it.")
+                None
+              } else {
+                logger.info(s"Publishing output object: [${file.name}]")
+                Some(
+                  transferManager.upload(
+                    file,
+                    s3Address,
+                    Map(
+                      "artifact-org"     -> config.metadata.organization,
+                      "artifact-name"    -> config.metadata.artifact,
+                      "artifact-version" -> config.metadata.version,
+                      "artifact-url"     -> config.metadata.artifactUrl
+                    )
+                  )
                 )
-              )
+              }
             }
 
             // TODO: check whether we can fold Try's here somehow
