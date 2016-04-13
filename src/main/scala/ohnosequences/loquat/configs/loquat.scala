@@ -42,7 +42,10 @@ abstract class AnyLoquatConfig extends AnyConfig {
   val dataMappings: List[AnyDataMapping]
 
   /* This setting switches the check of existence of the input S3 objects */
-  val checkInputObjects: Boolean
+  val checkInputObjects: Boolean = true
+
+  /* This setting determines whether empty output files will be uploaded or not */
+  val skipEmptyResults: Boolean = true
 
 
 
