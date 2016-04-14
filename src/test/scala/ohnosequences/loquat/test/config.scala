@@ -38,7 +38,7 @@ case object config {
     val N = 10000
     val dataMappings: List[AnyDataMapping] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
 
-    val checkInputObjects = false
+    override val checkInputObjects = false
   }
 
   case object testLoquat extends Loquat(testConfig, test.dataProcessing.processingBundle)
