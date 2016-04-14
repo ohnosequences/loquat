@@ -10,15 +10,18 @@ import ohnosequences.loquat._, test.data._, test.dataProcessing._
 
 class PostingDataMappings extends org.scalatest.FunSuite {
 
-  // lazy val creds      = new com.amazonaws.auth.profile.ProfileCredentialsProvider("default")
+  lazy val creds      = new com.amazonaws.auth.profile.ProfileCredentialsProvider("default")
   lazy val clientConf = new com.amazonaws.ClientConfiguration
 
-  // lazy val connections  : Int = 400
-  // lazy val customConf = clientConf.withMaxConnections(connections)
+  lazy val connections  : Int = 400
+  lazy val customConf = clientConf.withMaxConnections(connections)
 
-  val sqs: SQS = new SQS(new com.amazonaws.services.sqs.AmazonSQSClient(clientConf))
+  val sqs: SQS = new SQS(
+    new com.amazonaws.services.sqs.AmazonSQSClient(clientConf)
+      .withRegion(com.amazonaws.regions.Regions.EU_WEST_1)
+  )
 
-  lazy val queueName: String = "loquat-testing-parallel"
+  lazy val queueName: String = "loquat-testing-parallel-2"
   lazy val queue    : Queue  = (sqs getQueueByName queueName) getOrElse (sqs createQueue queueName)
 
   val input   = S3Folder("loquat.testing", "input")
@@ -86,16 +89,16 @@ class PostingDataMappings extends org.scalatest.FunSuite {
   test("post dataMappings in parallel") {
 
     // NOTE too slow
-    runTest( 1,   400, 120 seconds )
-    runTest( 4,   400, 60 seconds )
-    runTest( 8,   400, 14 seconds )
-    runTest( 16,  400, 8 seconds )
-    runTest( 24,  400, 8 seconds )
-    runTest( 32,  800, 8 seconds )
-    runTest( 48,  400, 8 seconds )
-    runTest( 64,  400, 8 seconds )
-    runTest( 72,  400, 8 seconds )
-    runTest( 86,  400, 8 seconds )
+    // runTest( 1,   400, 120 seconds )
+    // runTest( 4,   400, 60 seconds )
+    // runTest( 8,   400, 14 seconds )
+    // runTest( 16,  400, 8 seconds )
+    // runTest( 24,  400, 8 seconds )
+    // runTest( 32,  800, 8 seconds )
+    // runTest( 48,  400, 8 seconds )
+    // runTest( 64,  400, 8 seconds )
+    // runTest( 72,  400, 8 seconds )
+    // runTest( 86,  400, 8 seconds )
     runTest( 94,  400, 8 seconds )
 
   }
