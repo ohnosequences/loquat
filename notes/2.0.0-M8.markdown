@@ -1,0 +1,2 @@
+* #56: Some improvements to the resource handling and a temporary solution for the "Too many open files" issue.
+* #59, #62: Added a configuration option to switch skipping empty output files on upload (on by default)
