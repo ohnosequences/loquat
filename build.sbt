@@ -5,11 +5,11 @@ description  := "🍋"
 organization := "ohnosequences"
 bucketSuffix := "era7.com"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
   // logging:
-  "ch.qos.logback"              % "logback-classic" % "1.1.3",
+  "ch.qos.logback"              % "logback-classic" % "1.1.7",
   "com.typesafe.scala-logging" %% "scala-logging"   % "3.1.0",
   // json:
   "com.lihaoyi" %% "upickle" % "0.3.6",
@@ -22,11 +22,12 @@ libraryDependencies ++= Seq(
   // files:
   "com.github.pathikrit" %% "better-files" % "2.13.0",
   // testing
-  "org.scalatest"  %% "scalatest" % "2.2.5" % Test
+  "org.scalatest"  %% "scalatest" % "2.2.6" % Test
 )
 
-
-// dependencyOverrides ++= Set()
+dependencyOverrides ++= Set(
+  "org.slf4j" % "slf4j-api" % "1.7.20"
+)
 
 // FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()
