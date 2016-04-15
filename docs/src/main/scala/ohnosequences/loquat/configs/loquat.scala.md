@@ -58,7 +58,13 @@ Metadata generated for your loquat project
 This setting switches the check of existence of the input S3 objects
 
 ```scala
-  val checkInputObjects: Boolean
+  val checkInputObjects: Boolean = true
+```
+
+This setting determines whether empty output files will be uploaded or not
+
+```scala
+  val skipEmptyResults: Boolean = true
 ```
 
 Here follow all the values that are dependent on those defined on top
@@ -69,8 +75,6 @@ Here follow all the values that are dependent on those defined on top
   lazy val ami: AnyAmazonLinuxAMI = managerConfig.instanceSpecs.ami
   lazy val amiEnv: AnyLinuxAMIEnvironment = amznAMIEnv(ami)
   lazy val region: Region = ami.region
-
-  final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
 
   lazy final val fatArtifactS3Object: S3Object = {
     val s3url = """s3://(.+)/(.+)""".r
