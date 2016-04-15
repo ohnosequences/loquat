@@ -5,7 +5,7 @@ description  := "🍋"
 organization := "ohnosequences"
 bucketSuffix := "era7.com"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
   // logging:
@@ -46,4 +46,4 @@ buildInfoKeys    := Seq[BuildInfoKey](
 
 //// Uncomment for testing: ////
 // For including test code in the fat artifact:
-unmanagedSourceDirectories in Compile += (scalaSource in Test).value
+// unmanagedSourceDirectories in Compile += (scalaSource in Test).value
