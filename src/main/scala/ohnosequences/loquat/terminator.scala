@@ -21,7 +21,8 @@ import better.files._
 private[loquat]
 case class TerminationDaemonBundle(
   val config: AnyLoquatConfig,
-  val scheduler: Scheduler
+  val scheduler: Scheduler,
+  val initialCount: Int
 ) extends Bundle() with LazyLogging {
 
   lazy val aws = instanceAWSClients(config)
@@ -78,8 +79,7 @@ case class TerminationDaemonBundle(
 
     lazy val afterInitial = TerminateAfterInitialDataMappings(
       config.terminationConfig.terminateAfterInitialDataMappings,
-      //FIXME: dataMappings.length
-      ???,
+      initialCount,
       successResults.size
     )
     logger.debug(s"${afterInitial}: ${afterInitial.check}")
