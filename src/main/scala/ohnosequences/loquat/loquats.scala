@@ -1,14 +1,12 @@
 package ohnosequences.loquat
 
 import utils._
-
 import ohnosequences.statika._
-
+import ohnosequences.datasets._
 import ohnosequences.awstools.AWSClients
-
 import com.typesafe.scalalogging.LazyLogging
-
 import scala.util.Try
+import collection.JavaConversions._
 
 
 trait AnyLoquat { loquat =>
@@ -32,8 +30,8 @@ trait AnyLoquat { loquat =>
 
   case object managerCompat extends CompatibleWithPrefix(fullName)(config.amiEnv, manager, config.metadata)
 
-  final def check(user: LoquatUser): Unit = LoquatOps.check(config, user)
-  final def deploy(user: LoquatUser): Unit = LoquatOps.deploy(config, user, managerCompat.userScript)
+  final def check(user: LoquatUser): Unit = LoquatOps.check(config, user, dataMappings)
+  final def deploy(user: LoquatUser): Unit = LoquatOps.deploy(config, user, dataMappings, managerCompat.userScript)
   final def undeploy(user: LoquatUser): Unit =
     LoquatOps.undeploy(
       config,
@@ -57,9 +55,37 @@ abstract class Loquat[
 private[loquat]
 case object LoquatOps extends LazyLogging {
 
+  def checkInputData(aws: AWSClients, dataMappings: List[AnyDataMapping]): Seq[String] = {
+
+    logger.info("Checking input S3 objects existence...")
+
+    dataMappings flatMap { dataMapping =>
+
+      // if an input object doesn't exist, we return an arror message
+      dataMapping.remoteInput flatMap {
+        case (dataKey, S3Resource(s3address)) => {
+          val exists: Boolean = Try(
+            aws.s3.s3.listObjects(s3address.bucket, s3address.key).getObjectSummaries
+          ).filter{ _.length > 0 }.isSuccess
+
+          if (exists) print("+") else print("-")
+
+          if (exists) None
+          else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address.url}]")
+        }
+        // if the mapping is not an S3Resource, we don't check
+        case _ => None
+      }
+    }
+  }
+
+  // def checkDataMappings(aws: AWSClients, checkInputObjects: Boolean): Seq[String] = {
+  // }
+
   def check(
     config: AnyLoquatConfig,
-    user: LoquatUser
+    user: LoquatUser,
+    dataMappings: List[AnyDataMapping]
   ): Either[String, AWSClients] = {
 
     if (Try( user.localCredentials.getCredentials ).isFailure) {
@@ -69,7 +95,27 @@ case object LoquatOps extends LazyLogging {
 
       if(user.validateWithLogging(aws).nonEmpty) Left("User validation failed")
       else if (config.validateWithLogging(aws).nonEmpty) Left("Config validation failed")
-      else Right(aws)
+      else {
+        logger.info("Checking that data mappings define all the needed data keys...")
+
+        val invalidDM = dataMappings.find { _.checkDataKeys.nonEmpty }
+
+        invalidDM match {
+
+          case Some(dm) => {
+            dm.checkDataKeys foreach { msg => logger.error(msg) }
+            Left("Some dataMappings are invalid")
+          }
+
+          case None => if (config.checkInputObjects) {
+            val missingInputs = checkInputData(aws, dataMappings)
+            missingInputs foreach { msg => logger.error(msg) }
+
+            if (missingInputs.nonEmpty) Left("Some input data is missing")
+            else Right(aws)
+          } else Right(aws)
+        }
+      }
     }
 
   }
@@ -78,10 +124,11 @@ case object LoquatOps extends LazyLogging {
   def deploy(
     config: AnyLoquatConfig,
     user: LoquatUser,
+    dataMappings: List[AnyDataMapping],
     managerUserScript: String
   ): Unit = {
 
-    LoquatOps.check(config, user) match {
+    LoquatOps.check(config, user, dataMappings) match {
       case Left(msg) => logger.error(msg)
       case Right(aws) => {
 
