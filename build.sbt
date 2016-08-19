@@ -1,5 +1,3 @@
-Nice.scalaProject
-
 name         := "loquat"
 description  := "🍋"
 organization := "ohnosequences"
@@ -32,19 +30,11 @@ dependencyOverrides ++= Set(
 // FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()
 
-fatArtifactSettings
 
-enablePlugins(BuildInfoPlugin)
-buildInfoPackage := "generated.metadata"
-buildInfoObject  := name.value.split("""\W""").map(_.capitalize).mkString
-buildInfoOptions := Seq(BuildInfoOption.Traits("ohnosequences.statika.AnyArtifactMetadata"))
-buildInfoKeys    := Seq[BuildInfoKey](
-  organization,
-  version,
-  "artifact" -> name.value.toLowerCase,
-  "artifactUrl" -> fatArtifactUrl.value
-)
+generateStatikaMetadataIn(Test)
 
-// //// Uncomment for testing: ////
-// // For including test code in the fat artifact:
-// unmanagedSourceDirectories in Compile += (scalaSource in Test).value
+// This includes tests sources in the assembled fat-jar:
+fullClasspath in assembly := (fullClasspath in Test).value
+
+// This turns on fat-jar publishing during release process:
+publishFatArtifact in Release := true
