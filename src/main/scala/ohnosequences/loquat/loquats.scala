@@ -16,15 +16,17 @@ trait AnyLoquat { loquat =>
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  type DataProcessingBundle <: AnyDataProcessingBundle
-  val  instructionsBundle: DataProcessingBundle
+  type DataProcessing <: AnyDataProcessingBundle
+  val  dataProcessing: DataProcessing
+
+  val dataMappings: List[DataMapping[DataProcessing]]
 
   lazy val fullName: String = this.getClass.getName.split("\\$").mkString(".")
 
   // Bundles hierarchy:
-  case object worker extends WorkerBundle(instructionsBundle, config)
+  case object worker extends WorkerBundle(dataProcessing, config)
 
-  case object manager extends ManagerBundle(worker) {
+  case object manager extends ManagerBundle(worker)(dataMappings) {
     override lazy val fullName: String = s"${loquat.fullName}.${this.toString}"
   }
 
@@ -42,11 +44,12 @@ trait AnyLoquat { loquat =>
 
 abstract class Loquat[
   C <: AnyLoquatConfig,
-  I <: AnyDataProcessingBundle
-](val config: C, val instructionsBundle: I) extends AnyLoquat {
+  DP <: AnyDataProcessingBundle
+](val config: C, val dataProcessing: DP
+)(val dataMappings: List[DataMapping[DP]]) extends AnyLoquat {
 
   type Config = C
-  type DataProcessingBundle = I
+  type DataProcessing = DP
 }
 
 

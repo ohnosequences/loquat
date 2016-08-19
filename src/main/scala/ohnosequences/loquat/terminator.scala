@@ -78,7 +78,8 @@ case class TerminationDaemonBundle(
 
     lazy val afterInitial = TerminateAfterInitialDataMappings(
       config.terminationConfig.terminateAfterInitialDataMappings,
-      config.dataMappings.length,
+      //FIXME: dataMappings.length
+      ???,
       successResults.size
     )
     logger.debug(s"${afterInitial}: ${afterInitial.check}")

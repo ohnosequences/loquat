@@ -23,6 +23,8 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   val config = worker.config
 
+  val dataMappings: List[DataMapping[Worker#DataProcessingBundle]]
+
   case object workerCompat extends CompatibleWithPrefix(fullName)(
     environment = config.amiEnv,
     bundle = worker,
@@ -40,7 +42,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   lazy val aws = instanceAWSClients(config)
 
-  def uploadInitialDataMappings(dataMappings: List[AnyDataMapping]): Try[Unit] = {
+  def uploadInitialDataMappings: Try[Unit] = {
     val managerStatus = aws.as.getTagValue(config.resourceNames.managerGroup, StatusTag.label)
 
     if (managerStatus == Some(StatusTag.running.status)) {
@@ -94,7 +96,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     lazy val normalScenario: Instructions[Unit] = {
       LazyTry {
         logger.debug("Uploading initial dataMappings to the input queue")
-        uploadInitialDataMappings(config.dataMappings).get
+        uploadInitialDataMappings.get
       } -&-
       LazyTry {
         aws.as.getAutoScalingGroupByName(config.resourceNames.managerGroup) map { group =>
@@ -142,4 +144,5 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
 private[loquat]
 abstract class ManagerBundle[W <: AnyWorkerBundle](val worker: W)
+  (val dataMappings: List[DataMapping[W#DataProcessingBundle]])
   extends AnyManagerBundle { type Worker = W }
