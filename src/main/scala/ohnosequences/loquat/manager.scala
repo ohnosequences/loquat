@@ -139,7 +139,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
         val subject = s"Loquat ${config.loquatId} manager failed during installation"
         val logTail = loggerBundle.logFile.lines.toSeq.takeRight(20).mkString("\n") // 20 last lines
-        val message = s"""${subject}.
+        val message = s"""${subject}. It will try to restart. If it's a fatal failure, you should manually undeploy the loquat.
           |Full log is at [${loggerBundle.logS3.getOrElse("Failed to get log S3 location")}]
           |Here is its tail:
           |
