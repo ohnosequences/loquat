@@ -39,7 +39,7 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
   val terminationConfig: TerminationConfig
 
-  val dataMappings: List[AnyDataMapping]
+  // val dataMappings: List[AnyDataMapping]
 
   /* This setting switches the check of existence of the input S3 objects */
   val checkInputObjects: Boolean = true
@@ -79,52 +79,10 @@ abstract class AnyLoquatConfig extends AnyConfig {
   )
 
   def validationErrors(aws: AWSClients): Seq[String] = {
-
-    logger.info("Checking that data mappings define all the needed data keys...")
-    dataMappings.find {
-      _.checkDataKeys.nonEmpty
-    } match {
-
-      case Some(dm) => dm.checkDataKeys
-
-      case _ => {
-
-        logger.info("Checking the fat-artifact existence...")
-        if (aws.s3.objectExists(fatArtifactS3Object).isFailure) {
-          Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
-        } else if(checkInputObjects) {
-
-          logger.info("Checking input S3 objects existence...")
-
-          print("[")
-
-          val errors: Seq[String] = dataMappings flatMap { dataMapping =>
-
-            // if an input object doesn't exist, we return an arror message
-            dataMapping.remoteInput flatMap {
-              case (dataKey, S3Resource(s3address)) => {
-                val exists: Boolean = Try(
-                  aws.s3.s3.listObjects(s3address.bucket, s3address.key).getObjectSummaries
-                ).filter{ _.length > 0 }.isSuccess
-
-                if (exists) print("+") else print("-")
-                // logger.debug(s"[${dataMapping.id}]: [${dataKey.label}] -> [${s3address.url}] ${if(exists) "exists" else "DOESN'T exist!"}")
-
-                if (exists) None
-                else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address.url}]")
-              }
-              // if the mapping is not an S3Resource, we don't check
-              case _ => None
-            }
-          }
-
-          println("]")
-
-          errors
-
-        } else Seq()
-      }
-    }
+    logger.info("Checking the fat-artifact existence...")
+    if (aws.s3.objectExists(fatArtifactS3Object).isFailure) {
+      Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+    } else Seq()
   }
 
 }
