@@ -35,9 +35,12 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   lazy final val scheduler = Scheduler(2)
 
+  lazy val loggerBundle = LogUploaderBundle(config, scheduler)
+  lazy val terminationBundle = TerminationDaemonBundle(config, scheduler, dataMappings.length)
+
   val bundleDependencies: List[AnyBundle] = List(
-    LogUploaderBundle(config, scheduler),
-    TerminationDaemonBundle(config, scheduler, dataMappings.length)
+    loggerBundle,
+    terminationBundle
   )
 
   lazy val aws = instanceAWSClients(config)
@@ -108,7 +111,8 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
             config.workersConfig.autoScalingGroup(
               config.resourceNames.workersGroup,
               keypairName,
-              config.iamRoleName
+              // config.iamRoleName
+              "foo"
             ),
             workerCompat.userScript
           )
@@ -119,7 +123,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           logger.debug("Waiting for the workers autoscaling group creation")
           utils.waitForResource(
             getResource = aws.as.getAutoScalingGroupByName(workersGroup.name),
-            tries = 30,
+            tries = 0,
             timeStep = 5.seconds
           )
 
@@ -133,6 +137,19 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     lazy val failScenario = {
       LazyTry {
         logger.error("Manager failed, trying to restart it")
+
+        val subject = s"Loquat ${config.loquatId} manager failed during installation"
+        val logTail = loggerBundle.logFile.lines.toSeq.takeRight(30).mkString("\n") // 30 last lines
+        val message = s"""Full log is at
+          |  ${loggerBundle.logS3.getOrElse("Failed to get log S3 location")}
+          |Here is its tail:
+          |
+          |${logTail}
+          |""".stripMargin
+
+        val notificationTopic = aws.sns.createTopic(config.resourceNames.notificationTopic)
+        notificationTopic.publish(message, subject)
+
         aws.ec2.getCurrentInstance.foreach(_.terminate)
       } -&-
       failure[Unit]("Manager failed during installation")
