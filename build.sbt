@@ -29,6 +29,7 @@ dependencyOverrides ++= Set(
 
 // FIXME: warts should be turn on back after the code clean up
 wartremoverErrors in (Compile, compile) := Seq()
+wartremoverErrors in (Test,    compile) := Seq()
 
 
 generateStatikaMetadataIn(Test)
