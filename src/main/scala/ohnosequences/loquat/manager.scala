@@ -35,9 +35,12 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   lazy final val scheduler = Scheduler(2)
 
+  lazy val loggerBundle = LogUploaderBundle(config, scheduler)
+  lazy val terminationBundle = TerminationDaemonBundle(config, scheduler, dataMappings.length)
+
   val bundleDependencies: List[AnyBundle] = List(
-    LogUploaderBundle(config, scheduler),
-    TerminationDaemonBundle(config, scheduler, dataMappings.length)
+    loggerBundle,
+    terminationBundle
   )
 
   lazy val aws = instanceAWSClients(config)
@@ -133,6 +136,20 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     lazy val failScenario = {
       LazyTry {
         logger.error("Manager failed, trying to restart it")
+
+        val subject = s"Loquat ${config.loquatId} manager failed during installation"
+        val logTail = loggerBundle.logFile.lines.toSeq.takeRight(20).mkString("\n") // 20 last lines
+        val message = s"""${subject}. It will try to restart. If it's a fatal failure, you should manually undeploy the loquat.
+          |Full log is at [${loggerBundle.logS3.getOrElse("Failed to get log S3 location")}]
+          |Here is its tail:
+          |
+          |[...]
+          |${logTail}
+          |""".stripMargin
+
+        val notificationTopic = aws.sns.createTopic(config.resourceNames.notificationTopic)
+        notificationTopic.publish(message, subject)
+
         aws.ec2.getCurrentInstance.foreach(_.terminate)
       } -&-
       failure[Unit]("Manager failed during installation")

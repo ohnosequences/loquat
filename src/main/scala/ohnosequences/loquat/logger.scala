@@ -22,16 +22,21 @@ case class LogUploaderBundle(
 
   lazy val aws = instanceAWSClients(config)
 
-  val logFile = file"/root/log.txt"
-  val bucket = config.resourceNames.bucket
+  lazy val logFile = file"/root/log.txt"
 
-  def uploadLog(): Unit = Try {
-    aws.ec2.getCurrentInstanceId.get
-  }.map { id =>
-    aws.s3.uploadFile(S3Object(bucket, s"${config.loquatId}/${id}.log"), logFile.toJava)
+  lazy val bucket = config.resourceNames.bucket
+  lazy val logS3: Option[S3Object] = aws.ec2.getCurrentInstanceId.map { id =>
+    S3Object(bucket, s"${config.loquatId}/${id}.log")
+  }
+  // getOrElse {
+  //   logger.error(s"Failed to get current instance ID")
+  // }
+
+  def uploadLog(): Unit = logS3.map { destination =>
+    aws.s3.uploadFile(destination, logFile.toJava)
     ()
   }.getOrElse {
-    logger.error(s"Failed to upload the log to the bucket [${bucket}]")
+    logger.error(s"Failed to upload the log to [${bucket}]")
   }
 
   def instructions: AnyInstructions = LazyTry[Unit] {
