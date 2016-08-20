@@ -111,8 +111,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
             config.workersConfig.autoScalingGroup(
               config.resourceNames.workersGroup,
               keypairName,
-              // config.iamRoleName
-              "foo"
+              config.iamRoleName
             ),
             workerCompat.userScript
           )
@@ -123,7 +122,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           logger.debug("Waiting for the workers autoscaling group creation")
           utils.waitForResource(
             getResource = aws.as.getAutoScalingGroupByName(workersGroup.name),
-            tries = 0,
+            tries = 30,
             timeStep = 5.seconds
           )
 
@@ -139,11 +138,12 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         logger.error("Manager failed, trying to restart it")
 
         val subject = s"Loquat ${config.loquatId} manager failed during installation"
-        val logTail = loggerBundle.logFile.lines.toSeq.takeRight(30).mkString("\n") // 30 last lines
-        val message = s"""Full log is at
-          |  ${loggerBundle.logS3.getOrElse("Failed to get log S3 location")}
+        val logTail = loggerBundle.logFile.lines.toSeq.takeRight(20).mkString("\n") // 20 last lines
+        val message = s"""${subject}.
+          |Full log is at [${loggerBundle.logS3.getOrElse("Failed to get log S3 location")}]
           |Here is its tail:
           |
+          |[...]
           |${logTail}
           |""".stripMargin
 
