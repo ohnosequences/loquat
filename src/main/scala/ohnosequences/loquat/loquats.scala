@@ -73,7 +73,7 @@ case object LoquatOps extends LazyLogging {
           if (exists) print("+") else print("-")
 
           if (exists) None
-          else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address.url}]")
+          else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address}]")
         }
         // if the mapping is not an S3Resource, we don't check
         case _ => None

@@ -81,7 +81,7 @@ abstract class AnyLoquatConfig extends AnyConfig {
   def validationErrors(aws: AWSClients): Seq[String] = {
     logger.info("Checking the fat-artifact existence...")
     if (! aws.s3.objectExists(fatArtifactS3Object)) {
-      Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+      Seq(s"Couldn't access the artifact at [${fatArtifactS3Object}] (probably you forgot to publish it)")
     } else Seq()
   }
 

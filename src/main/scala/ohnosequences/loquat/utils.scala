@@ -139,7 +139,7 @@ case object utils {
       destination: File
     ): Try[File] = {
       println(s"""Dowloading object
-        |from: ${s3Address.url}
+        |from: ${s3Address}
         |to: ${destination.path}
         |""".stripMargin
       )
@@ -171,7 +171,7 @@ case object utils {
     ): Try[AnyS3Address] = {
       println(s"""Uploading object
         |from: ${file.path}
-        |to: ${s3Address.url}
+        |to: ${s3Address}
         |""".stripMargin
       )
 
