@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
   "ohnosequences" %% "statika"     % "2.0.0-M5-4-gb18d01a",
   "ohnosequences" %% "datasets"    % "0.3.0-7-g9bb7220",
   // amazon:
-  "ohnosequences" %% "aws-scala-tools" % "0.17.0-26-gfa0b497",
+  "ohnosequences" %% "aws-scala-tools" % "0.17.0",
   // files:
   "com.github.pathikrit" %% "better-files" % "2.13.0",
   // testing
@@ -24,7 +24,7 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides ++= Set(
-  "ohnosequences" %% "aws-scala-tools" % "0.17.0",
+  "ohnosequences" %% "aws-scala-tools" % "0.17.0-27-g79054e6",
   "org.slf4j" % "slf4j-api" % "1.7.20"
 )
 

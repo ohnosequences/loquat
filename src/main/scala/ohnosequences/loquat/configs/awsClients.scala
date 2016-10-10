@@ -17,7 +17,6 @@ case class AWSClients(
   lazy val as = AutoScaling.create(credentialsProvider, ec2, region)
   lazy val sns = SNS.create(credentialsProvider, region)
 
-  lazy val sqs = SQS.create(credentialsProvider, region)
-  // lazy val sqs = awstools.sqs.client(credentials = credentialsProvider, region = region)
+  lazy val sqs = awstools.sqs.client(credentials = credentialsProvider, region = region)
   lazy val s3 = awstools.s3.client(credentialsProvider, region)
 }

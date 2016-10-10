@@ -3,9 +3,7 @@ package ohnosequences.loquat
 import utils._
 
 import ohnosequences.statika._
-
 import ohnosequences.datasets._
-
 import ohnosequences.awstools._, sqs._, s3._
 
 import com.typesafe.scalalogging.LazyLogging
@@ -64,10 +62,11 @@ class DataProcessor(
 
   lazy val aws = instanceAWSClients(config)
 
-  // FIXME: don't use Option.get
-  val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
-  val errorQueue = aws.sqs.getQueueByName(config.resourceNames.errorQueue).get
-  val outputQueue = aws.sqs.getQueueByName(config.resourceNames.outputQueue).get
+  // FIXME: don't use Try.get
+  import ohnosequences.awstools.sqs._
+  val inputQueue = aws.sqs.get(config.resourceNames.inputQueue).get
+  val errorQueue = aws.sqs.get(config.resourceNames.errorQueue).get
+  val outputQueue = aws.sqs.get(config.resourceNames.outputQueue).get
 
   val instance = aws.ec2.getCurrentInstance
 
@@ -75,16 +74,17 @@ class DataProcessor(
 
   def waitForDataMapping(queue: Queue): Message = {
 
-    var message: Option[Message] = queue.receiveMessage
+    var message: Try[Option[Message]] = queue.receiveOne
 
-    while(message.isEmpty) {
+    // FIXME
+    while(message.isFailure || message.get.isEmpty) {
       logger.info("Data processor is waiting for new data")
       // instance.foreach(_.createTag(StatusTag.idle))
       Thread.sleep(10.seconds.toMillis)
-      message = queue.receiveMessage
+      message = queue.receiveOne
     }
 
-    message.get
+    message.get.get
   }
 
   def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
@@ -109,7 +109,7 @@ class DataProcessor(
           case None => {
             // every 5min we extend it for 6min
             if (tries % (5*60) == 0) {
-              if (Try(message.changeVisibilityTimeout(6*60)).isFailure)
+              if (Try(message.changeVisibility(6*60)).isFailure)
                 logger.warn("Couldn't change the visibility globalTimeout")
               // FIXME: something weird is happening here
             }
@@ -177,7 +177,7 @@ class DataProcessor(
       result match {
         case Failure(tr) => {
           logger.error(s"Script finished with non zero code: ${result}. publishing it to the error queue.")
-          errorQueue.sendMessage(upickle.default.write(resultDescription))
+          errorQueue.sendOne(upickle.default.write(resultDescription))
           result
         }
         case Success(tr, outputFileMap) => {
@@ -213,7 +213,7 @@ class DataProcessor(
             // TODO: check whether we can fold Try's here somehow
             if (uploadTries.forall(_.isSuccess)) {
               logger.info("Finished uploading output files. publishing message to the output queue.")
-              outputQueue.sendMessage(upickle.default.write(resultDescription))
+              outputQueue.sendOne(upickle.default.write(resultDescription))
               result //-&- success(s"task [${dataMapping.id}] is successfully finished", ())
             } else {
               logger.error(s"Some uploads failed: ${uploadTries.filter(_.isFailure)}")
@@ -232,7 +232,7 @@ class DataProcessor(
     } catch {
       case t: Throwable => {
         logger.error("Fatal failure during dataMapping processing", t)
-        errorQueue.sendMessage(upickle.default.write(t.getMessage))
+        errorQueue.sendOne(upickle.default.write(t.getMessage))
         terminateWorker
         Failure(Seq(t.getMessage))
       }
@@ -272,14 +272,14 @@ class DataProcessor(
         // FIXME: check this. what happens if result has failures?
         if (dataMappingResult.isSuccessful) {
           logger.info("Result was successful. deleting message from the input queue")
-          inputQueue.deleteMessage(message)
+          message.delete()
         }
 
         transferManager.tm.shutdownNow(false)
       } catch {
         case e: Throwable => {
           logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
-          errorQueue.sendMessage(upickle.default.write(e.getMessage))
+          errorQueue.sendOne(upickle.default.write(e.getMessage))
           terminateWorker
         }
       }

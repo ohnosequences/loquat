@@ -55,7 +55,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       scala.util.Success( () )
     } else {
 
-      lazy val getQueue = Try { aws.sqs.getQueueByName(config.resourceNames.inputQueue).get }
+      lazy val getQueue = aws.sqs.get(config.resourceNames.inputQueue)
 
       lazy val upload = getQueue match {
         case scala.util.Failure(t) => {
@@ -67,7 +67,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
           // NOTE: we can send messages in parallel
           dataMappings.zipWithIndex.par.foreach { case (dataMapping, ix) =>
-            inputQueue.sendMessage(
+            inputQueue.sendOne(
               upickle.default.write[SimpleDataMapping](
                 SimpleDataMapping(
                   id = ix.toString,

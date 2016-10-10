@@ -3,7 +3,8 @@ package ohnosequences.loquat
 import utils._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools._, sqs._, s3._
+import ohnosequences.awstools._, s3._
+import ohnosequences.awstools.sqs._
 
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
@@ -221,16 +222,19 @@ case object LoquatOps extends LazyLogging {
       Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
     ).execute
 
+    // FIXME: I don't know why this import is needed here
+    import ohnosequences.awstools.sqs._
+
     Step(s"deleting error queue: ${names.errorQueue}")(
-      Try { aws.sqs.getQueueByName(names.errorQueue).foreach(_.delete) }
+      aws.sqs.get(names.errorQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting output queue: ${names.outputQueue}")(
-      Try { aws.sqs.getQueueByName(names.outputQueue).foreach(_.delete) }
+      aws.sqs.get(names.outputQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting input queue: ${names.inputQueue}")(
-      Try { aws.sqs.getQueueByName(names.inputQueue).foreach(_.delete) }
+      aws.sqs.get(names.inputQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting manager group: ${names.managerGroup}")(

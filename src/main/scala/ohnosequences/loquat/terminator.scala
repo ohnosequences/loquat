@@ -45,9 +45,13 @@ case class TerminationDaemonBundle(
   def checkConditions(): Unit = {
     logger.info(s"Checking termination conditions")
 
-    aws.sqs.getQueueByName(config.resourceNames.outputQueue) match {
-      case None => logger.error(s"Couldn't access output queue: ${config.resourceNames.outputQueue}")
-      case Some(outputQueue) =>
+    aws.sqs.get(config.resourceNames.outputQueue) match {
+      case scala.util.Failure(ex) => {
+        logger.error(s"Couldn't access output queue: ${config.resourceNames.outputQueue}")
+        // FIXME: check typical exceptions
+        logger.error(ex.toString)
+      }
+      case scala.util.Success(outputQueue) =>
         receiveProcessingResults(outputQueue) match {
           case scala.util.Failure(t) => {
             logger.error(s"Couldn't poll the queue: ${config.resourceNames.outputQueue}\n${t.getMessage()}")
@@ -61,9 +65,13 @@ case class TerminationDaemonBundle(
     }
     logger.debug(s"Success results: ${successResults.size}")
 
-    aws.sqs.getQueueByName(config.resourceNames.errorQueue) match {
-      case None => logger.error(s"Couldn't access error queue: ${config.resourceNames.errorQueue}")
-      case Some(errorQueue) =>
+    aws.sqs.get(config.resourceNames.errorQueue) match {
+      case scala.util.Failure(ex) => {
+        logger.error(s"Couldn't access error queue: ${config.resourceNames.errorQueue}")
+        // FIXME: check typical exceptions
+        logger.error(ex.toString)
+      }
+      case scala.util.Success(errorQueue) =>
         receiveProcessingResults(errorQueue) match {
           case scala.util.Failure(t) => {
             logger.error(s"Couldn't poll the queue: ${config.resourceNames.errorQueue}\n${t.getMessage()}")
@@ -108,6 +116,7 @@ case class TerminationDaemonBundle(
     reason.foreach{ LoquatOps.undeploy(config, aws, _) }
   }
 
+  // FIXME: use queue.poll here
   def receiveProcessingResults(queue: sqs.Queue): Try[List[ProcessingResult]] = {
 
     val pollingDeadline: Deadline = 20.seconds.fromNow
@@ -117,7 +126,7 @@ case class TerminationDaemonBundle(
     */
     def getMessageBodies(): List[String] = {
       val bodies = queue.sqs.receiveMessage(
-        new amzn.sqs.model.ReceiveMessageRequest(queue.url)
+        new amzn.sqs.model.ReceiveMessageRequest(queue.url.toString)
           .withMaxNumberOfMessages(10) // this is the maximum we can ask Amazon for
       ).getMessages.toList.map{ _.getBody }
       // logger.debug(s"Received [${bodies.length}] messages from the queue ${queue.name}")
