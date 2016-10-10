@@ -9,7 +9,8 @@ import com.typesafe.scalalogging.LazyLogging
 import ohnosequences.awstools.sqs._
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 
-import scala.concurrent.duration._
+import java.util.concurrent.Executors
+import scala.concurrent._, duration._
 import scala.util.Try
 
 
@@ -55,42 +56,50 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       scala.util.Success( () )
     } else {
 
-      lazy val getQueue = aws.sqs.get(config.resourceNames.inputQueue)
-
-      lazy val upload = getQueue match {
-        case scala.util.Failure(t) => {
+      val queue: Try[Queue] = aws.sqs.get(config.resourceNames.inputQueue)
+        .recoverWith { case t =>
           logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")
-          scala.util.Failure[Unit](t)
+          scala.util.Failure[Queue](t)
         }
-        case scala.util.Success(inputQueue) => Try {
-          logger.debug("Adding initial dataMappings to SQS")
 
-          // NOTE: we can send messages in parallel
-          dataMappings.zipWithIndex.par.foreach { case (dataMapping, ix) =>
-            inputQueue.sendOne(
-              upickle.default.write[SimpleDataMapping](
-                SimpleDataMapping(
-                  id = ix.toString,
-                  inputs = toMap(dataMapping.remoteInput),
-                  outputs = toMap(dataMapping.remoteOutput)
-                )
-              )
-            )
-          }
-        }
+      val msgs: Iterator[String] = dataMappings.toIterator.zipWithIndex.map { case (dataMapping, ix) =>
+        upickle.default.write[SimpleDataMapping](
+          SimpleDataMapping(
+            id = ix.toString,
+            inputs = toMap(dataMapping.remoteInput),
+            outputs = toMap(dataMapping.remoteOutput)
+          )
+        )
       }
 
-      upload match {
-        case fail @ scala.util.Failure(_) => {
-          logger.error("Failed to upload initial dataMappings")
-          fail
-        }
-        case scala.util.Success(inputQueue) => Try {
+      // TODO: 100 connections? more?
+      val executor = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(100))
+
+      val tryToSend: Try[SendBatchResult] = queue.map { inputQueue =>
+        logger.debug("Adding initial dataMappings to SQS")
+
+        Await.result(inputQueue.sendBatch(msgs)(executor), 1.hour)
+      }
+
+      executor.shutdown()
+
+      tryToSend.flatMap { result =>
+        if (result.failures.nonEmpty) {
+          // Probably printing all errors is too much, this is just to see which kinds of errors occure
+          logger.error("Failed to batch send initial dataMappings:")
+          result.failures.take(10).foreach { case (msg, err) =>
+            logger.error(s"Error ${err.getCode}: ${err.getMessage} (sender fault: ${err.getSenderFault}). \n${msg}\n")
+          }
+          // TODO: better exception here?
+          scala.util.Failure(new RuntimeException("Failed to upload initial dataMappings"))
+        } else {
           // NOTE: we tag manager group as running
           aws.as.createTags(config.resourceNames.managerGroup, StatusTag.running)
           logger.info("Initial dataMappings are ready")
+          scala.util.Success( () )
         }
       }
+
     }
   }
 
