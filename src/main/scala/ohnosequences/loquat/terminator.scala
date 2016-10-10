@@ -116,56 +116,17 @@ case class TerminationDaemonBundle(
     reason.foreach{ LoquatOps.undeploy(config, aws, _) }
   }
 
-  // FIXME: use queue.poll here
-  def receiveProcessingResults(queue: sqs.Queue): Try[List[ProcessingResult]] = {
+  // TODO: use approxMsgAvailable/InFlight instead of polling (it's too slow and expensive)
+  def receiveProcessingResults(queue: sqs.Queue): Try[Seq[ProcessingResult]] = {
 
-    val pollingDeadline: Deadline = 20.seconds.fromNow
-
-    /* Note that this request does so called short-polling, see the [Amazon documentation](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/sqs/model/ReceiveMessageRequest.html).
-       Long polling doesn't work here, because it returns too many responses with the same messages (so it's not clear when you can stop polling).
-    */
-    def getMessageBodies(): List[String] = {
-      val bodies = queue.sqs.receiveMessage(
-        new amzn.sqs.model.ReceiveMessageRequest(queue.url.toString)
-          .withMaxNumberOfMessages(10) // this is the maximum we can ask Amazon for
-      ).getMessages.toList.map{ _.getBody }
-      // logger.debug(s"Received [${bodies.length}] messages from the queue ${queue.name}")
-      bodies
+    queue.poll(
+      timeout = 20.seconds,
+      maxSequentialEmptyResponses = 5
+    ).map { msgs =>
+      msgs.map { msg =>
+        upickle.default.read[ProcessingResult](msg.body)
+      }
     }
-
-    /* We are polling the queue until we get an empty response 5+ times in a row,
-       because short polling eventually returns false empty responses.
-    */
-    def pollQueue: List[String] = {
-
-      // logger.debug(s">>> Started polling ${queue.name}")
-
-      @scala.annotation.tailrec
-        def pollQueue_rec(
-          acc: scala.collection.mutable.ListBuffer[String],
-          tries: Int
-        ): List[String] = {
-          Thread.sleep(300)
-          val response = getMessageBodies()
-
-          if (pollingDeadline.isOverdue) acc.toList
-          else if (response.isEmpty) {
-            if (tries > 5) acc.toList
-            else
-              pollQueue_rec(acc ++= response, tries + 1)
-          } else
-            pollQueue_rec(acc ++= response, 0)
-        }
-
-      val result = pollQueue_rec(scala.collection.mutable.ListBuffer(), 0)
-      // logger.debug(s"<<< Finished polling. got ${result.length} messages")
-      result
-    }
-
-    Try {
-      pollQueue.map { upickle.default.read[ProcessingResult](_) }
-    }
-
   }
 
 }
