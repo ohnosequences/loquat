@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-import ohnosequences.awstools.sqs
+import ohnosequences.awstools._, sqs._
 
 import com.amazonaws.{ services => amzn }
 

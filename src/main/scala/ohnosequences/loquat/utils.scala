@@ -10,7 +10,7 @@ case object utils {
   import ohnosequences.awstools.ec2._
   import ohnosequences.awstools.s3._
   import ohnosequences.awstools.autoscaling.{ AutoScaling, AutoScalingGroup }
-  import ohnosequences.awstools.AWSClients
+
 
   import com.amazonaws.auth.InstanceProfileCredentialsProvider
   import com.amazonaws.services.s3.transfer._
@@ -36,7 +36,7 @@ case object utils {
     l.map{ case (d, v) => (d.tpe.label, v) }
 
 
-  def instanceAWSClients(config: AnyLoquatConfig) = AWSClients.create(
+  def instanceAWSClients(config: AnyLoquatConfig) = AWSClients(
     credentialsProvider = new InstanceProfileCredentialsProvider(),
     region = config.region
   )

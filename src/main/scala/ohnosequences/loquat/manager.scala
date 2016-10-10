@@ -6,6 +6,7 @@ import ohnosequences.statika._
 
 import com.typesafe.scalalogging.LazyLogging
 
+import ohnosequences.awstools.sqs._
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 
 import scala.concurrent.duration._

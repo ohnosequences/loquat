@@ -5,7 +5,7 @@ import utils._
 import ohnosequences.statika.AnyArtifactMetadata
 import ohnosequences.statika.aws._
 
-import ohnosequences.awstools.AWSClients
+
 import ohnosequences.awstools.regions.Region
 import ohnosequences.awstools.ec2.AnyAmazonLinuxAMI
 import ohnosequences.awstools.s3._
@@ -80,7 +80,7 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
   def validationErrors(aws: AWSClients): Seq[String] = {
     logger.info("Checking the fat-artifact existence...")
-    if (aws.s3.objectExists(fatArtifactS3Object).isFailure) {
+    if (! aws.s3.objectExists(fatArtifactS3Object)) {
       Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
     } else Seq()
   }

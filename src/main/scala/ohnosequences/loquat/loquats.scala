@@ -3,7 +3,8 @@ package ohnosequences.loquat
 import utils._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools.AWSClients
+import ohnosequences.awstools._, sqs._, s3._
+
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
 import collection.JavaConversions._
@@ -35,7 +36,7 @@ trait AnyLoquat { loquat =>
   final def undeploy(user: LoquatUser): Unit =
     LoquatOps.undeploy(
       config,
-      AWSClients.create(user.localCredentials, config.region),
+      AWSClients(user.localCredentials, config.region),
       TerminateManually
     )
 }
@@ -64,8 +65,9 @@ case object LoquatOps extends LazyLogging {
       // if an input object doesn't exist, we return an arror message
       dataMapping.remoteInput flatMap {
         case (dataKey, S3Resource(s3address)) => {
+          // FIXME: should be in awstools
           val exists: Boolean = Try(
-            aws.s3.s3.listObjects(s3address.bucket, s3address.key).getObjectSummaries
+            aws.s3.listObjects(s3address.bucket, s3address.key).getObjectSummaries
           ).filter{ _.length > 0 }.isSuccess
 
           if (exists) print("+") else print("-")
@@ -91,7 +93,7 @@ case object LoquatOps extends LazyLogging {
     if (Try( user.localCredentials.getCredentials ).isFailure) {
       Left(s"Couldn't load local credentials: ${user.localCredentials}")
     } else {
-      val aws = AWSClients.create(user.localCredentials, config.region)
+      val aws = AWSClients(user.localCredentials, config.region)
 
       if(user.validateWithLogging(aws).nonEmpty) Left("User validation failed")
       else if (config.validateWithLogging(aws).nonEmpty) Left("Config validation failed")
@@ -155,7 +157,7 @@ case object LoquatOps extends LazyLogging {
           ),
           Step( s"Checking the bucket: ${names.bucket}" )(
             Try {
-              if(aws.s3.bucketExists(names.bucket)) {
+              if(aws.s3.doesBucketExist(names.bucket)) {
                 logger.info(s"Bucket [${names.bucket}] already exists.")
               } else {
                 logger.info(s"Bucket [${names.bucket}] doesn't exists. Trying to create it.")
@@ -245,7 +247,7 @@ case object LoquatOps extends LazyLogging {
   // def addDataMappings(loquat: AnyLoquat, dataMappings: List[AnyDataMapping]): Unit = {
   //
   //   val sqs = SQS.create(loquat.config.localCredentials)
-  //   val inputQueue = sqs.getQueueByName(loquat.config.resourceNames.inputQueue).get
+  //   val inputQueue = sqs.get(loquat.config.resourceNames.inputQueue).get
   //   dataMappings.foreach {
   //     t => inputQueue.sendMessage(upickle.default.write[SimpleDataMapping](t))
   //   }

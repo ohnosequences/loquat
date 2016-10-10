@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 import ohnosequences.awstools.ec2._
 import ohnosequences.awstools.autoscaling._
-import ohnosequences.awstools.AWSClients
+
 
 
 trait AnyAutoScalingConfig extends AnyConfig { conf =>

@@ -6,9 +6,7 @@ import ohnosequences.statika._
 
 import ohnosequences.datasets._
 
-import ohnosequences.awstools.sqs.Message
-import ohnosequences.awstools.sqs.Queue
-import ohnosequences.awstools.s3._
+import ohnosequences.awstools._, sqs._, s3._
 
 import com.typesafe.scalalogging.LazyLogging
 
@@ -165,7 +163,7 @@ class DataProcessor(
           }
           case S3Resource(s3Address) => {
             // FIXME: this shouldn't ignore the returned Try
-            val destination: File = transferManager.download(s3Address, inputDir / name).get
+            val destination: File = utils.TransferManagerOps(transferManager).download(s3Address, inputDir / name).get
             (name -> destination)
           }
         }
@@ -198,7 +196,7 @@ class DataProcessor(
               } else {
                 logger.info(s"Publishing output object: [${file.name}]")
                 Some(
-                  transferManager.upload(
+                  utils.TransferManagerOps(transferManager).upload(
                     file,
                     s3Address,
                     Map(
@@ -250,7 +248,8 @@ class DataProcessor(
 
     while(!stopped) {
       try {
-        val transferManager = new TransferManager(aws.s3.s3)
+        // FIXME
+        val transferManager = utils.TransferManagerOps(new TransferManager(aws.s3))
 
         val message = waitForDataMapping(inputQueue)
 
@@ -261,7 +260,7 @@ class DataProcessor(
         logger.info("DataProcessor processing message")
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
-          processDataMapping(transferManager, dataMapping, workingDir)
+          processDataMapping(transferManager.tm, dataMapping, workingDir)
         }
 
         // NOTE: this is blocking until the Future gets a result
@@ -276,7 +275,7 @@ class DataProcessor(
           inputQueue.deleteMessage(message)
         }
 
-        transferManager.shutdownNow(false)
+        transferManager.tm.shutdownNow(false)
       } catch {
         case e: Throwable => {
           logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")

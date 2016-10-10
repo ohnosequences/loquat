@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import ohnosequences.awstools.AWSClients
+
 import ohnosequences.awstools.ec2.EC2
 
 import com.amazonaws.auth.AWSCredentialsProvider

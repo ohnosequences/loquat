@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 import scala.concurrent.duration._
 
-import ohnosequences.awstools.AWSClients
+
 
 
 trait AnyTerminationReason {

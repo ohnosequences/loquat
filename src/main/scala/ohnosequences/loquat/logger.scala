@@ -9,6 +9,7 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
 import ohnosequences.awstools.s3._
+import scala.concurrent._
 import java.util.concurrent._
 import scala.util.Try
 import better.files._
@@ -31,16 +32,17 @@ case class LogUploaderBundle(
   // getOrElse {
   //   logger.error(s"Failed to get current instance ID")
   // }
+  lazy val tm = utils.TransferManagerOps(aws.s3.createTransferManager)
 
   def uploadLog(): Unit = logS3.map { destination =>
-    aws.s3.uploadFile(destination, logFile.toJava)
+    tm.upload(logFile, destination, Map())
     ()
   }.getOrElse {
     logger.error(s"Failed to upload the log to [${bucket}]")
   }
 
   def instructions: AnyInstructions = LazyTry[Unit] {
-    if (aws.s3.bucketExists(bucket)) {
+    if (aws.s3.doesBucketExist(bucket)) {
       scheduler.repeat(
         after = 30.seconds,
         every = 30.seconds
