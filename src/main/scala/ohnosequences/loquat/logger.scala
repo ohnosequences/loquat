@@ -3,14 +3,11 @@ package ohnosequences.loquat
 import utils._
 
 import ohnosequences.statika._
+import ohnosequences.awstools.s3._
 
 import com.typesafe.scalalogging.LazyLogging
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration._
-
-import ohnosequences.awstools.s3._
-import scala.concurrent._
 import java.util.concurrent._
+import scala.concurrent._, duration._
 import scala.util.Try
 import better.files._
 
@@ -32,10 +29,10 @@ case class LogUploaderBundle(
   // getOrElse {
   //   logger.error(s"Failed to get current instance ID")
   // }
-  lazy val tm = utils.TransferManagerOps(aws.s3.createTransferManager)
+  lazy val tm = aws.s3.createTransferManager
 
   def uploadLog(): Unit = logS3.map { destination =>
-    tm.upload(logFile, destination, Map())
+    tm.upload(logFile.toJava, destination)
     ()
   }.getOrElse {
     logger.error(s"Failed to upload the log to [${bucket}]")

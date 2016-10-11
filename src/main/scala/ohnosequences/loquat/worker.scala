@@ -4,20 +4,16 @@ import utils._
 
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools._, sqs._, s3._
+
+import com.amazonaws.services.s3.transfer.TransferManager
+import ohnosequences.awstools.sqs._
+import ohnosequences.awstools.s3._
 
 import com.typesafe.scalalogging.LazyLogging
-
 import better.files._
-
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent._, duration._
 import scala.util.Try
-
 import upickle.Js
-
-import com.amazonaws.services.s3.transfer._
-import com.amazonaws.services.s3.model._
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -163,7 +159,7 @@ class DataProcessor(
           }
           case S3Resource(s3Address) => {
             // FIXME: this shouldn't ignore the returned Try
-            val destination: File = utils.TransferManagerOps(transferManager).download(s3Address, inputDir / name).get
+            val destination: File = transferManager.download(s3Address, (inputDir / name).toJava).get.toScala
             (name -> destination)
           }
         }
@@ -196,8 +192,8 @@ class DataProcessor(
               } else {
                 logger.info(s"Publishing output object: [${file.name}]")
                 Some(
-                  utils.TransferManagerOps(transferManager).upload(
-                    file,
+                  transferManager.upload(
+                    file.toJava,
                     s3Address,
                     Map(
                       "artifact-org"     -> config.metadata.organization,
@@ -248,8 +244,7 @@ class DataProcessor(
 
     while(!stopped) {
       try {
-        // FIXME
-        val transferManager = utils.TransferManagerOps(new TransferManager(aws.s3))
+        val transferManager = aws.s3.createTransferManager
 
         val message = waitForDataMapping(inputQueue)
 
@@ -260,7 +255,7 @@ class DataProcessor(
         logger.info("DataProcessor processing message")
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
-          processDataMapping(transferManager.tm, dataMapping, workingDir)
+          processDataMapping(transferManager, dataMapping, workingDir)
         }
 
         // NOTE: this is blocking until the Future gets a result
@@ -275,7 +270,7 @@ class DataProcessor(
           message.delete()
         }
 
-        transferManager.tm.shutdownNow(false)
+        transferManager.shutdownNow(false)
       } catch {
         case e: Throwable => {
           logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
