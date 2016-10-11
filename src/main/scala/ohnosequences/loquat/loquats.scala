@@ -66,10 +66,7 @@ case object LoquatOps extends LazyLogging {
       // if an input object doesn't exist, we return an arror message
       dataMapping.remoteInput flatMap {
         case (dataKey, S3Resource(s3address)) => {
-          // FIXME: should be in awstools
-          val exists: Boolean = Try(
-            aws.s3.listObjects(s3address.bucket, s3address.key).getObjectSummaries
-          ).filter{ _.length > 0 }.isSuccess
+          val exists: Boolean = aws.s3.prefixExists(s3address)
 
           if (exists) print("+") else print("-")
 
@@ -221,9 +218,6 @@ case object LoquatOps extends LazyLogging {
     Step(s"deleting workers group: ${names.workersGroup}")(
       Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
     ).execute
-
-    // FIXME: I don't know why this import is needed here
-    import ohnosequences.awstools.sqs._
 
     Step(s"deleting error queue: ${names.errorQueue}")(
       aws.sqs.get(names.errorQueue).flatMap(_.delete)
