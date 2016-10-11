@@ -29,10 +29,9 @@ case class LogUploaderBundle(
   // getOrElse {
   //   logger.error(s"Failed to get current instance ID")
   // }
-  lazy val tm = aws.s3.createTransferManager
 
   def uploadLog(): Unit = logS3.map { destination =>
-    tm.upload(logFile.toJava, destination)
+    aws.s3.putObject(destination.bucket, destination.key, logFile.toJava)
     ()
   }.getOrElse {
     logger.error(s"Failed to upload the log to [${bucket}]")

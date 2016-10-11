@@ -159,7 +159,11 @@ class DataProcessor(
           }
           case S3Resource(s3Address) => {
             // FIXME: this shouldn't ignore the returned Try
-            val destination: File = transferManager.download(s3Address, (inputDir / name).toJava).get.toScala
+            val destination: File = transferManager.download(
+              s3Address,
+              (inputDir / name).toJava,
+              false // not silent
+            ).get.toScala
             (name -> destination)
           }
         }
@@ -200,7 +204,8 @@ class DataProcessor(
                       "artifact-name"    -> config.metadata.artifact,
                       "artifact-version" -> config.metadata.version,
                       "artifact-url"     -> config.metadata.artifactUrl
-                    )
+                    ),
+                    false // not silent
                   )
                 )
               }
@@ -270,7 +275,7 @@ class DataProcessor(
           message.delete()
         }
 
-        transferManager.shutdownNow(false)
+        transferManager.shutdown()
       } catch {
         case e: Throwable => {
           logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
