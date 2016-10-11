@@ -36,7 +36,7 @@ case object config {
       terminateAfterInitialDataMappings = true
     )
 
-    override val checkInputObjects = true
+    override val checkInputObjects = false
   }
 
   val N = 3000

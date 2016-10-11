@@ -32,9 +32,9 @@ case class TerminationDaemonBundle(
       .map{ _.getTime.millis }
 
   // NOTE: if these requests fail, there's no point to continue, so I just use get
-  lazy val inputQueue: Queue  = aws.sqs.get(config.resourceNames.inputQueue).get
+  lazy val inputQueue:  Queue = aws.sqs.get(config.resourceNames.inputQueue).get
   lazy val outputQueue: Queue = aws.sqs.get(config.resourceNames.outputQueue).get
-  lazy val errorQueue: Queue  = aws.sqs.get(config.resourceNames.errorQueue).get
+  lazy val errorQueue:  Queue = aws.sqs.get(config.resourceNames.errorQueue).get
 
   def instructions: AnyInstructions = LazyTry[Unit] {
     scheduler.repeat(
@@ -44,30 +44,30 @@ case class TerminationDaemonBundle(
   } -&- say("Termination daemon started")
 
   def checkConditions(): Unit = {
-    logger.info(s"Checking termination conditions")
 
     val numbers: AllQueuesNumbers = averageQueuesNumbers(inputQueue, outputQueue, errorQueue)
-    logger.info(numbers.toString)
+    logger.info(s"Queues state:\n${numbers.toString}")
 
+    logger.info(s"Checking termination conditions")
     lazy val afterInitial = TerminateAfterInitialDataMappings(
       config.terminationConfig.terminateAfterInitialDataMappings,
       initialCount,
       numbers.inputQ,
       numbers.outputQ
     )
-    logger.debug(s"${afterInitial}: ${afterInitial.check}")
+    logger.info(s"Terminate after initial tasks:  ${afterInitial.check}")
 
     lazy val tooManyErrors = TerminateWithTooManyErrors(
       config.terminationConfig.errorsThreshold,
       numbers.errorQ.available
     )
-    logger.debug(s"${tooManyErrors}: ${tooManyErrors.check}")
+    logger.info(s"Terminate with too many errors: ${tooManyErrors.check}")
 
     lazy val globalTimeout = TerminateAfterGlobalTimeout(
       config.terminationConfig.globalTimeout,
       managerCreationTime
     )
-    logger.debug(s"${globalTimeout}: ${globalTimeout.check}")
+    logger.info(s"Terminate after global timeout: ${globalTimeout.check}")
 
     val reason: Option[AnyTerminationReason] =
            if (afterInitial.check) Some(afterInitial)
