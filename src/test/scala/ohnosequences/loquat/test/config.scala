@@ -29,7 +29,7 @@ case object config {
     val workersConfig = WorkersConfig(
       instanceSpecs = InstanceSpecs(defaultAMI, m3.medium),
       purchaseModel = Spot(maxPrice = Some(0.1)),
-      groupSize = AutoScalingGroupSize(0, 1, 20)
+      groupSize = AutoScalingGroupSize(0, 10, 20)
     )
 
     val terminationConfig = TerminationConfig(
@@ -39,7 +39,7 @@ case object config {
     override val checkInputObjects = true
   }
 
-  val N = 1000
+  val N = 3000
   val dataMappings: List[DataMapping[processingBundle.type]] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
 
   case object testLoquat extends Loquat(testConfig, processingBundle)(dataMappings)

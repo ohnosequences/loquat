@@ -105,5 +105,4 @@ case object utils {
       waitForResource(getResource, tries - 1, timeStep)
     } else resource
   }
-
 }
