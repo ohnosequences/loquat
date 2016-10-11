@@ -6,6 +6,8 @@ import ohnosequences.statika._
 
 import com.typesafe.scalalogging.LazyLogging
 
+import com.amazonaws.PredefinedClientConfigurations
+import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import ohnosequences.awstools.sqs._
 import ohnosequences.awstools.autoscaling.AutoScalingGroup
 
@@ -56,7 +58,14 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       scala.util.Success( () )
     } else {
 
-      val queue: Try[Queue] = aws.sqs.get(config.resourceNames.inputQueue)
+      val sqs = ohnosequences.awstools.sqs.client(
+        InstanceProfileCredentialsProvider.getInstance(),
+        config.region,
+        // TODO: 100 connections? more?
+        PredefinedClientConfigurations.defaultConfig.withMaxConnections(100)
+      )
+
+      val queue: Try[Queue] = sqs.get(config.resourceNames.inputQueue)
         .recoverWith { case t =>
           logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")
           scala.util.Failure[Queue](t)
@@ -72,8 +81,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         )
       }
 
-      // TODO: 100 connections? more?
-      val executor = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(100))
+
+      // Sending initial datamappings in parallel
+      val executor = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(30))
 
       val tryToSend: Try[SendBatchResult] = queue.map { inputQueue =>
         logger.debug("Adding initial dataMappings to SQS")
