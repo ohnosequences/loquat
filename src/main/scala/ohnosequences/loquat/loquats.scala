@@ -3,8 +3,7 @@ package ohnosequences.loquat
 import utils._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools._, s3._
-import ohnosequences.awstools.sqs._
+import ohnosequences.awstools._, s3._, sqs._, sns._
 
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
@@ -164,14 +163,15 @@ case object LoquatOps extends LazyLogging {
             }
           ),
           Step( s"Creating notification topic: ${names.notificationTopic}" )(
-            Try { aws.sns.createTopic(names.notificationTopic) }
-              .map { topic =>
-                if (!topic.isEmailSubscribed(user.email.toString)) {
-                  logger.info(s"Subscribing [${user.email}] to the notification topic")
-                  topic.subscribeEmail(user.email.toString)
-                  logger.info("Check your email and confirm subscription")
-                }
+            aws.sns.getOrCreate(names.notificationTopic).map { topic =>
+
+              if (!topic.subscribed(Subscriber.email(user.email.toString))) {
+
+                logger.info(s"Subscribing [${user.email}] to the notification topic")
+                topic.subscribe(Subscriber.email(user.email.toString))
+                logger.info("Check your email and confirm subscription")
               }
+            }
           ),
           Step( s"Creating manager group: ${managerGroup.name}" )(
             Try { aws.as.fixAutoScalingGroupUserData(managerGroup, managerUserScript) }
@@ -208,11 +208,9 @@ case object LoquatOps extends LazyLogging {
     val names = config.resourceNames
 
     Step("Sending notification on your email")(
-      Try {
-        val subject = "Loquat " + config.loquatId + " is terminated"
-        val notificationTopic = aws.sns.createTopic(names.notificationTopic)
-        notificationTopic.publish(reason.msg, subject)
-      }
+      aws.sns
+        .getOrCreate(names.notificationTopic)
+        .map { _.publish(reason.msg, s"Loquat ${config.loquatId} is terminated") }
     ).execute
 
     Step(s"deleting workers group: ${names.workersGroup}")(

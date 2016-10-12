@@ -8,8 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import com.amazonaws.PredefinedClientConfigurations
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
-import ohnosequences.awstools.sqs._
-import ohnosequences.awstools.autoscaling.AutoScalingGroup
+import ohnosequences.awstools._, sqs._, sns._, autoscaling.AutoScalingGroup
 
 import java.util.concurrent.Executors
 import scala.concurrent._, duration._
@@ -167,8 +166,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           |${logTail}
           |""".stripMargin
 
-        val notificationTopic = aws.sns.createTopic(config.resourceNames.notificationTopic)
-        notificationTopic.publish(message, subject)
+        aws.sns
+          .getOrCreate(config.resourceNames.notificationTopic)
+          .map { _.publish(message, subject) }
 
         aws.ec2.getCurrentInstance.foreach(_.terminate)
       } -&-
