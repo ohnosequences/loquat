@@ -68,21 +68,6 @@ class DataProcessor(
 
   @volatile var stopped = false
 
-  def waitForDataMapping(queue: Queue): Message = {
-
-    var message: Try[Option[Message]] = queue.receiveOne
-
-    // FIXME
-    while(message.isFailure || message.get.isEmpty) {
-      logger.info("Data processor is waiting for new data")
-      // instance.foreach(_.createTag(StatusTag.idle))
-      Thread.sleep(10.seconds.toMillis)
-      message = queue.receiveOne
-    }
-
-    message.get.get
-  }
-
   def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
     val startTime = System.currentTimeMillis.millis
     val step = 5.seconds
@@ -251,7 +236,16 @@ class DataProcessor(
       try {
         val transferManager = aws.s3.createTransferManager
 
-        val message = waitForDataMapping(inputQueue)
+        logger.info("Data processor is waiting for new data")
+
+        var response: Try[Option[Message]] = inputQueue.poll(
+          timeout = Duration.Inf,
+          amountLimit = Some(1),
+          adjustRequest = { _.withWaitTimeSeconds(10) }
+        ).map { _.headOption }
+
+        // FIXME: if we haven't got a message instance should eighter stop or terminate, here it will fail and terminate:
+        val message = response.get.get
 
         // instance.foreach(_.createTag(StatusTag.processing))
         logger.info("DataProcessor: received message " + message)

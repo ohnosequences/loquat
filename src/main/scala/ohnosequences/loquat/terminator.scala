@@ -120,8 +120,7 @@ case class TerminationDaemonBundle(
   def receiveProcessingResults(queue: sqs.Queue): Try[Seq[ProcessingResult]] = {
 
     queue.poll(
-      timeout = 20.seconds,
-      maxSequentialEmptyResponses = 5
+      timeout = 20.seconds
     ).map { msgs =>
       msgs.map { msg =>
         upickle.default.read[ProcessingResult](msg.body)
