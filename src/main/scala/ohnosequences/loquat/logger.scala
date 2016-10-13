@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._
 
 import ohnosequences.statika._
-import ohnosequences.awstools.s3._
+import ohnosequences.awstools._, s3._, ec2._
 
 import com.typesafe.scalalogging.LazyLogging
 import java.util.concurrent._

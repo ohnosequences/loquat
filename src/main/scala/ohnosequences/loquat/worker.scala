@@ -6,8 +6,7 @@ import ohnosequences.statika._
 import ohnosequences.datasets._
 
 import com.amazonaws.services.s3.transfer.TransferManager
-import ohnosequences.awstools.sqs._
-import ohnosequences.awstools.s3._
+import ohnosequences.awstools._, sqs._, s3._, ec2._
 
 import com.typesafe.scalalogging.LazyLogging
 import better.files._

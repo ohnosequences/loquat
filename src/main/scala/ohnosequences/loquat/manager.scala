@@ -8,7 +8,8 @@ import com.typesafe.scalalogging.LazyLogging
 
 import com.amazonaws.PredefinedClientConfigurations
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
-import ohnosequences.awstools._, sqs._, sns._, autoscaling.AutoScalingGroup
+import ohnosequences.awstools._, sqs._, sns._, ec2._
+import ohnosequences.awstools.autoscaling.AutoScalingGroup
 
 import java.util.concurrent.Executors
 import scala.concurrent._, duration._
@@ -57,9 +58,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       scala.util.Success( () )
     } else {
 
-      val sqs = ohnosequences.awstools.sqs.client(
-        InstanceProfileCredentialsProvider.getInstance(),
+      val sqs = SQSClient(
         config.region,
+        InstanceProfileCredentialsProvider.getInstance(),
         // TODO: 100 connections? more?
         PredefinedClientConfigurations.defaultConfig.withMaxConnections(100)
       )

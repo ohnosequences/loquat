@@ -1,10 +1,7 @@
 package ohnosequences.loquat
 
-
-import ohnosequences.awstools.ec2.EC2
-
+import ohnosequences.awstools.ec2._
 import com.amazonaws.auth.AWSCredentialsProvider
-
 import scala.util.Try
 
 
