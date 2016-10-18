@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 import ohnosequences.awstools.ec2._
 import ohnosequences.awstools.autoscaling._
-
+import com.amazonaws.services.autoscaling.model._
 
 
 trait AnyAutoScalingConfig extends AnyConfig { conf =>
@@ -12,8 +12,7 @@ trait AnyAutoScalingConfig extends AnyConfig { conf =>
   type InstanceSpecs <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI }
   val  instanceSpecs: InstanceSpecs
 
-  type PurchaseModel <: AnyPurchaseModel
-  val  purchaseModel: PurchaseModel
+  val purchaseModel: PurchaseModel
 
   val groupSize: AutoScalingGroupSize
 
@@ -34,74 +33,46 @@ trait AnyAutoScalingConfig extends AnyConfig { conf =>
       else Seq()
     }
 
-    val purchaseModelErrors: Seq[String] = purchaseModel match {
-      case Spot(Some(price), Some(delta)) if price <= 0 || delta < 0 =>
-        Seq(s"Spot price has to be positive: ${price}")
+    val purchaseModelErrors: Seq[String] = purchaseModel.maxPrice match {
+      case Some(price) if (price <= 0) => Seq(s"Spot price has to be positive: ${price}")
       case _ => Seq()
     }
 
     groupSizeErros ++ purchaseModelErrors
   }
 
-  def autoScalingGroup(
-    groupName: String,
-    keypairName: String,
-    iamRoleName: String
-  ): AutoScalingGroup =
-    AutoScalingGroup(
-      name = groupName,
-      size = conf.groupSize,
-      launchConfiguration = LaunchConfiguration(
-        name = groupName + "-launchConfiguration",
-        purchaseModel = conf.purchaseModel,
-        launchSpecs = LaunchSpecs(
-          conf.instanceSpecs
-        )(keyName = keypairName,
-          instanceProfile = Some(iamRoleName),
-          deviceMapping = conf.deviceMapping
-        )
-      ),
-      availabilityZones = conf.availabilityZones
-    )
-
 }
+
 
 /* Manager autoscaling group configuration */
-trait AnyManagerConfig extends AnyAutoScalingConfig {
-
-  val groupSize = AutoScalingGroupSize(1, 1, 1)
-  val deviceMapping = Map[String, String]()
-}
+trait AnyManagerConfig extends AnyAutoScalingConfig
 
 case class ManagerConfig[
-  IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI },
-  PM <: AnyPurchaseModel
+  IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI }
 ](instanceSpecs: IS,
-  purchaseModel: PM,
+  purchaseModel: PurchaseModel,
   availabilityZones: List[String] = List()
 ) extends AnyManagerConfig {
   val configLabel = "Manager config"
 
   type InstanceSpecs = IS
-  type PurchaseModel = PM
+
+  val groupSize = AutoScalingGroupSize(1, 1, 1)
+  val deviceMapping = Map[String, String]()
 }
 
 /* Workers autoscaling group configuration */
-
 trait AnyWorkersConfig extends AnyAutoScalingConfig
 
 case class WorkersConfig[
-  IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI },
-  PM <: AnyPurchaseModel
+  IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI }
 ](instanceSpecs: IS,
-  purchaseModel: PM,
+  purchaseModel: PurchaseModel,
   groupSize: AutoScalingGroupSize,
   availabilityZones: List[String] = List(),
-  // TODO: use some better type for this
   deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
 ) extends AnyWorkersConfig {
   val configLabel = "Workers config"
 
   type InstanceSpecs = IS
-  type PurchaseModel = PM
 }

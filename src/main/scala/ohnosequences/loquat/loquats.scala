@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools._, s3._, sqs._, sns._
+import ohnosequences.awstools._, s3._, sqs._, sns._, autoscaling._, ec2._
 
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
@@ -133,12 +133,6 @@ case object LoquatOps extends LazyLogging {
 
         val names = config.resourceNames
 
-        val managerGroup = config.managerConfig.autoScalingGroup(
-          config.resourceNames.managerGroup,
-          user.keypairName,
-          config.iamRoleName
-        )
-
         logger.info(s"Deploying loquat: ${config.loquatId}")
 
 
@@ -173,14 +167,33 @@ case object LoquatOps extends LazyLogging {
               }
             }
           ),
-          Step( s"Creating manager group: ${managerGroup.name}" )(
-            Try { aws.as.fixAutoScalingGroupUserData(managerGroup, managerUserScript) }
-              .map { asGroup =>
-                aws.as.createAutoScalingGroup(asGroup)
-                // TODO: make use of the managerGroup status tag
-                utils.tagAutoScalingGroup(aws.as, asGroup, StatusTag.preparing)
-              }
+          Step( s"Creating manager launch configuration: ${names.managerLaunchConfig}" )(
+
+            aws.as.createOrGetLaunchConfig(
+              names.managerLaunchConfig,
+              config.managerConfig.purchaseModel,
+              LaunchSpecs(config.managerConfig.instanceSpecs)(
+                keyName = user.keypairName,
+                userData = managerUserScript,
+                instanceProfile = Some(config.iamRoleName),
+                deviceMapping = config.managerConfig.deviceMapping
+              )
+            )
           ),
+          Step( s"Creating manager group: ${names.managerGroup}" ){
+            aws.as.createOrGetGroup(
+              names.managerGroup,
+              names.managerLaunchConfig,
+              config.managerConfig.groupSize,
+              config.managerConfig.availabilityZones
+            )
+
+            aws.as.setTags(names.managerGroup, Map(
+              "product" -> "loquat",
+              "group"   -> names.managerGroup,
+              StatusTag.label -> StatusTag.preparing.status
+            ))
+          },
           Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(
             util.Success(true)
           )
@@ -214,7 +227,7 @@ case object LoquatOps extends LazyLogging {
     ).execute
 
     Step(s"deleting workers group: ${names.workersGroup}")(
-      Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
+      Try { aws.as.deleteGroup(names.workersGroup) }
     ).execute
 
     Step(s"deleting error queue: ${names.errorQueue}")(
@@ -230,7 +243,7 @@ case object LoquatOps extends LazyLogging {
     ).execute
 
     Step(s"deleting manager group: ${names.managerGroup}")(
-      Try { aws.as.deleteAutoScalingGroup(names.managerGroup) }
+      Try { aws.as.deleteGroup(names.managerGroup) }
     ).execute
 
     logger.info("Loquat is undeployed")

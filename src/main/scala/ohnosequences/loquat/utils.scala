@@ -6,8 +6,9 @@ import ohnosequences.cosas._, types._, klists._
 import com.typesafe.scalalogging.LazyLogging
 
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
+import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import ohnosequences.awstools.ec2._
-import ohnosequences.awstools.autoscaling.{ AutoScaling, AutoScalingGroup }
+import ohnosequences.awstools.autoscaling._
 
 import better.files._
 import scala.collection.JavaConversions._
@@ -68,13 +69,9 @@ case object utils {
   }
 
 
-  sealed trait AnyStatusTag {
-    val status: String
-    val instanceTag = InstanceTag(StatusTag.label, status)
-  }
-  implicit def toAwsInstanceTag(st: AnyStatusTag): InstanceTag = st.instanceTag
+  // implicit def toAwsInstanceTag(st: AnyStatusTag): InstanceTag = st.instanceTag
 
-  class StatusTag(val status: String) extends AnyStatusTag
+  sealed class StatusTag(val status: String)
 
   case object StatusTag {
     val label: String = "status"
@@ -86,13 +83,6 @@ case object utils {
     case object idle        extends StatusTag("idle")
     case object terminating extends StatusTag("terminating")
     // case object failed      extends StatusTag("failed")
-  }
-
-  def tagAutoScalingGroup(as: AutoScaling, group: AutoScalingGroup, statusTag: AnyStatusTag): Unit = {
-    as.createTags(group.name, InstanceTag("product", "loquat"))
-    // TODO: loquat name/id
-    as.createTags(group.name, InstanceTag("group", group.name))
-    as.createTags(group.name, statusTag)
   }
 
 

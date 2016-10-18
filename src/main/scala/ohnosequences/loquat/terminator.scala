@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-import ohnosequences.awstools._, sqs._
+import ohnosequences.awstools._, sqs._, autoscaling._
 
 import com.amazonaws.{ services => amzn }
 
@@ -27,12 +27,16 @@ case class TerminationDaemonBundle(
 
   lazy val aws = instanceAWSClients(config)
 
+  lazy val names = config.resourceNames
+
   private val successResults = scala.collection.mutable.HashMap[String, String]()
   private val failedResults = scala.collection.mutable.HashMap[String, String]()
 
-  lazy val managerCreationTime: Option[FiniteDuration] =
-    aws.as.getCreatedTime(config.resourceNames.managerGroup)
-      .map{ _.getTime.millis }
+  lazy val managerCreationTime: Option[FiniteDuration] = {
+    aws.as.getGroup(names.managerGroup)
+      .map{ _.getCreatedTime.getTime.millis }
+      .toOption
+  }
 
   def instructions: AnyInstructions = LazyTry[Unit] {
     scheduler.repeat(
@@ -45,16 +49,16 @@ case class TerminationDaemonBundle(
   def checkConditions(): Unit = {
     logger.info(s"Checking termination conditions")
 
-    aws.sqs.get(config.resourceNames.outputQueue) match {
+    aws.sqs.get(names.outputQueue) match {
       case scala.util.Failure(ex) => {
-        logger.error(s"Couldn't access output queue: ${config.resourceNames.outputQueue}")
+        logger.error(s"Couldn't access output queue: ${names.outputQueue}")
         // FIXME: check typical exceptions
         logger.error(ex.toString)
       }
       case scala.util.Success(outputQueue) =>
         receiveProcessingResults(outputQueue) match {
           case scala.util.Failure(t) => {
-            logger.error(s"Couldn't poll the queue: ${config.resourceNames.outputQueue}\n${t.getMessage()}")
+            logger.error(s"Couldn't poll the queue: ${names.outputQueue}\n${t.getMessage()}")
           }
           case scala.util.Success(polledMessages) => {
             polledMessages.foreach { result =>
@@ -65,16 +69,16 @@ case class TerminationDaemonBundle(
     }
     logger.debug(s"Success results: ${successResults.size}")
 
-    aws.sqs.get(config.resourceNames.errorQueue) match {
+    aws.sqs.get(names.errorQueue) match {
       case scala.util.Failure(ex) => {
-        logger.error(s"Couldn't access error queue: ${config.resourceNames.errorQueue}")
+        logger.error(s"Couldn't access error queue: ${names.errorQueue}")
         // FIXME: check typical exceptions
         logger.error(ex.toString)
       }
       case scala.util.Success(errorQueue) =>
         receiveProcessingResults(errorQueue) match {
           case scala.util.Failure(t) => {
-            logger.error(s"Couldn't poll the queue: ${config.resourceNames.errorQueue}\n${t.getMessage()}")
+            logger.error(s"Couldn't poll the queue: ${names.errorQueue}\n${t.getMessage()}")
           }
           case scala.util.Success(polledMessages) => {
             polledMessages.foreach { result =>
