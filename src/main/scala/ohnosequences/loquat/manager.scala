@@ -8,6 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import com.amazonaws.PredefinedClientConfigurations
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
+import com.amazonaws.services.autoscaling.model._
 import ohnosequences.awstools._, sqs._, sns._, ec2._, autoscaling._
 
 import java.util.concurrent.Executors
@@ -142,7 +143,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
               instanceProfile = Some(config.iamRoleName),
               deviceMapping = config.workersConfig.deviceMapping
             )
-          )
+          ).recover {
+            case _: AlreadyExistsException => logger.warn(s"Workers launch configuration already exists")
+          }
         }
       } -&-
       LazyTry {

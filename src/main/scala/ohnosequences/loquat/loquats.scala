@@ -4,6 +4,7 @@ import utils._
 import ohnosequences.statika._
 import ohnosequences.datasets._
 import ohnosequences.awstools._, s3._, sqs._, sns._, autoscaling._, ec2._
+import com.amazonaws.services.autoscaling.model._
 
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
@@ -178,7 +179,9 @@ case object LoquatOps extends LazyLogging {
                 instanceProfile = Some(config.iamRoleName),
                 deviceMapping = config.managerConfig.deviceMapping
               )
-            )
+            ).recover {
+              case _: AlreadyExistsException => logger.warn(s"Manager launch configuration already exists")
+            }
           ),
           Step( s"Creating manager group: ${names.managerGroup}" ){
             aws.as.createGroup(
@@ -230,6 +233,10 @@ case object LoquatOps extends LazyLogging {
       Try { aws.as.deleteGroup(names.workersGroup) }
     ).execute
 
+    Step(s"deleting workers launch config: ${names.workersLaunchConfig}")(
+      aws.as.deleteLaunchConfig(names.workersLaunchConfig)
+    ).execute
+
     Step(s"deleting error queue: ${names.errorQueue}")(
       aws.sqs.get(names.errorQueue).flatMap(_.delete)
     ).execute
@@ -243,7 +250,11 @@ case object LoquatOps extends LazyLogging {
     ).execute
 
     Step(s"deleting manager group: ${names.managerGroup}")(
-      Try { aws.as.deleteGroup(names.managerGroup) }
+      aws.as.deleteGroup(names.managerGroup)
+    ).execute
+
+    Step(s"deleting manager launch config: ${names.managerLaunchConfig}")(
+      aws.as.deleteLaunchConfig(names.managerLaunchConfig)
     ).execute
 
     logger.info("Loquat is undeployed")
