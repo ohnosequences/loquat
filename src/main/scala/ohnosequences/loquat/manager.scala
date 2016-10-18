@@ -130,11 +130,10 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         }
       } -&-
       LazyTry {
+        logger.debug("Creating workers launch configuration")
         aws.as.getLaunchConfig(names.managerLaunchConfig) map { launchConfig =>
 
-          logger.debug("Setting up workers userScript")
-
-          aws.as.createOrGetLaunchConfig(
+          aws.as.createLaunchConfig(
             names.workersLaunchConfig,
             config.workersConfig.purchaseModel,
             LaunchSpecs(config.workersConfig.instanceSpecs)(
@@ -144,30 +143,24 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
               deviceMapping = config.workersConfig.deviceMapping
             )
           )
-
-          logger.debug("Creating workers autoscaling group")
-          aws.as.createOrGetGroup(
-            names.workersGroup,
-            names.workersLaunchConfig,
-            config.workersConfig.groupSize,
-            config.workersConfig.availabilityZones
-          )
-
-          logger.debug("Waiting for the workers autoscaling group creation")
-          // TODO: use AmazonAutoScaling.waiters
-          utils.waitForResource(
-            getResource = aws.as.getGroup(names.workersGroup).toOption,
-            tries = 30,
-            timeStep = 5.seconds
-          )
-
-          logger.debug("Creating tags for workers autoscaling group")
-          aws.as.setTags(names.workersGroup, Map(
-            "product" -> "loquat",
-            "group"   -> names.workersGroup,
-            StatusTag.label -> StatusTag.running.status
-          ))
         }
+      } -&-
+      LazyTry {
+        logger.debug("Creating workers autoscaling group")
+        aws.as.createGroup(
+          names.workersGroup,
+          names.workersLaunchConfig,
+          config.workersConfig.groupSize,
+          config.workersConfig.availabilityZones
+        )
+      } -&-
+      LazyTry {
+        logger.debug("Creating tags for workers autoscaling group")
+        aws.as.setTags(names.workersGroup, Map(
+          "product" -> "loquat",
+          "group"   -> names.workersGroup,
+          StatusTag.label -> StatusTag.running.status
+        ))
       } -&-
       say("manager installed")
     }

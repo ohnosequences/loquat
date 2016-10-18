@@ -169,7 +169,7 @@ case object LoquatOps extends LazyLogging {
           ),
           Step( s"Creating manager launch configuration: ${names.managerLaunchConfig}" )(
 
-            aws.as.createOrGetLaunchConfig(
+            aws.as.createLaunchConfig(
               names.managerLaunchConfig,
               config.managerConfig.purchaseModel,
               LaunchSpecs(config.managerConfig.instanceSpecs)(
@@ -181,7 +181,7 @@ case object LoquatOps extends LazyLogging {
             )
           ),
           Step( s"Creating manager group: ${names.managerGroup}" ){
-            aws.as.createOrGetGroup(
+            aws.as.createGroup(
               names.managerGroup,
               names.managerLaunchConfig,
               config.managerConfig.groupSize,

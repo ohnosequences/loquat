@@ -69,8 +69,6 @@ case object utils {
   }
 
 
-  // implicit def toAwsInstanceTag(st: AnyStatusTag): InstanceTag = st.instanceTag
-
   sealed class StatusTag(val status: String)
 
   case object StatusTag {
@@ -83,17 +81,6 @@ case object utils {
     case object idle        extends StatusTag("idle")
     case object terminating extends StatusTag("terminating")
     // case object failed      extends StatusTag("failed")
-  }
-
-
-  @scala.annotation.tailrec
-  def waitForResource[R](getResource: => Option[R], tries: Int, timeStep: FiniteDuration) : Option[R] = {
-    val resource = getResource
-
-    if (resource.isEmpty && tries <= 0) {
-      Thread.sleep(timeStep.toMillis)
-      waitForResource(getResource, tries - 1, timeStep)
-    } else resource
   }
 
 }
