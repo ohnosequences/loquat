@@ -154,7 +154,8 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           names.workersGroup,
           names.workersLaunchConfig,
           config.workersConfig.groupSize,
-          config.workersConfig.availabilityZones
+          if  (config.workersConfig.availabilityZones.isEmpty) aws.ec2.getAllAvailableZones
+          else config.workersConfig.availabilityZones
         )
       } -&-
       LazyTry {

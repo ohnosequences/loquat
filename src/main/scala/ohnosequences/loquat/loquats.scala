@@ -183,20 +183,22 @@ case object LoquatOps extends LazyLogging {
               case _: AlreadyExistsException => logger.warn(s"Manager launch configuration already exists")
             }
           ),
-          Step( s"Creating manager group: ${names.managerGroup}" ){
+          Step( s"Creating manager group: ${names.managerGroup}" )(
             aws.as.createGroup(
               names.managerGroup,
               names.managerLaunchConfig,
               config.managerConfig.groupSize,
-              config.managerConfig.availabilityZones
+              if  (config.managerConfig.availabilityZones.isEmpty) aws.ec2.getAllAvailableZones
+              else config.managerConfig.availabilityZones
             )
-
+          ),
+          Step( s"Tagging manager group" )(
             aws.as.setTags(names.managerGroup, Map(
               "product" -> "loquat",
               "group"   -> names.managerGroup,
               StatusTag.label -> StatusTag.preparing.status
             ))
-          },
+          ),
           Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(
             util.Success(true)
           )

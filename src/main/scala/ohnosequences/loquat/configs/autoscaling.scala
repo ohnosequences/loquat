@@ -17,7 +17,7 @@ trait AnyAutoScalingConfig extends AnyConfig { conf =>
   val groupSize: AutoScalingGroupSize
 
   /* Preferred availability zones, if empty, set to all available zones */
-  val availabilityZones: List[String]
+  val availabilityZones: Set[String]
 
   // TODO: use some better type for this
   val deviceMapping: Map[String, String]
@@ -51,7 +51,7 @@ case class ManagerConfig[
   IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI }
 ](instanceSpecs: IS,
   purchaseModel: PurchaseModel,
-  availabilityZones: List[String] = List()
+  availabilityZones: Set[String] = Set()
 ) extends AnyManagerConfig {
   val configLabel = "Manager config"
 
@@ -69,7 +69,7 @@ case class WorkersConfig[
 ](instanceSpecs: IS,
   purchaseModel: PurchaseModel,
   groupSize: AutoScalingGroupSize,
-  availabilityZones: List[String] = List(),
+  availabilityZones: Set[String] = Set(),
   deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
 ) extends AnyWorkersConfig {
   val configLabel = "Workers config"
