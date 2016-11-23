@@ -40,12 +40,18 @@ case class TerminationDaemonBundle(
     scheduler.repeat(
       after = 1.minute,
       every = 3.minutes
-    )(checkConditions)
+    ){ checkConditions(recheck = false) }
   } -&- say("Termination daemon started")
 
-  def checkConditions(): Unit = {
 
-    val numbers: AllQueuesNumbers = averageQueuesNumbers(inputQueue, outputQueue, errorQueue)
+  def checkConditions(recheck: Boolean): Option[AnyTerminationReason] = {
+
+    val numbers: AllQueuesNumbers = averageQueuesNumbers(
+      inputQueue,
+      outputQueue,
+      errorQueue
+    )(tries = if (recheck) 5 else 1)
+
     logger.info(s"Queues state:\n${numbers.toString}")
 
     logger.info(s"Checking termination conditions")
@@ -75,19 +81,25 @@ case class TerminationDaemonBundle(
       else if (globalTimeout.check) Some(globalTimeout)
       else None
 
-    logger.info(s"Termination reason: ${reason}")
 
-    // if there is a reason, we undeploy everything
-    reason.foreach{ LoquatOps.undeploy(config, aws, _) }
+    reason.flatMap { _ =>
+
+      /* if there is a reason, we first run a more robust check (with accumulating queue numbers several times) */
+      val sureReason = checkConditions(recheck = true)
+
+      /* and if it confirms, we undeploy everything */
+      logger.info(s"Termination reason: ${sureReason}")
+      sureReason.foreach { LoquatOps.undeploy(config, aws, _) }
+      sureReason
+    }
   }
-
 
   /* This method checks each queue's approximate available/in-flight messages numbers several times (with pauses) and returns their average. This way you can be more or less sure that the numbers you get are consistent. */
   def averageQueuesNumbers(
     inputQ: Queue,
     outputQ: Queue,
     errorQ: Queue
-  ): AllQueuesNumbers = {
+  )(tries: Int): AllQueuesNumbers = {
 
     def getNumbers = AllQueuesNumbers(
       QueueNumbers(inputQ.approxMsgAvailable,  inputQ.approxMsgInFlight),
@@ -123,7 +135,7 @@ case class TerminationDaemonBundle(
       }
     }
 
-    getAverage(5, Seq())
+    getAverage(tries, Seq())
   }
 }
 
