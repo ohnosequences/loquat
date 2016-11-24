@@ -26,7 +26,7 @@ case class LoquatUser(
       else Seq(s"User email [${email}] has invalid format")
 
     emailErr ++ {
-      if(aws.ec2.isKeyPairExists(keypairName)) Seq()
+      if(aws.ec2.keyPairExists(keypairName).isSuccess) Seq()
       else Seq(s"key pair: ${keypairName} doesn't exists")
     }
   }

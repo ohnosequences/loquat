@@ -59,11 +59,11 @@ class DataProcessor(
 
   // FIXME: don't use Try.get
   import ohnosequences.awstools.sqs._
-  val inputQueue = aws.sqs.get(config.resourceNames.inputQueue).get
-  val errorQueue = aws.sqs.get(config.resourceNames.errorQueue).get
-  val outputQueue = aws.sqs.get(config.resourceNames.outputQueue).get
+  val inputQueue = aws.sqs.getQueue(config.resourceNames.inputQueue).get
+  val errorQueue = aws.sqs.getQueue(config.resourceNames.errorQueue).get
+  val outputQueue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
 
-  val instance = aws.ec2.getCurrentInstance
+  val instance = aws.ec2.getCurrentInstance.get
 
   @volatile var stopped = false
 
@@ -116,7 +116,7 @@ class DataProcessor(
     stopped = true
     // instance.foreach(_.createTag(StatusTag.terminating))
     logger.info("Terminating instance")
-    instance.foreach(_.terminate)
+    instance.terminate
   }
 
   private def processDataMapping(
@@ -226,7 +226,7 @@ class DataProcessor(
 
   def runLoop(): Unit = {
 
-    logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
+    logger.info("DataProcessor started at " + instance.id)
 
     logger.info("Creating working directory: " + workingDir.path)
     workingDir.createDirectories()

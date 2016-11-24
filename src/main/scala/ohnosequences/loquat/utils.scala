@@ -7,8 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
-import ohnosequences.awstools.ec2._
-import ohnosequences.awstools.autoscaling._
+import ohnosequences.awstools._, ec2._, regions._, autoscaling._
 
 import better.files._
 import scala.collection.JavaConversions._
@@ -32,8 +31,8 @@ case object utils {
 
 
   def instanceAWSClients(config: AnyLoquatConfig) = AWSClients(
-    InstanceProfileCredentialsProvider.getInstance(),
-    config.region
+    config.region,
+    InstanceProfileCredentialsProvider.getInstance()
   )
 
   trait AnyStep extends LazyLogging

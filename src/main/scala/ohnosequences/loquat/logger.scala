@@ -4,6 +4,7 @@ import utils._
 
 import ohnosequences.statika._
 import ohnosequences.awstools._, s3._, ec2._
+// import com.amazonaws.services.s3.model.PutObjectResult
 
 import com.typesafe.scalalogging.LazyLogging
 import java.util.concurrent._
@@ -23,18 +24,17 @@ case class LogUploaderBundle(
   lazy val logFile = file"/root/log.txt"
 
   lazy val bucket = config.resourceNames.bucket
-  lazy val logS3: Option[S3Object] = aws.ec2.getCurrentInstanceId.map { id =>
-    S3Object(bucket, s"${config.loquatId}/${id}.log")
-  }
-  // getOrElse {
-  //   logger.error(s"Failed to get current instance ID")
-  // }
+  lazy val logS3: Try[S3Object] = getLocalMetadata("instance-id")
+    .map { id => S3Object(bucket, s"${config.loquatId}/${id}.log") }
+    // .getOrElse {
+    //   logger.error(s"Failed to get current instance ID")
+    // }
 
-  def uploadLog(): Unit = logS3.map { destination =>
+  def uploadLog(): Try[Unit] = logS3.map { destination =>
     aws.s3.putObject(destination.bucket, destination.key, logFile.toJava)
     ()
-  }.getOrElse {
-    logger.error(s"Failed to upload the log to [${bucket}]")
+  }.recover {
+    case e => logger.error(s"Failed to upload the log to [${bucket}]: ${e}")
   }
 
   def instructions: AnyInstructions = LazyTry[Unit] {

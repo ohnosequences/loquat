@@ -54,13 +54,13 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
   def uploadInitialDataMappings: Try[Unit] = {
 
     val sqs = SQSClient(
-      config.region,
+      config.ami.region,
       InstanceProfileCredentialsProvider.getInstance(),
       // TODO: 100 connections? more?
       PredefinedClientConfigurations.defaultConfig.withMaxConnections(100)
     )
 
-    val queue: Try[Queue] = sqs.get(names.inputQueue)
+    val queue: Try[Queue] = sqs.getQueue(names.inputQueue)
       .recoverWith { case t =>
         logger.error(s"Couldn't access input queue: ${names.inputQueue}")
         scala.util.Failure[Queue](t)
@@ -137,12 +137,14 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           aws.as.createLaunchConfig(
             names.workersLaunchConfig,
             config.workersConfig.purchaseModel,
-            LaunchSpecs(config.workersConfig.instanceSpecs)(
+            LaunchSpecs(
+              ami = config.workersConfig.ami,
+              instanceType = config.workersConfig.instanceType,
               keyName = launchConfig.getKeyName,
               userData = workerCompat.userScript,
-              instanceProfile = Some(config.iamRoleName),
-              deviceMapping = config.workersConfig.deviceMapping
-            )
+              iamProfileName = Some(config.iamRoleName),
+              deviceMappings = config.workersConfig.deviceMapping
+            )(config.workersConfig.supportsAMI)
           ).recover {
             case _: AlreadyExistsException => logger.warn(s"Workers launch configuration already exists")
           }
@@ -184,7 +186,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           |""".stripMargin
 
         aws.sns
-          .getOrCreate(names.notificationTopic)
+          .getOrCreateTopic(names.notificationTopic)
           .map { _.publish(message, subject) }
 
         aws.ec2.getCurrentInstance.foreach(_.terminate)

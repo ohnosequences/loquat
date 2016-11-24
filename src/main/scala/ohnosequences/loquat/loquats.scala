@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools._, s3._, sqs._, sns._, autoscaling._, ec2._
+import ohnosequences.awstools._, s3._, sqs._, sns._, autoscaling._, ec2._, regions._
 import com.amazonaws.services.autoscaling.model._
 
 import com.typesafe.scalalogging.LazyLogging
@@ -37,7 +37,7 @@ trait AnyLoquat { loquat =>
   final def undeploy(user: LoquatUser): Unit =
     LoquatOps.undeploy(
       config,
-      AWSClients(user.localCredentials, config.region),
+      AWSClients(config.region, user.localCredentials),
       TerminateManually
     )
 }
@@ -91,7 +91,7 @@ case object LoquatOps extends LazyLogging {
     if (Try( user.localCredentials.getCredentials ).isFailure) {
       Left(s"Couldn't load local credentials: ${user.localCredentials}")
     } else {
-      val aws = AWSClients(user.localCredentials, config.region)
+      val aws = AWSClients(config.region, user.localCredentials)
 
       if(user.validateWithLogging(aws).nonEmpty) Left("User validation failed")
       else if (config.validateWithLogging(aws).nonEmpty) Left("Config validation failed")
@@ -139,13 +139,13 @@ case object LoquatOps extends LazyLogging {
 
         Seq(
           Step( s"Creating input queue: ${names.inputQueue}" )(
-            Try { aws.sqs.createQueue(names.inputQueue) }
+            Try { aws.sqs.getOrCreateQueue(names.inputQueue) }
           ),
           Step( s"Creating output queue: ${names.outputQueue}" )(
-            Try { aws.sqs.createQueue(names.outputQueue) }
+            Try { aws.sqs.getOrCreateQueue(names.outputQueue) }
           ),
           Step( s"Creating error queue: ${names.errorQueue}" )(
-            Try { aws.sqs.createQueue(names.errorQueue) }
+            Try { aws.sqs.getOrCreateQueue(names.errorQueue) }
           ),
           Step( s"Checking the bucket: ${names.bucket}" )(
             Try {
@@ -158,7 +158,7 @@ case object LoquatOps extends LazyLogging {
             }
           ),
           Step( s"Creating notification topic: ${names.notificationTopic}" )(
-            aws.sns.getOrCreate(names.notificationTopic).map { topic =>
+            aws.sns.getOrCreateTopic(names.notificationTopic).map { topic =>
 
               if (!topic.subscribed(Subscriber.email(user.email.toString))) {
 
@@ -173,12 +173,14 @@ case object LoquatOps extends LazyLogging {
             aws.as.createLaunchConfig(
               names.managerLaunchConfig,
               config.managerConfig.purchaseModel,
-              LaunchSpecs(config.managerConfig.instanceSpecs)(
+              LaunchSpecs(
+                ami = config.managerConfig.ami,
+                instanceType = config.managerConfig.instanceType,
                 keyName = user.keypairName,
                 userData = managerUserScript,
-                instanceProfile = Some(config.iamRoleName),
-                deviceMapping = config.managerConfig.deviceMapping
-              )
+                iamProfileName = Some(config.iamRoleName),
+                deviceMappings = config.managerConfig.deviceMapping
+              )(config.managerConfig.supportsAMI)
             ).recover {
               case _: AlreadyExistsException => logger.warn(s"Manager launch configuration already exists")
             }
@@ -227,7 +229,7 @@ case object LoquatOps extends LazyLogging {
 
     Step("Sending notification on your email")(
       aws.sns
-        .getOrCreate(names.notificationTopic)
+        .getOrCreateTopic(names.notificationTopic)
         .map { _.publish(reason.msg, s"Loquat ${config.loquatId} is terminated") }
     ).execute
 
@@ -240,15 +242,15 @@ case object LoquatOps extends LazyLogging {
     ).execute
 
     Step(s"deleting error queue: ${names.errorQueue}")(
-      aws.sqs.get(names.errorQueue).flatMap(_.delete)
+      aws.sqs.getQueue(names.errorQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting output queue: ${names.outputQueue}")(
-      aws.sqs.get(names.outputQueue).flatMap(_.delete)
+      aws.sqs.getQueue(names.outputQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting input queue: ${names.inputQueue}")(
-      aws.sqs.get(names.inputQueue).flatMap(_.delete)
+      aws.sqs.getQueue(names.inputQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting manager group: ${names.managerGroup}")(

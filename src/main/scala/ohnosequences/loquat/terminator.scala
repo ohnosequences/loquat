@@ -27,86 +27,55 @@ case class TerminationDaemonBundle(
 
   lazy val aws = instanceAWSClients(config)
 
-  lazy val names = config.resourceNames
-
-  private val successResults = scala.collection.mutable.HashMap[String, String]()
-  private val failedResults = scala.collection.mutable.HashMap[String, String]()
-
-  lazy val managerCreationTime: Option[FiniteDuration] = {
-    aws.as.getGroup(names.managerGroup)
-      .map{ _.getCreatedTime.getTime.millis }
+  lazy val managerCreationTime: Option[FiniteDuration] =
+    aws.as.getGroup(config.resourceNames.managerGroup)
+      .map { _.getCreatedTime.getTime.millis }
       .toOption
-  }
+
+
+  // NOTE: if these requests fail, there's no point to continue, so I just use get
+  lazy val inputQueue:  Queue = aws.sqs.getQueue(config.resourceNames.inputQueue).get
+  lazy val outputQueue: Queue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
+  lazy val errorQueue:  Queue = aws.sqs.getQueue(config.resourceNames.errorQueue).get
 
   def instructions: AnyInstructions = LazyTry[Unit] {
     scheduler.repeat(
       after = 1.minute,
-      every = 1.minute
-    )(checkConditions)
+      every = 3.minutes
+    ){ checkConditions(recheck = false) }
   } -&- say("Termination daemon started")
 
 
-  def checkConditions(): Unit = {
+  def checkConditions(recheck: Boolean): Option[AnyTerminationReason] = {
+
+    val numbers: AllQueuesNumbers = averageQueuesNumbers(
+      inputQueue,
+      outputQueue,
+      errorQueue
+    )(tries = if (recheck) 5 else 1)
+
+    logger.info(s"Queues state:\n${numbers.toString}")
+
     logger.info(s"Checking termination conditions")
-
-    aws.sqs.get(names.outputQueue) match {
-      case scala.util.Failure(ex) => {
-        logger.error(s"Couldn't access output queue: ${names.outputQueue}")
-        // FIXME: check typical exceptions
-        logger.error(ex.toString)
-      }
-      case scala.util.Success(outputQueue) =>
-        receiveProcessingResults(outputQueue) match {
-          case scala.util.Failure(t) => {
-            logger.error(s"Couldn't poll the queue: ${names.outputQueue}\n${t.getMessage()}")
-          }
-          case scala.util.Success(polledMessages) => {
-            polledMessages.foreach { result =>
-              successResults.put(result.id, result.message)
-            }
-          }
-        }
-    }
-    logger.debug(s"Success results: ${successResults.size}")
-
-    aws.sqs.get(names.errorQueue) match {
-      case scala.util.Failure(ex) => {
-        logger.error(s"Couldn't access error queue: ${names.errorQueue}")
-        // FIXME: check typical exceptions
-        logger.error(ex.toString)
-      }
-      case scala.util.Success(errorQueue) =>
-        receiveProcessingResults(errorQueue) match {
-          case scala.util.Failure(t) => {
-            logger.error(s"Couldn't poll the queue: ${names.errorQueue}\n${t.getMessage()}")
-          }
-          case scala.util.Success(polledMessages) => {
-            polledMessages.foreach { result =>
-              failedResults.put(result.id, result.message)
-            }
-          }
-        }
-    }
-    logger.debug(s"Failure results: ${failedResults.size}")
-
     lazy val afterInitial = TerminateAfterInitialDataMappings(
       config.terminationConfig.terminateAfterInitialDataMappings,
       initialCount,
-      successResults.size
+      numbers.inputQ,
+      numbers.outputQ
     )
-    logger.debug(s"${afterInitial}: ${afterInitial.check}")
+    logger.info(s"Terminate after initial tasks:  ${afterInitial.check}")
 
     lazy val tooManyErrors = TerminateWithTooManyErrors(
       config.terminationConfig.errorsThreshold,
-      failedResults.size
+      numbers.errorQ.available
     )
-    logger.debug(s"${tooManyErrors}: ${tooManyErrors.check}")
+    logger.info(s"Terminate with too many errors: ${tooManyErrors.check}")
 
     lazy val globalTimeout = TerminateAfterGlobalTimeout(
       config.terminationConfig.globalTimeout,
       managerCreationTime
     )
-    logger.debug(s"${globalTimeout}: ${globalTimeout.check}")
+    logger.info(s"Terminate after global timeout: ${globalTimeout.check}")
 
     val reason: Option[AnyTerminationReason] =
            if (afterInitial.check) Some(afterInitial)
@@ -114,22 +83,81 @@ case class TerminationDaemonBundle(
       else if (globalTimeout.check) Some(globalTimeout)
       else None
 
-    logger.info(s"Termination reason: ${reason}")
 
-    // if there is a reason, we undeploy everything
-    reason.foreach{ LoquatOps.undeploy(config, aws, _) }
-  }
+    reason.flatMap { _ =>
 
-  // TODO: use approxMsgAvailable/InFlight instead of polling (it's too slow and expensive)
-  def receiveProcessingResults(queue: sqs.Queue): Try[Seq[ProcessingResult]] = {
+      /* if there is a reason, we first run a more robust check (with accumulating queue numbers several times) */
+      val sureReason = checkConditions(recheck = true)
 
-    queue.poll(
-      timeout = 20.seconds
-    ).map { msgs =>
-      msgs.map { msg =>
-        upickle.default.read[ProcessingResult](msg.body)
-      }
+      /* and if it confirms, we undeploy everything */
+      logger.info(s"Termination reason: ${sureReason}")
+      sureReason.foreach { LoquatOps.undeploy(config, aws, _) }
+      sureReason
     }
   }
 
+  /* This method checks each queue's approximate available/in-flight messages numbers several times (with pauses) and returns their average. This way you can be more or less sure that the numbers you get are consistent. */
+  def averageQueuesNumbers(
+    inputQ: Queue,
+    outputQ: Queue,
+    errorQ: Queue
+  )(tries: Int): AllQueuesNumbers = {
+
+    def getNumbers = AllQueuesNumbers(
+      QueueNumbers(inputQ.approxMsgAvailable,  inputQ.approxMsgInFlight),
+      QueueNumbers(outputQ.approxMsgAvailable, outputQ.approxMsgInFlight),
+      QueueNumbers(errorQ.approxMsgAvailable,  errorQ.approxMsgInFlight)
+    )
+
+    def averageOf(vals: Seq[Int]): Int = vals.sum / vals.length
+
+    @scala.annotation.tailrec
+    def getAverage(triesLeft: Int, acc: Seq[AllQueuesNumbers]): AllQueuesNumbers = {
+
+      if (triesLeft > 0) {
+
+        Thread.sleep(5.seconds.toMillis)
+        getAverage(triesLeft - 1, getNumbers +: acc)
+      } else {
+
+        AllQueuesNumbers(
+          QueueNumbers(
+            averageOf( acc.map { _.inputQ.available } ),
+            averageOf( acc.map { _.inputQ.inFlight } )
+          ),
+          QueueNumbers(
+            averageOf( acc.map { _.outputQ.available } ),
+            averageOf( acc.map { _.outputQ.inFlight } )
+          ),
+          QueueNumbers(
+            averageOf( acc.map { _.errorQ.available } ),
+            averageOf( acc.map { _.errorQ.inFlight } )
+          )
+        )
+      }
+    }
+
+    getAverage(tries, Seq())
+  }
+}
+
+case class QueueNumbers(
+  val available: Int,
+  val inFlight: Int
+) {
+
+  override def toString = s"${available} available, ${inFlight} in flight"
+}
+
+case class AllQueuesNumbers(
+  val inputQ: QueueNumbers,
+  val outputQ: QueueNumbers,
+  val errorQ: QueueNumbers
+) {
+
+  override def toString = Seq(
+    s"input  queue: ${inputQ}",
+    s"output queue: ${outputQ}",
+    s"error  queue: ${errorQ}"
+  ).mkString("\n")
 }

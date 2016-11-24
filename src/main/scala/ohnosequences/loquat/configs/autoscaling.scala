@@ -9,8 +9,15 @@ trait AnyAutoScalingConfig extends AnyConfig { conf =>
 
   val subConfigs: Seq[AnyConfig] = Seq()
 
-  type InstanceSpecs <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI }
-  val  instanceSpecs: InstanceSpecs
+  type InstanceType <: AnyInstanceType
+  val  instanceType: InstanceType
+
+  type AMI <: AnyAmazonLinuxAMI
+  val  ami: AMI
+
+  /* We want to ensure that the instance type supports the given AMI at compile time */
+  implicit val supportsAMI: InstanceType SupportsAMI AMI
+
 
   val purchaseModel: PurchaseModel
 
@@ -48,14 +55,19 @@ trait AnyAutoScalingConfig extends AnyConfig { conf =>
 trait AnyManagerConfig extends AnyAutoScalingConfig
 
 case class ManagerConfig[
-  IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI }
-](instanceSpecs: IS,
+  T <: AnyInstanceType,
+  A <: AnyAmazonLinuxAMI
+](ami: A,
+  instanceType: T,
   purchaseModel: PurchaseModel,
   availabilityZones: Set[String] = Set()
+)(implicit
+  val supportsAMI: T SupportsAMI A
 ) extends AnyManagerConfig {
   val configLabel = "Manager config"
 
-  type InstanceSpecs = IS
+  type AMI = A
+  type InstanceType = T
 
   val groupSize = AutoScalingGroupSize(1, 1, 1)
   val deviceMapping = Map[String, String]()
@@ -65,14 +77,19 @@ case class ManagerConfig[
 trait AnyWorkersConfig extends AnyAutoScalingConfig
 
 case class WorkersConfig[
-  IS <: AnyInstanceSpecs { type AMI <: AnyAmazonLinuxAMI }
-](instanceSpecs: IS,
+  T <: AnyInstanceType,
+  A <: AnyAmazonLinuxAMI
+](ami: A,
+  instanceType: T,
   purchaseModel: PurchaseModel,
   groupSize: AutoScalingGroupSize,
   availabilityZones: Set[String] = Set(),
   deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
+)(implicit
+  val supportsAMI: T SupportsAMI A
 ) extends AnyWorkersConfig {
   val configLabel = "Workers config"
 
-  type InstanceSpecs = IS
+  type AMI = A
+  type InstanceType = T
 }
