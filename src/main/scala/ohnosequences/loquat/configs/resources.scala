@@ -11,10 +11,12 @@ case class ResourceNames(prefix: String, bucketName: String) {
   val errorQueue: String = prefix + "-loquat-errors"
   /* name of bucket for logs files */
   val bucket: String = bucketName
-  /* topic name to notificate user about termination of loquat */
+  /* topic name to notify user about termination of loquat */
   val notificationTopic: String = prefix + "-loquat-notifications"
   /* name of the manager autoscaling group */
   val managerGroup: String = prefix + "-loquat-manager"
+  val managerLaunchConfig: String = managerGroup + "-launch-configuration"
   /* name of the workers autoscaling group */
   val workersGroup: String = prefix + "-loquat-workers"
+  val workersLaunchConfig: String = workersGroup + "-launch-configuration"
 }

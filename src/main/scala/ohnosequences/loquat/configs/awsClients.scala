@@ -1,22 +1,18 @@
 package ohnosequences.loquat
 
-import com.amazonaws.auth.AWSCredentialsProvider
-import ohnosequences.awstools, awstools.sqs._
-import ohnosequences.awstools.regions.Region
-import ohnosequences.awstools.ec2.EC2
-import ohnosequences.awstools.autoscaling.AutoScaling
-import ohnosequences.awstools.sns.SNS
+import com.amazonaws.auth._
+import com.amazonaws.regions._
+import ohnosequences.awstools._, sqs._, sns._, s3._, ec2._, autoscaling._, regions._
 
 
 case class AWSClients(
-  credentialsProvider: AWSCredentialsProvider,
-  region: Region
+  region:      AwsRegionProvider      = new DefaultAwsRegionProviderChain(),
+  credentials: AWSCredentialsProvider = new DefaultAWSCredentialsProviderChain()
 ) {
 
-  lazy val ec2 = EC2.create(credentialsProvider, region)
-  lazy val as = AutoScaling.create(credentialsProvider, ec2, region)
-  lazy val sns = SNS.create(credentialsProvider, region)
-
-  lazy val sqs = awstools.sqs.client(credentials = credentialsProvider, region = region)
-  lazy val s3 = awstools.s3.client(credentialsProvider, region)
+  lazy val ec2 = EC2Client(region, credentials)
+  lazy val sns = SNSClient(region, credentials)
+  lazy val sqs = SQSClient(region, credentials)
+  lazy val  s3 = S3Client(region, credentials)
+  lazy val  as = AutoScalingClient(region, credentials)
 }

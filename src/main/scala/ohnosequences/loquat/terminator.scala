@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-import ohnosequences.awstools._, sqs._
+import ohnosequences.awstools._, sqs._, autoscaling._
 
 import com.amazonaws.{ services => amzn }
 
@@ -28,13 +28,15 @@ case class TerminationDaemonBundle(
   lazy val aws = instanceAWSClients(config)
 
   lazy val managerCreationTime: Option[FiniteDuration] =
-    aws.as.getCreatedTime(config.resourceNames.managerGroup)
-      .map{ _.getTime.millis }
+    aws.as.getGroup(config.resourceNames.managerGroup)
+      .map { _.getCreatedTime.getTime.millis }
+      .toOption
+
 
   // NOTE: if these requests fail, there's no point to continue, so I just use get
-  lazy val inputQueue:  Queue = aws.sqs.get(config.resourceNames.inputQueue).get
-  lazy val outputQueue: Queue = aws.sqs.get(config.resourceNames.outputQueue).get
-  lazy val errorQueue:  Queue = aws.sqs.get(config.resourceNames.errorQueue).get
+  lazy val inputQueue:  Queue = aws.sqs.getQueue(config.resourceNames.inputQueue).get
+  lazy val outputQueue: Queue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
+  lazy val errorQueue:  Queue = aws.sqs.getQueue(config.resourceNames.errorQueue).get
 
   def instructions: AnyInstructions = LazyTry[Unit] {
     scheduler.repeat(
