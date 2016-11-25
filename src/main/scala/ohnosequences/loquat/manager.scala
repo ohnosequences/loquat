@@ -6,9 +6,13 @@ import ohnosequences.statika._
 
 import com.typesafe.scalalogging.LazyLogging
 
-import ohnosequences.awstools.autoscaling.AutoScalingGroup
+import com.amazonaws.PredefinedClientConfigurations
+import com.amazonaws.auth.InstanceProfileCredentialsProvider
+import com.amazonaws.services.autoscaling.model._
+import ohnosequences.awstools._, sqs._, sns._, ec2._, autoscaling._
 
-import scala.concurrent.duration._
+import java.util.concurrent.Executors
+import scala.concurrent._, duration._
 import scala.util.Try
 
 
@@ -45,52 +49,65 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   lazy val aws = instanceAWSClients(config)
 
+  lazy val names = config.resourceNames
+
   def uploadInitialDataMappings: Try[Unit] = {
-    val managerStatus = aws.as.getTagValue(config.resourceNames.managerGroup, StatusTag.label)
 
-    if (managerStatus == Some(StatusTag.running.status)) {
+    val sqs = SQSClient(
+      config.ami.region,
+      InstanceProfileCredentialsProvider.getInstance(),
+      // TODO: 100 connections? more?
+      PredefinedClientConfigurations.defaultConfig.withMaxConnections(100)
+    )
 
-      logger.info("DataMappings are supposed to be in the queue already")
-      scala.util.Success( () )
-    } else {
-
-      lazy val getQueue = Try { aws.sqs.getQueueByName(config.resourceNames.inputQueue).get }
-
-      lazy val upload = getQueue match {
-        case scala.util.Failure(t) => {
-          logger.error(s"Couldn't access input queue: ${config.resourceNames.inputQueue}")
-          scala.util.Failure[Unit](t)
-        }
-        case scala.util.Success(inputQueue) => Try {
-          logger.debug("Adding initial dataMappings to SQS")
-
-          // NOTE: we can send messages in parallel
-          dataMappings.zipWithIndex.par.foreach { case (dataMapping, ix) =>
-            inputQueue.sendMessage(
-              upickle.default.write[SimpleDataMapping](
-                SimpleDataMapping(
-                  id = ix.toString,
-                  inputs = toMap(dataMapping.remoteInput),
-                  outputs = toMap(dataMapping.remoteOutput)
-                )
-              )
-            )
-          }
-        }
+    val queue: Try[Queue] = sqs.getQueue(names.inputQueue)
+      .recoverWith { case t =>
+        logger.error(s"Couldn't access input queue: ${names.inputQueue}")
+        scala.util.Failure[Queue](t)
       }
 
-      upload match {
-        case fail @ scala.util.Failure(_) => {
-          logger.error("Failed to upload initial dataMappings")
-          fail
+    val msgs: Iterator[String] = dataMappings.toIterator.zipWithIndex.map { case (dataMapping, ix) =>
+      upickle.default.write[SimpleDataMapping](
+        SimpleDataMapping(
+          id = ix.toString,
+          inputs = toMap(dataMapping.remoteInput),
+          outputs = toMap(dataMapping.remoteOutput)
+        )
+      )
+    }
+
+
+    // Sending initial datamappings in parallel
+    val executor = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(30))
+
+    val tryToSend: Try[SendBatchResult] = queue.map { inputQueue =>
+      logger.debug("Adding initial dataMappings to SQS")
+
+      Await.result(inputQueue.sendBatch(msgs)(executor), 1.hour)
+    }
+
+    executor.shutdown()
+
+    tryToSend.flatMap { result =>
+      if (result.failures.nonEmpty) {
+        // Probably printing all errors is too much, this is just to see which kinds of errors occure
+        logger.error("Failed to batch send initial dataMappings:")
+        result.failures.take(10).foreach { case (msg, err) =>
+          logger.error(s"Error ${err.getCode}: ${err.getMessage} (sender fault: ${err.getSenderFault}). \n${msg}\n")
         }
-        case scala.util.Success(inputQueue) => Try {
-          // NOTE: we tag manager group as running
-          aws.as.createTags(config.resourceNames.managerGroup, StatusTag.running)
-          logger.info("Initial dataMappings are ready")
-        }
+        // TODO: better exception here?
+        scala.util.Failure(new RuntimeException("Failed to upload initial dataMappings"))
+      } else {
+        // NOTE: we tag manager group as running
+        aws.as.setTags(
+          names.managerGroup,
+          Map(StatusTag.label -> StatusTag.running.status)
+        )
+        logger.info("Initial dataMappings are ready")
+        scala.util.Success( () )
       }
     }
+
   }
 
 
@@ -99,36 +116,57 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     lazy val normalScenario: Instructions[Unit] = {
       LazyTry {
         logger.debug("Uploading initial dataMappings to the input queue")
-        uploadInitialDataMappings.get
+
+        aws.as.tagValue(
+          names.managerGroup,
+          StatusTag.label
+        ) match {
+
+          case scala.util.Success(StatusTag.running.status) => {
+            logger.info("DataMappings are supposed to be in the queue already")
+            // scala.util.Success( () )
+          }
+
+          case _ => uploadInitialDataMappings
+        }
       } -&-
       LazyTry {
-        aws.as.getAutoScalingGroupByName(config.resourceNames.managerGroup) map { group =>
-          group.launchConfiguration.launchSpecs.keyName
-        } map { keypairName =>
+        logger.debug("Creating workers launch configuration")
+        aws.as.getLaunchConfig(names.managerLaunchConfig) map { launchConfig =>
 
-          logger.debug("Setting up workers userScript")
-          val workersGroup = aws.as.fixAutoScalingGroupUserData(
-            config.workersConfig.autoScalingGroup(
-              config.resourceNames.workersGroup,
-              keypairName,
-              config.iamRoleName
-            ),
-            workerCompat.userScript
-          )
-
-          logger.debug("Creating workers autoscaling group")
-          aws.as.createAutoScalingGroup(workersGroup)
-
-          logger.debug("Waiting for the workers autoscaling group creation")
-          utils.waitForResource(
-            getResource = aws.as.getAutoScalingGroupByName(workersGroup.name),
-            tries = 30,
-            timeStep = 5.seconds
-          )
-
-          logger.debug("Creating tags for workers autoscaling group")
-          utils.tagAutoScalingGroup(aws.as, workersGroup, StatusTag.running)
+          aws.as.createLaunchConfig(
+            names.workersLaunchConfig,
+            config.workersConfig.purchaseModel,
+            LaunchSpecs(
+              ami = config.workersConfig.ami,
+              instanceType = config.workersConfig.instanceType,
+              keyName = launchConfig.getKeyName,
+              userData = workerCompat.userScript,
+              iamProfileName = Some(config.iamRoleName),
+              deviceMappings = config.workersConfig.deviceMapping
+            )(config.workersConfig.supportsAMI)
+          ).recover {
+            case _: AlreadyExistsException => logger.warn(s"Workers launch configuration already exists")
+          }
         }
+      } -&-
+      LazyTry {
+        logger.debug("Creating workers autoscaling group")
+        aws.as.createGroup(
+          names.workersGroup,
+          names.workersLaunchConfig,
+          config.workersConfig.groupSize,
+          if  (config.workersConfig.availabilityZones.isEmpty) aws.ec2.getAllAvailableZones
+          else config.workersConfig.availabilityZones
+        )
+      } -&-
+      LazyTry {
+        logger.debug("Creating tags for workers autoscaling group")
+        aws.as.setTags(names.workersGroup, Map(
+          "product" -> "loquat",
+          "group"   -> names.workersGroup,
+          StatusTag.label -> StatusTag.running.status
+        ))
       } -&-
       say("manager installed")
     }
@@ -147,8 +185,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
           |${logTail}
           |""".stripMargin
 
-        val notificationTopic = aws.sns.createTopic(config.resourceNames.notificationTopic)
-        notificationTopic.publish(message, subject)
+        aws.sns
+          .getOrCreateTopic(names.notificationTopic)
+          .map { _.publish(message, subject) }
 
         aws.ec2.getCurrentInstance.foreach(_.terminate)
       } -&-

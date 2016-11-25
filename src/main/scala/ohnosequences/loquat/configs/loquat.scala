@@ -5,8 +5,8 @@ import utils._
 import ohnosequences.statika.AnyArtifactMetadata
 import ohnosequences.statika.aws._
 
-import ohnosequences.awstools.AWSClients
-import ohnosequences.awstools.regions.Region
+
+import ohnosequences.awstools.regions._
 import ohnosequences.awstools.ec2.AnyAmazonLinuxAMI
 import ohnosequences.awstools.s3._
 
@@ -17,7 +17,8 @@ import ohnosequences.cosas._, types._
 import better.files._
 
 import scala.util.Try
-import collection.JavaConversions._
+import scala.collection.JavaConversions._
+import java.net.URI
 
 
 /* Configuration for loquat */
@@ -52,17 +53,11 @@ abstract class AnyLoquatConfig extends AnyConfig {
   /* Here follow all the values that are dependent on those defined on top */
   lazy val configLabel: String = s"${loquatName} config"
 
-  lazy val ami: AnyAmazonLinuxAMI = managerConfig.instanceSpecs.ami
+  lazy val ami: AnyAmazonLinuxAMI = managerConfig.ami
   lazy val amiEnv: AnyLinuxAMIEnvironment = amznAMIEnv(ami)
   lazy val region: Region = ami.region
 
-  lazy final val fatArtifactS3Object: S3Object = {
-    val s3url = """s3://(.+)/(.+)""".r
-    metadata.artifactUrl match {
-      case s3url(bucket, key) => S3Object(bucket, key)
-      case _ => throw new Error("Wrong fat jar url, it should be an S3 address")
-    }
-  }
+  lazy final val fatArtifactS3Object: S3Object = S3Object(new URI(metadata.artifactUrl))
 
   /* Unique id  of the loquat instance */
   lazy final val artifactName: String = metadata.artifact.replace(".", "-").toLowerCase
@@ -80,8 +75,8 @@ abstract class AnyLoquatConfig extends AnyConfig {
 
   def validationErrors(aws: AWSClients): Seq[String] = {
     logger.info("Checking the fat-artifact existence...")
-    if (aws.s3.objectExists(fatArtifactS3Object).isFailure) {
-      Seq(s"Couldn't access the artifact at [${fatArtifactS3Object.url}] (probably you forgot to publish it)")
+    if (! aws.s3.objectExists(fatArtifactS3Object)) {
+      Seq(s"Couldn't access the artifact at [${fatArtifactS3Object}] (probably you forgot to publish it)")
     } else Seq()
   }
 

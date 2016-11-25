@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 import scala.concurrent.duration._
 
-import ohnosequences.awstools.AWSClients
+
 
 
 trait AnyTerminationReason {
@@ -13,14 +13,20 @@ trait AnyTerminationReason {
 case class TerminateAfterInitialDataMappings(
   val isOn: Boolean,
   val initialCount: Int,
-  val successfulCount: Int
+  val  inputQNumbers: QueueNumbers,
+  val outputQNumbers: QueueNumbers
 ) extends AnyTerminationReason {
 
-  def check: Boolean = isOn && (successfulCount >= initialCount)
+  def check: Boolean = { isOn &&
+    inputQNumbers.inFlight  == 0 &&
+    inputQNumbers.available == 0 &&
+    outputQNumbers.inFlight == 0 &&
+    outputQNumbers.available >= initialCount
+  }
 
   def msg: String = s"""|Termination after successfully processing all the initial data mappings.
     |  Initial data mappings count: ${initialCount}
-    |  Successful results: ${successfulCount}
+    |  Successful results: ${outputQNumbers.available}
     |""".stripMargin
 }
 

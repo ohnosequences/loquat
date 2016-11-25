@@ -1,10 +1,7 @@
 package ohnosequences.loquat
 
-import ohnosequences.awstools.AWSClients
-import ohnosequences.awstools.ec2.EC2
-
+import ohnosequences.awstools.ec2._
 import com.amazonaws.auth.AWSCredentialsProvider
-
 import scala.util.Try
 
 
@@ -29,7 +26,7 @@ case class LoquatUser(
       else Seq(s"User email [${email}] has invalid format")
 
     emailErr ++ {
-      if(aws.ec2.isKeyPairExists(keypairName)) Seq()
+      if(aws.ec2.keyPairExists(keypairName).isSuccess) Seq()
       else Seq(s"key pair: ${keypairName} doesn't exists")
     }
   }

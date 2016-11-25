@@ -1,7 +1,7 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.loquat._
-import ohnosequences.awstools._, regions.Region._, ec2._, InstanceType._, autoscaling._
+import ohnosequences.awstools._, regions._, ec2._, autoscaling._
 import ohnosequences.statika._, aws._
 import test.dataProcessing._
 
@@ -16,30 +16,29 @@ case object config {
     val iamRoleName = "loquat.testing"
     val logsBucketName = "loquat.testing"
 
-    // type AMI = defaultAMI.type
-    // lazy val ami: AMI = defaultAMI
-
     val metadata: AnyArtifactMetadata = ohnosequences.generated.metadata.loquat
 
     val  managerConfig = ManagerConfig(
-      InstanceSpecs(defaultAMI, m3.medium),
-      purchaseModel = Spot(maxPrice = Some(0.1))
+      defaultAMI,
+      m3.medium,
+      PurchaseModel.spot(0.1)
     )
 
     val workersConfig = WorkersConfig(
-      instanceSpecs = InstanceSpecs(defaultAMI, m3.medium),
-      purchaseModel = Spot(maxPrice = Some(0.1)),
-      groupSize = AutoScalingGroupSize(0, 1, 20)
+      defaultAMI,
+      m3.medium,
+      PurchaseModel.spot(0.1),
+      AutoScalingGroupSize(0, 1, 20)
     )
 
     val terminationConfig = TerminationConfig(
       terminateAfterInitialDataMappings = true
     )
 
-    override val checkInputObjects = true
+    override val checkInputObjects = false
   }
 
-  val N = 10
+  val N = 100
   val dataMappings: List[DataMapping[processingBundle.type]] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
 
   case object testLoquat extends Loquat(testConfig, processingBundle)(dataMappings)

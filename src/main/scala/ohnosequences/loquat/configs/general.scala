@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 import com.typesafe.scalalogging.LazyLogging
 
-import ohnosequences.awstools.AWSClients
+
 
 
 /* Any config here can validate itself (in runtime) */

@@ -3,7 +3,9 @@ package ohnosequences.loquat
 import utils._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools.AWSClients
+import ohnosequences.awstools._, s3._, sqs._, sns._, autoscaling._, ec2._, regions._
+import com.amazonaws.services.autoscaling.model._
+
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
 import collection.JavaConversions._
@@ -35,7 +37,7 @@ trait AnyLoquat { loquat =>
   final def undeploy(user: LoquatUser): Unit =
     LoquatOps.undeploy(
       config,
-      AWSClients.create(user.localCredentials, config.region),
+      AWSClients(config.region, user.localCredentials),
       TerminateManually
     )
 }
@@ -64,14 +66,12 @@ case object LoquatOps extends LazyLogging {
       // if an input object doesn't exist, we return an arror message
       dataMapping.remoteInput flatMap {
         case (dataKey, S3Resource(s3address)) => {
-          val exists: Boolean = Try(
-            aws.s3.s3.listObjects(s3address.bucket, s3address.key).getObjectSummaries
-          ).filter{ _.length > 0 }.isSuccess
+          val exists: Boolean = aws.s3.prefixExists(s3address)
 
           if (exists) print("+") else print("-")
 
           if (exists) None
-          else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address.url}]")
+          else Some(s"Input object [${dataKey.label}] doesn't exist at the address: [${s3address}]")
         }
         // if the mapping is not an S3Resource, we don't check
         case _ => None
@@ -91,7 +91,7 @@ case object LoquatOps extends LazyLogging {
     if (Try( user.localCredentials.getCredentials ).isFailure) {
       Left(s"Couldn't load local credentials: ${user.localCredentials}")
     } else {
-      val aws = AWSClients.create(user.localCredentials, config.region)
+      val aws = AWSClients(config.region, user.localCredentials)
 
       if(user.validateWithLogging(aws).nonEmpty) Left("User validation failed")
       else if (config.validateWithLogging(aws).nonEmpty) Left("Config validation failed")
@@ -134,28 +134,22 @@ case object LoquatOps extends LazyLogging {
 
         val names = config.resourceNames
 
-        val managerGroup = config.managerConfig.autoScalingGroup(
-          config.resourceNames.managerGroup,
-          user.keypairName,
-          config.iamRoleName
-        )
-
         logger.info(s"Deploying loquat: ${config.loquatId}")
 
 
         Seq(
           Step( s"Creating input queue: ${names.inputQueue}" )(
-            Try { aws.sqs.createQueue(names.inputQueue) }
+            Try { aws.sqs.getOrCreateQueue(names.inputQueue) }
           ),
           Step( s"Creating output queue: ${names.outputQueue}" )(
-            Try { aws.sqs.createQueue(names.outputQueue) }
+            Try { aws.sqs.getOrCreateQueue(names.outputQueue) }
           ),
           Step( s"Creating error queue: ${names.errorQueue}" )(
-            Try { aws.sqs.createQueue(names.errorQueue) }
+            Try { aws.sqs.getOrCreateQueue(names.errorQueue) }
           ),
           Step( s"Checking the bucket: ${names.bucket}" )(
             Try {
-              if(aws.s3.bucketExists(names.bucket)) {
+              if(aws.s3.doesBucketExist(names.bucket)) {
                 logger.info(s"Bucket [${names.bucket}] already exists.")
               } else {
                 logger.info(s"Bucket [${names.bucket}] doesn't exists. Trying to create it.")
@@ -164,22 +158,48 @@ case object LoquatOps extends LazyLogging {
             }
           ),
           Step( s"Creating notification topic: ${names.notificationTopic}" )(
-            Try { aws.sns.createTopic(names.notificationTopic) }
-              .map { topic =>
-                if (!topic.isEmailSubscribed(user.email.toString)) {
-                  logger.info(s"Subscribing [${user.email}] to the notification topic")
-                  topic.subscribeEmail(user.email.toString)
-                  logger.info("Check your email and confirm subscription")
-                }
+            aws.sns.getOrCreateTopic(names.notificationTopic).map { topic =>
+
+              if (!topic.subscribed(Subscriber.email(user.email.toString))) {
+
+                logger.info(s"Subscribing [${user.email}] to the notification topic")
+                topic.subscribe(Subscriber.email(user.email.toString))
+                logger.info("Check your email and confirm subscription")
               }
+            }
           ),
-          Step( s"Creating manager group: ${managerGroup.name}" )(
-            Try { aws.as.fixAutoScalingGroupUserData(managerGroup, managerUserScript) }
-              .map { asGroup =>
-                aws.as.createAutoScalingGroup(asGroup)
-                // TODO: make use of the managerGroup status tag
-                utils.tagAutoScalingGroup(aws.as, asGroup, StatusTag.preparing)
-              }
+          Step( s"Creating manager launch configuration: ${names.managerLaunchConfig}" )(
+
+            aws.as.createLaunchConfig(
+              names.managerLaunchConfig,
+              config.managerConfig.purchaseModel,
+              LaunchSpecs(
+                ami = config.managerConfig.ami,
+                instanceType = config.managerConfig.instanceType,
+                keyName = user.keypairName,
+                userData = managerUserScript,
+                iamProfileName = Some(config.iamRoleName),
+                deviceMappings = config.managerConfig.deviceMapping
+              )(config.managerConfig.supportsAMI)
+            ).recover {
+              case _: AlreadyExistsException => logger.warn(s"Manager launch configuration already exists")
+            }
+          ),
+          Step( s"Creating manager group: ${names.managerGroup}" )(
+            aws.as.createGroup(
+              names.managerGroup,
+              names.managerLaunchConfig,
+              config.managerConfig.groupSize,
+              if  (config.managerConfig.availabilityZones.isEmpty) aws.ec2.getAllAvailableZones
+              else config.managerConfig.availabilityZones
+            )
+          ),
+          Step( s"Tagging manager group" )(
+            aws.as.setTags(names.managerGroup, Map(
+              "product" -> "loquat",
+              "group"   -> names.managerGroup,
+              StatusTag.label -> StatusTag.preparing.status
+            ))
           ),
           Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(
             util.Success(true)
@@ -208,31 +228,37 @@ case object LoquatOps extends LazyLogging {
     val names = config.resourceNames
 
     Step("Sending notification on your email")(
-      Try {
-        val subject = "Loquat " + config.loquatId + " is terminated"
-        val notificationTopic = aws.sns.createTopic(names.notificationTopic)
-        notificationTopic.publish(reason.msg, subject)
-      }
+      aws.sns
+        .getOrCreateTopic(names.notificationTopic)
+        .map { _.publish(reason.msg, s"Loquat ${config.loquatId} is terminated") }
     ).execute
 
     Step(s"deleting workers group: ${names.workersGroup}")(
-      Try { aws.as.deleteAutoScalingGroup(names.workersGroup) }
+      Try { aws.as.deleteGroup(names.workersGroup) }
+    ).execute
+
+    Step(s"deleting workers launch config: ${names.workersLaunchConfig}")(
+      aws.as.deleteLaunchConfig(names.workersLaunchConfig)
     ).execute
 
     Step(s"deleting error queue: ${names.errorQueue}")(
-      Try { aws.sqs.getQueueByName(names.errorQueue).foreach(_.delete) }
+      aws.sqs.getQueue(names.errorQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting output queue: ${names.outputQueue}")(
-      Try { aws.sqs.getQueueByName(names.outputQueue).foreach(_.delete) }
+      aws.sqs.getQueue(names.outputQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting input queue: ${names.inputQueue}")(
-      Try { aws.sqs.getQueueByName(names.inputQueue).foreach(_.delete) }
+      aws.sqs.getQueue(names.inputQueue).flatMap(_.delete)
     ).execute
 
     Step(s"deleting manager group: ${names.managerGroup}")(
-      Try { aws.as.deleteAutoScalingGroup(names.managerGroup) }
+      aws.as.deleteGroup(names.managerGroup)
+    ).execute
+
+    Step(s"deleting manager launch config: ${names.managerLaunchConfig}")(
+      aws.as.deleteLaunchConfig(names.managerLaunchConfig)
     ).execute
 
     logger.info("Loquat is undeployed")
@@ -245,7 +271,7 @@ case object LoquatOps extends LazyLogging {
   // def addDataMappings(loquat: AnyLoquat, dataMappings: List[AnyDataMapping]): Unit = {
   //
   //   val sqs = SQS.create(loquat.config.localCredentials)
-  //   val inputQueue = sqs.getQueueByName(loquat.config.resourceNames.inputQueue).get
+  //   val inputQueue = sqs.get(loquat.config.resourceNames.inputQueue).get
   //   dataMappings.foreach {
   //     t => inputQueue.sendMessage(upickle.default.write[SimpleDataMapping](t))
   //   }
