@@ -17,7 +17,8 @@ import ohnosequences.cosas._, types._
 import better.files._
 
 import scala.util.Try
-import collection.JavaConversions._
+import scala.collection.JavaConversions._
+import java.net.URI
 
 
 /* Configuration for loquat */
@@ -56,14 +57,7 @@ abstract class AnyLoquatConfig extends AnyConfig {
   lazy val amiEnv: AnyLinuxAMIEnvironment = amznAMIEnv(ami)
   lazy val region: Region = ami.region
 
-  // TODO: use S3Address parsing from aws-scala-tools
-  lazy final val fatArtifactS3Object: S3Object = {
-    val s3url = """s3://(.+)/(.+)""".r
-    metadata.artifactUrl match {
-      case s3url(bucket, key) => S3Object(bucket, key)
-      case _ => throw new Error("Wrong fat jar url, it should be an S3 address")
-    }
-  }
+  lazy final val fatArtifactS3Object: S3Object = S3Object(new URI(metadata.artifactUrl))
 
   /* Unique id  of the loquat instance */
   lazy final val artifactName: String = metadata.artifact.replace(".", "-").toLowerCase
