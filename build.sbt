@@ -12,11 +12,11 @@ libraryDependencies ++= Seq(
   // json:
   "com.lihaoyi" %% "upickle" % "0.3.6",
   // AWS:
-  "ohnosequences" %% "aws-scala-tools" % "0.17.0-97-g37276e9",
+  "ohnosequences" %% "aws-scala-tools" % "0.18.0",
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
-  "ohnosequences" %% "statika"     % "2.0.0-M5-6-gaa30027",
-  "ohnosequences" %% "datasets"    % "0.3.0-12-ged03fe2",
+  "ohnosequences" %% "statika"     % "2.0.0-RC1",
+  "ohnosequences" %% "datasets"    % "0.4.0",
   // files:
   "com.github.pathikrit" %% "better-files" % "2.13.0",
   // testing
