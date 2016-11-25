@@ -8,23 +8,21 @@ scalaVersion := "2.11.8"
 libraryDependencies ++= Seq(
   // logging:
   "ch.qos.logback"              % "logback-classic" % "1.1.7",
-  "com.typesafe.scala-logging" %% "scala-logging"   % "3.1.0",
+  "com.typesafe.scala-logging" %% "scala-logging"   % "3.5.0",
   // json:
-  "com.lihaoyi" %% "upickle" % "0.3.6",
+  "com.lihaoyi" %% "upickle" % "0.4.4",
   // AWS:
   "ohnosequences" %% "aws-scala-tools" % "0.18.0",
+  // files:
+  "com.github.pathikrit" %% "better-files" % "2.16.0",
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
   "ohnosequences" %% "statika"     % "2.0.0-RC1",
-  "ohnosequences" %% "datasets"    % "0.4.0",
-  // files:
-  "com.github.pathikrit" %% "better-files" % "2.13.0",
-  // testing
-  "org.scalatest"  %% "scalatest" % "2.2.6" % Test
+  "ohnosequences" %% "datasets"    % "0.4.0"
 )
 
 dependencyOverrides ++= Set(
-  "org.slf4j" % "slf4j-api" % "1.7.20"
+  "org.slf4j" % "slf4j-api" % "1.7.21"
 )
 
 // FIXME: warts should be turn on back after the code clean up
@@ -38,4 +36,4 @@ generateStatikaMetadataIn(Test)
 fullClasspath in assembly := (fullClasspath in Test).value
 
 // This turns on fat-jar publishing during release process:
-publishFatArtifact in Release := true
+// publishFatArtifact in Release := true
