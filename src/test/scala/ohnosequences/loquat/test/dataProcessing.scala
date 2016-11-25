@@ -33,7 +33,7 @@ case object dataProcessing {
         outFile.append(txt)
       } -&-
       success("transposed",
-        transposed(outFile) ::
+        transposed(outFile.toJava) ::
         *[AnyDenotation { type Value <: FileResource }]
       )
     }

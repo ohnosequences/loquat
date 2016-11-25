@@ -1,7 +1,7 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.loquat._
-import ohnosequences.awstools._, regions.Region._, ec2._, InstanceType._, autoscaling._
+import ohnosequences.awstools._, regions._, ec2._, autoscaling._
 import ohnosequences.statika._, aws._
 import test.dataProcessing._
 
@@ -19,12 +19,14 @@ case object config {
     val metadata: AnyArtifactMetadata = ohnosequences.generated.metadata.loquat
 
     val  managerConfig = ManagerConfig(
-      InstanceSpecs(defaultAMI, m3.medium),
+      defaultAMI,
+      m3.medium,
       PurchaseModel.spot(0.1)
     )
 
     val workersConfig = WorkersConfig(
-      InstanceSpecs(defaultAMI, m3.medium),
+      defaultAMI,
+      m3.medium,
       PurchaseModel.spot(0.1),
       AutoScalingGroupSize(0, 1, 20)
     )
