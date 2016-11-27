@@ -67,6 +67,8 @@ case object utils {
     }
   }
 
+  def sleep(time: FiniteDuration): Unit = Thread.sleep(time.toMillis)
+
 
   sealed class StatusTag(val status: String)
 

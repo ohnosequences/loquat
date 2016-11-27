@@ -116,7 +116,7 @@ case class TerminationDaemonBundle(
 
       if (triesLeft > 0) {
 
-        Thread.sleep(5.seconds.toMillis)
+        sleep(5.seconds)
         getAverage(triesLeft - 1, getNumbers +: acc)
       } else {
 
