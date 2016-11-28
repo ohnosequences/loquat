@@ -45,3 +45,21 @@ abstract class WorkerBundle[
   type DataProcessingBundle = I
   type Config = C
 }
+
+
+case object WorkContext(
+  val config: AnyLoquatConfig,
+  val instructionsBundle: AnyDataProcessingBundle
+) {
+
+  final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
+
+  /* AWS related things */
+  lazy val aws = instanceAWSClients(config)
+
+  val inputQueue  = aws.sqs.getQueue(config.resourceNames.inputQueue).get
+  val errorQueue  = aws.sqs.getQueue(config.resourceNames.errorQueue).get
+  val outputQueue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
+
+  val instance = aws.ec2.getCurrentInstance.get
+}
