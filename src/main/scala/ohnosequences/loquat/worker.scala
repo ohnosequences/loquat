@@ -100,4 +100,17 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
     }
   }
 
+  /* This downloads input files for the given datamapping. Multiple files will be downloaded in parallel. */
+  def prepareInputData(dataMapping: SimpleDataMapping): Future[Map[String, File]] = Future {
+
+    logger.debug(s"Cleaning up and preparing the working directory: ${workingDir.path}")
+    workingDir.createIfNotExists(asDirectory = true, createParents = true)
+    workingDir.clear()
+  }.flatMap { _ =>
+
+    logger.debug("Downloading input data...")
+    Future.traverse(dataMapping.inputs) { case (name, resource) =>
+      downloadInput(name, resource).map { name -> _ }
+    }
+  }
 }
