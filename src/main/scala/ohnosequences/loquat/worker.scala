@@ -63,3 +63,41 @@ case object WorkContext(
 
   val instance = aws.ec2.getCurrentInstance.get
 }
+
+case class Workflow(ctx: WorkContext) extends LazyLogging {
+  import ctx._
+
+  def receiveMessage(): Future[Message] = Future {
+    logger.info("Data processor is waiting for new data...")
+
+    inputQueue.poll(
+      timeout = Duration.Inf,
+      amountLimit = Some(1),
+      adjustRequest = { _.withWaitTimeSeconds(10) }
+    ).get.head
+  }
+
+  // upickle.default.read[SimpleDataMapping](message.body)
+
+    // logger.info("DataProcessor started at " + instance.id)
+
+  /* This method downloads one input data resource and returns the created file */
+  def downloadInput(name: String, resource: AnyRemoteResource): Future[File] = resource match {
+    /* - if the resource is a message, we just write it to a file */
+    case MessageResource(msg) => Future {
+      logger.debug(s"Input [${name}]: writing message to a file")
+      (inputDir / name).createIfNotExists().overwrite(msg)
+    }
+    /* - if the resource is an S3 object/folder, we download it */
+    case S3Resource(s3Address) => Future.fromTry {
+      // NOTE: if it is an S3 folder, destination will be inputDir/name/<s3Address.key>/
+      logger.debug(s"Input [${name}]: downloading [${s3Address}]")
+      transferManager.download(
+        s3Address,
+        (inputDir / name).toJava,
+        silent = false // minimal logging
+      ).get.toScala
+    }
+  }
+
+}
