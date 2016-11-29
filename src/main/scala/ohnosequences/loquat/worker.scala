@@ -113,4 +113,52 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
       downloadInput(name, resource).map { name -> _ }
     }
   }
+
+  def processFiles(inputFiles: Map[String, File]): Future[Map[String, File]] = Future {
+
+    instructionsBundle.runProcess(workingDir, inputFiles) match {
+      case Success(_, outputFiles) => outputFiles
+      case Failure(errors) => {
+
+        logger.error(s"Data processing failed, publishing it to the error queue")
+        errorQueue.sendOne(upickle.default.write(
+          // TODO: attach normall log
+          ProcessingResult(instance.id, errors.mkString("\n"))
+        ))
+        // TODO: make a specific exception
+        throw new Throwable(errors.mkString("\n"))
+      }
+    }
+  }
+
+  /* This method uploads one output file and returns the destination S3 address or `None` if the files was empty and could be skept */
+  def uploadOutput(file: File, destination: AnyS3Address): Future[Option[AnyS3Address]] = {
+
+    // FIXME: file.isEmpty may fail on compressed files!
+    if (config.skipEmptyResults && file.isEmpty) Future.success {
+      logger.info(s"Output file [${file.name}] is empty. Skipping it.")
+      None
+    } else Future.fromTry {
+
+      logger.info(s"Publishing output object: [${file.name}]")
+      transferManager.upload(
+        file.toJava,
+        destination,
+        s3Metadata,
+        silent = false // minimal logging
+      ).map(Some)
+    }
+  }
+  
+  // logger.error("Fatal failure during dataMapping processing", t)
+  // errorQueue.sendOne(upickle.default.write(t.getMessage))
+  // terminateWorker
+
+  // def terminateWorker(): Unit = {
+  //   stopped = true
+  //   // instance.foreach(_.createTag(StatusTag.terminating))
+  //   logger.info("Terminating instance")
+  //   instance.terminate
+  // }
+
 }
