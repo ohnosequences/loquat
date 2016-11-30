@@ -61,7 +61,25 @@ case object WorkContext(
   val errorQueue  = aws.sqs.getQueue(config.resourceNames.errorQueue).get
   val outputQueue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
 
+  val transferManager = aws.s3.createTransferManager
+  // TODO: it should be shutdown explicitly at some point
+  // transferManager.shutdown()
+
   val instance = aws.ec2.getCurrentInstance.get
+
+  /* This metadata will be attached to each uploaded S3 object */
+  val s3Metadata: Map[String, Strin] = Map(
+    "artifact-org"     -> config.metadata.organization,
+    "artifact-name"    -> config.metadata.artifact,
+    "artifact-version" -> config.metadata.version,
+    "artifact-url"     -> config.metadata.artifactUrl
+  )
+
+  /* Execution context for the futures */
+  implicit lazy val fixedThreadPoolExecutionContext: ExecutionContext = {
+    val fixedThreadPool: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors)
+    ExecutionContext.fromExecutor(fixedThreadPool)
+  }
 }
 
 case class Workflow(ctx: WorkContext) extends LazyLogging {
@@ -149,7 +167,100 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
       ).map(Some)
     }
   }
-  
+
+  def finishTask(
+    message: Message,
+    outputFiles: Map[String, File]
+  ): Future[Unit] = {
+    val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
+
+    // logger.info("Uploading output files...")
+    Future.traverse(outputFileMap) { case (name, file) =>
+
+      uploadOutput(file, dataMapping.outputs(name).resource)
+
+    }.flatMap { outputObjects =>
+
+      // logger.info("Finished uploading output files. publishing message to the output queue.")
+      Future.fromTry {
+        outputQueue.sendOne(upickle.default.write(
+          ProcessingResult(instance.id, dataMapping.id)
+        ))
+      }
+    }.flatMap { _ =>
+      Future.fromTry { message.delete() }
+    }
+  }
+
+
+  def holdMessage(message: Message)(futureResult: Future[Unit]): Future[FiniteDuration] = Future {
+    val interval = 5.minutes
+
+    val startTime = Deadline.now
+
+    def timeSpent: FiniteDuration = -startTime.timeLeft
+
+    val deadline: Deadline = startTime +
+      config.terminationConfig
+        .taskProcessingTimeout
+        .getOrElse(12.hours)
+
+
+    @scala.annotation.tailrec
+    def waitMore: Future[FiniteDuration] = {
+
+      futureResult.value match {
+        case Some(tryResult) => {
+          finishTask(message)
+          timeSpent
+        }
+        case None => {
+
+          if(deadline.isOverdue) {
+            terminateWorker
+            // Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
+          } else {
+
+          message.changeVisibility(interval.toSeconds).recover {
+            case ReceiptHandleIsInvalidException => // message doesn't exist
+            case MessageNotInflightException => // message exists but is not in flight
+          }
+          Thread.sleep((interval - 10.seconds).toMillis)
+          waitMore
+        }
+      }
+
+      if(timeSpent > taskProcessingTimeout) {
+        terminateWorker
+        Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
+      } else {
+        futureResult.value match {
+          case None => {
+            // every 5min we extend it for 6min
+            if (tries % (5*60) == 0) {
+              if (Try(message.changeVisibility(6*60)).isFailure)
+                logger.warn("Couldn't change the visibility globalTimeout")
+              // FIXME: something weird is happening here
+            }
+            Thread.sleep(step.toMillis)
+            // logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
+            waitMore(tries + 1)
+          }
+          case Some(scala.util.Success(r)) => {
+            logger.info("Got a result: " + r.trace.toString)
+            r
+          }
+          case Some(scala.util.Failure(t)) => Failure(s"future error: ${t.getMessage}")
+        }
+      }
+    }
+
+    waitMore(tries = 0) match {
+      case Failure(tr) => Failure(tr)
+      case Success(tr, _) => Success(tr, timeSpent)
+    }
+  }
+
   // logger.error("Fatal failure during dataMapping processing", t)
   // errorQueue.sendOne(upickle.default.write(t.getMessage))
   // terminateWorker
