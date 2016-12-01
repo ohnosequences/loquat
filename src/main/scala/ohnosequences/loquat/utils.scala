@@ -67,7 +67,8 @@ case object utils {
     }
   }
 
-  def sleep(time: FiniteDuration): Unit = Thread.sleep(time.toMillis)
+  // FIXME: should be FiniteDuration (should be fixed in aws-scala-tools SQS)
+  def sleep(time: Duration): Unit = Thread.sleep(time.toMillis)
 
 
   sealed class StatusTag(val status: String)

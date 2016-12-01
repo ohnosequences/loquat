@@ -6,12 +6,14 @@ import ohnosequences.statika._
 import ohnosequences.datasets._
 
 import com.amazonaws.services.s3.transfer.TransferManager
+import com.amazonaws.services.sqs.model.ReceiptHandleIsInvalidException
 import ohnosequences.awstools._, sqs._, s3._, ec2._
 
 import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent._, duration._
-import scala.util.Try
+import scala.util, util.Try
+import java.util.concurrent.{ Executors, ExecutorService }
 import upickle.Js
 
 
@@ -34,10 +36,11 @@ trait AnyWorkerBundle extends AnyBundle {
 
   def instructions: AnyInstructions = LazyTry {
     // TODO: any better way to loop this?
-    ctx.taskIteration.onComplete {
-      case util.Success(_) => ctx.taskIteration
-      case util.Failure(ex) => suicide(ex) // shouldn't it be caught before?
-    }
+    // ctx.taskIteration.onComplete {
+    //   case util.Success(_) => ctx.taskIteration
+    //   case util.Failure(ex) => suicide(ex) // shouldn't it be caught before?
+    // }
+    ???
     // or just this?
     // ctx.taskIteration.flatMap { _ => ctx.taskIteration }
   }
@@ -56,12 +59,14 @@ abstract class WorkerBundle[
 
 
 /* General context per-worker */
-case object GeneralContext(
+case class GeneralContext(
   val config: AnyLoquatConfig,
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging { ctx =>
 
-  final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
+  lazy val workingDir: File = file"/media/ephemeral0/applicator/loquat"
+  lazy val inputDir:  File = workingDir / "input"
+  lazy val outputDir: File = workingDir / "output"
 
   /* AWS related things */
   lazy val aws = instanceAWSClients(config)
@@ -77,7 +82,7 @@ case object GeneralContext(
   val instance = aws.ec2.getCurrentInstance.get
 
   /* This metadata will be attached to each uploaded S3 object */
-  val s3Metadata: Map[String, Strin] = Map(
+  val s3Metadata: Map[String, String] = Map(
     "artifact-org"     -> config.metadata.organization,
     "artifact-name"    -> config.metadata.artifact,
     "artifact-version" -> config.metadata.version,
@@ -85,28 +90,33 @@ case object GeneralContext(
   )
 
   /* Execution context for the futures */
+  // TODO: probably download/upload futures need their own execution context (and AWS clients with more connectinos open)
   implicit lazy val fixedThreadPoolExecutionContext: ExecutionContext = {
     val fixedThreadPool: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors * 2)
     ExecutionContext.fromExecutor(fixedThreadPool)
+    // TODO: use publishError as a reporter
   }
 
 
-  /* This is one _full_ cycle of the worker */
+  /* This is a _full_ iteration of the task processing loop */
   def taskIteration(): Future[FiniteDuration] = {
 
     receiveMessage.flatMap { message =>
       val taskCtx = TaskContext(message, Deadline.now)(ctx)
-      val futureResult = processTask(taskCtx)
+      val futureResult = taskCtx.processTask()
 
       logger.info(s"Started task ${taskCtx.dataMapping.id}")
 
+      // TODO: can this cause a situation when all threads are ocupied by the futureResult's inner futures and there's no thread left for the keepMessageInFlight, which is supposed to run in parallel with futureResult?
       Future.firstCompletedOf(Seq(
-        futureResult,
-        keepMessageInFlight(message, futureResult)
+        taskCtx.keepMessageInFlight(futureResult),
+        futureResult
       ))
     }
   }
 
+
+  /* Waits for a task-message from the input queue. It is supposed to wait and send requests as long as needed. */
   def receiveMessage(): Future[Message] = Future {
     logger.info("Data processor is waiting for new data...")
 
@@ -115,16 +125,9 @@ case object GeneralContext(
       amountLimit = Some(1),
       adjustRequest = { _.withWaitTimeSeconds(10) }
     ).get.head
-  }
+  // NOTE: for whatever reason it fails, the best we can do is just try again
+  }.fallbackTo(receiveMessage())
 
-  /* Enter the void... */
-  def suicide(reason: Throwable): Unit = {
-    // TODO: SNS notifications on critical failures
-    publishError(s"Instance is terminated due to a fatal exception: ${reason}")
-    instance.terminate
-    // throw the suicide note
-    throw reason
-  }
 
 }
 
@@ -147,7 +150,7 @@ case class TaskContext(
     prepareInputData()
       .flatMap(processFiles)
       .flatMap(finishTask)
-      .flatMap { _ => timeSpent() }
+      .map { _ => timeSpent }
   }
 
 
@@ -162,11 +165,12 @@ case class TaskContext(
     case S3Resource(s3Address) => Future.fromTry {
       // NOTE: if it is an S3 folder, destination will be inputDir/name/<s3Address.key>/
       logger.debug(s"Input [${name}]: downloading [${s3Address}]")
+      import ohnosequences.awstools.s3._
       transferManager.download(
         s3Address,
         (inputDir / name).toJava,
-        silent = false // minimal logging
-      ).get.toScala
+        false // not silent
+      ).map { _.toScala }
     }
   }
 
@@ -181,7 +185,7 @@ case class TaskContext(
     logger.debug("Downloading input data...")
     Future.traverse(dataMapping.inputs) { case (name, resource) =>
       downloadInput(name, resource).map { name -> _ }
-    }
+    }.map { _.toMap }
   }
 
   def processFiles(inputFiles: Map[String, File]): Future[Map[String, File]] = Future {
@@ -205,7 +209,7 @@ case class TaskContext(
   private def uploadOutput(file: File, destination: AnyS3Address): Future[Option[AnyS3Address]] = {
 
     // FIXME: file.isEmpty may fail on compressed files!
-    if (config.skipEmptyResults && file.isEmpty) Future.success {
+    if (config.skipEmptyResults && file.isEmpty) Future.successful {
       logger.info(s"Output file [${file.name}] is empty. Skipping it.")
       None
     } else Future.fromTry {
@@ -215,19 +219,16 @@ case class TaskContext(
         file.toJava,
         destination,
         s3Metadata,
-        silent = false // minimal logging
-      ).map(Some)
+        false // not silent
+      ).map { Some(_) }
     }
   }
 
   /* This method uploads all output files, sends a success-message and (!) deletes the task-message from the input queue */
   def finishTask(outputFiles: Map[String, File]): Future[Unit] = {
-    // TODO: this should be a part of the task-context
-    val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
-
     // NOTE: this method could be split, but the point of it is to control that task is successfully finished _only_ if the output files are successfully uploaded. Then we can delete the task-message and the task is "announced" as done.
     // logger.info("Uploading output files...")
-    Future.traverse(outputFileMap) { case (name, file) =>
+    Future.traverse(outputFiles) { case (name, file) =>
 
       uploadOutput(file, dataMapping.outputs(name).resource)
 
@@ -274,7 +275,7 @@ case class TaskContext(
         } else {
 
           message.changeVisibility(
-            messageTimeout.toSeconds
+            messageTimeout.toSeconds.toInt
           ).recover {
 
             /* The message likely doesn't exist, i.e. already successfuly processed (possibly by somebody else) */
@@ -288,17 +289,28 @@ case class TaskContext(
           }
         }
       }
+
+      timeSpent
     }
   }
 
 
   /* Publishes an error message to the SQS queue */
-  def publishError(msg: String): Try[Unit] = {
+  def publishError(msg: String): Try[MessageId] = {
     logger.error(msg)
 
     // TODO: should publish relevant part of the log
     // TODO: construct a JSON?
     errorQueue.sendOne(s"Instance: ${instance.id}; Task: ${dataMapping.id}; Reason: ${msg}")
+  }
+
+  /* Enter the void... */
+  def suicide(reason: Throwable): Unit = {
+    // TODO: SNS notifications on critical failures
+    publishError(s"Instance is terminated due to a fatal exception: ${reason}")
+    instance.terminate
+    // throw the suicide note
+    throw reason
   }
 
 }
