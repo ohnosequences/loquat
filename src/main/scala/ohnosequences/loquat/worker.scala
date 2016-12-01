@@ -168,12 +168,15 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
     }
   }
 
+  /* This method uploads all output files, sends a success-message and (!) deletes the task-message from the input queue */
   def finishTask(
     message: Message,
     outputFiles: Map[String, File]
   ): Future[Unit] = {
+    // TODO: this should be a part of the task-context
     val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
 
+    // NOTE: this method could be split, but the point of it is to control that task is successfully finished _only_ if the output files are successfully uploaded. Then we can delete the task-message and the task is "announced" as done.
     // logger.info("Uploading output files...")
     Future.traverse(outputFileMap) { case (name, file) =>
 
@@ -193,71 +196,60 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
   }
 
 
-  def holdMessage(message: Message)(futureResult: Future[Unit]): Future[FiniteDuration] = Future {
-    val interval = 5.minutes
-
+  /* This is the main method that conbines all the other methods */
+  def processTask(message: Message): Future[FiniteDuration] = {
     val startTime = Deadline.now
-
     def timeSpent: FiniteDuration = -startTime.timeLeft
 
-    val deadline: Deadline = startTime +
+    ??? // TODO
+
+    timeSpent
+  }
+
+
+
+  def keepMessageInFlight(message: Message)(futureResult: Future[FiniteDuration]): Future[FiniteDuration] = {
+    val deadline: Deadline =
       config.terminationConfig
-        .taskProcessingTimeout
-        .getOrElse(12.hours)
+        .taskProcessingTimeout // either configured timeout
+        .getOrElse(12.hours)   // or just the global one
+        .fromNow
 
+    val messageTimeout = inputQueue.visibilityTimeout
 
-    @scala.annotation.tailrec
-    def waitMore: Future[FiniteDuration] = {
+    /* This future will be cycling until the task is done or timeout is exceeded */
+    Future {
+      // TODO: is there a better way to loop it?
+      while(!futureResult.isCompleted) {
 
-      futureResult.value match {
-        case Some(tryResult) => {
-          finishTask(message)
-          timeSpent
-        }
-        case None => {
+        /* We sleep a bit less to prolong visibility timeout _before_ the message will return to the queue */
+        // NOTE: probably this need some more careful "time-padding"
+        sleep(messageTimeout * 0.95)
 
-          if(deadline.isOverdue) {
-            terminateWorker
-            // Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
-          } else {
+        /* - if by the time we wake up everything is already done, no need to do anything else: we return the result (although it won't be used anywhere) */
+        if (futureResult.isCompleted) futureResult
+        /* - if it takes too much time we fail */
+        else if(deadline.isOverdue) {
+          // TODO: publish error message
+          suicide(new TimeoutException("Task processing timeout exceeded"))
+        /* - otherwise, data is still being processed and we try to keep the message in-flight */
+        } else {
 
-          message.changeVisibility(interval.toSeconds).recover {
-            case ReceiptHandleIsInvalidException => // message doesn't exist
-            case MessageNotInflightException => // message exists but is not in flight
+          message.changeVisibility(
+            messageTimeout.toSeconds
+          ).recover {
+
+            /* The message likely doesn't exist, i.e. already successfuly processed (possibly by somebody else) */
+            // NOTE: as we don't have any civilized way to stop ongoing parallel computation, we just terminate the instance
+            case ex: ReceiptHandleIsInvalidException =>
+              suicide(new ReceiptHandleIsInvalidException(s"Task ${dataMapping.id} is already done by somebody"))
+
+            /* The message exists, but is not in flight, i.e. at some point we failed to keep it in-flight */
+            // NOTE: we can ignore this case because once the task will be finished (by this or another instance) it will be deleted and the other case will terminate the slowpoke worker
+            // case ex: MessageNotInflightException =>
           }
-          Thread.sleep((interval - 10.seconds).toMillis)
-          waitMore
-        }
-      }
-
-      if(timeSpent > taskProcessingTimeout) {
-        terminateWorker
-        Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
-      } else {
-        futureResult.value match {
-          case None => {
-            // every 5min we extend it for 6min
-            if (tries % (5*60) == 0) {
-              if (Try(message.changeVisibility(6*60)).isFailure)
-                logger.warn("Couldn't change the visibility globalTimeout")
-              // FIXME: something weird is happening here
-            }
-            Thread.sleep(step.toMillis)
-            // logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
-            waitMore(tries + 1)
-          }
-          case Some(scala.util.Success(r)) => {
-            logger.info("Got a result: " + r.trace.toString)
-            r
-          }
-          case Some(scala.util.Failure(t)) => Failure(s"future error: ${t.getMessage}")
         }
       }
-    }
-
-    waitMore(tries = 0) match {
-      case Failure(tr) => Failure(tr)
-      case Success(tr, _) => Success(tr, timeSpent)
     }
   }
 
@@ -265,11 +257,12 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
   // errorQueue.sendOne(upickle.default.write(t.getMessage))
   // terminateWorker
 
-  // def terminateWorker(): Unit = {
-  //   stopped = true
-  //   // instance.foreach(_.createTag(StatusTag.terminating))
-  //   logger.info("Terminating instance")
-  //   instance.terminate
-  // }
+  /* Enter the void... */
+  def suicide(reason: Throwable): Unit = {
+    logger.info(s"Instance will be terminated due to a fatal exception: ${reason}")
+    instance.terminate
+    // throw the suicide note
+    throw reason
+  }
 
 }
