@@ -1,10 +1,11 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.datasets._
-import ohnosequences.loquat._, test.data._
+import ohnosequences.loquat._, test.data._, utils._
 import ohnosequences.statika._
 import ohnosequences.datasets._, FileResource._
 import ohnosequences.cosas._, klists._, types._, records._
+import concurrent.duration._
 import better.files._
 
 case object dataProcessing {
@@ -27,6 +28,7 @@ case object dataProcessing {
       val outFile: File = (context / s"${prfx}.transposed.txt").createIfNotExists()
 
       LazyTry {
+        sleep(2.minutes + 20.seconds)
         val matrixRows = context.inputFile(matrix).lines
         val trans = matrixRows.map{ _.reverse }.toList.reverse
         outFile.createIfNotExists().overwrite(trans.mkString("\n"))

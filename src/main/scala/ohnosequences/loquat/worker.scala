@@ -35,14 +35,9 @@ trait AnyWorkerBundle extends AnyBundle {
   lazy val ctx = GeneralContext(config, instructionsBundle)
 
   def instructions: AnyInstructions = LazyTry {
+    import ctx._
     // TODO: any better way to loop this?
-    // ctx.taskIteration.onComplete {
-    //   case util.Success(_) => ctx.taskIteration
-    //   case util.Failure(ex) => suicide(ex) // shouldn't it be caught before?
-    // }
-    ???
-    // or just this?
-    // ctx.taskIteration.flatMap { _ => ctx.taskIteration }
+    taskIteration.flatMap { _ => taskIteration }
   }
 }
 
