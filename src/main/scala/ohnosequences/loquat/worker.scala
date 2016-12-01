@@ -158,7 +158,9 @@ case class TaskContext(
     /* - if the resource is a message, we just write it to a file */
     case MessageResource(msg) => Future {
       logger.debug(s"Input [${name}]: writing message to a file")
-      (inputDir / name).createIfNotExists().overwrite(msg)
+      val f = (inputDir / name).write(msg)
+      logger.debug(s"Input [${name}]: written to ${f.path}")
+      f
     }
     /* - if the resource is an S3 object/folder, we download it */
     case S3Resource(s3Address) => Future.fromTry {
@@ -189,6 +191,7 @@ case class TaskContext(
 
   def processFiles(inputFiles: Map[String, File]): Future[Map[String, File]] = Future {
 
+    logger.debug("Processing data...")
     instructionsBundle.runProcess(workingDir, inputFiles) match {
       case Success(_, outputFiles) => outputFiles
       case Failure(errors) => {
@@ -233,7 +236,7 @@ case class TaskContext(
 
     }.flatMap { outputObjects =>
 
-      // logger.info("Finished uploading output files. publishing message to the output queue.")
+      logger.info("Finished uploading output files. Publishing message to the output queue.")
       Future.fromTry {
         outputQueue.sendOne(upickle.default.write(
           ProcessingResult(instance.id, dataMapping.id)

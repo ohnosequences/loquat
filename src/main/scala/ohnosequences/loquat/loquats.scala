@@ -237,7 +237,7 @@ case object LoquatOps extends LazyLogging {
     ).execute
 
     Step(s"deleting workers group: ${names.workersGroup}")(
-      Try { aws.as.deleteGroup(names.workersGroup) }
+      aws.as.deleteGroup(names.workersGroup)
     ).execute
 
     Step(s"deleting workers launch config: ${names.workersLaunchConfig}")(
