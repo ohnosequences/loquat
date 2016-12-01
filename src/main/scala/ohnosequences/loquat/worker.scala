@@ -30,14 +30,16 @@ trait AnyWorkerBundle extends AnyBundle {
     LogUploaderBundle(config, scheduler)
   )
 
+  lazy val ctx = GeneralContext(config, instructionsBundle)
+
   def instructions: AnyInstructions = LazyTry {
     // TODO: any better way to loop this?
-    taskIteration.onComplete {
-      case util.Success(_) => taskIteration
+    ctx.taskIteration.onComplete {
+      case util.Success(_) => ctx.taskIteration
       case util.Failure(ex) => suicide(ex) // shouldn't it be caught before?
     }
     // or just this?
-    // taskIteration.flatMap { _ => taskIteration }
+    // ctx.taskIteration.flatMap { _ => ctx.taskIteration }
   }
 }
 
@@ -53,10 +55,11 @@ abstract class WorkerBundle[
 }
 
 
-case object WorkContext(
+/* General context per-worker */
+case object GeneralContext(
   val config: AnyLoquatConfig,
   val instructionsBundle: AnyDataProcessingBundle
-) {
+) extends LazyLogging { ctx =>
 
   final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
 
@@ -83,13 +86,26 @@ case object WorkContext(
 
   /* Execution context for the futures */
   implicit lazy val fixedThreadPoolExecutionContext: ExecutionContext = {
-    val fixedThreadPool: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors)
+    val fixedThreadPool: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors * 2)
     ExecutionContext.fromExecutor(fixedThreadPool)
   }
-}
 
-case class Workflow(ctx: WorkContext) extends LazyLogging {
-  import ctx._
+
+  /* This is one _full_ cycle of the worker */
+  def taskIteration(): Future[FiniteDuration] = {
+
+    receiveMessage.flatMap { message =>
+      val taskCtx = TaskContext(message, Deadline.now)(ctx)
+      val futureResult = processTask(taskCtx)
+
+      logger.info(s"Started task ${taskCtx.dataMapping.id}")
+
+      Future.firstCompletedOf(Seq(
+        futureResult,
+        keepMessageInFlight(message, futureResult)
+      ))
+    }
+  }
 
   def receiveMessage(): Future[Message] = Future {
     logger.info("Data processor is waiting for new data...")
@@ -101,12 +117,42 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
     ).get.head
   }
 
-  // upickle.default.read[SimpleDataMapping](message.body)
+  /* Enter the void... */
+  def suicide(reason: Throwable): Unit = {
+    // TODO: SNS notifications on critical failures
+    publishError(s"Instance is terminated due to a fatal exception: ${reason}")
+    instance.terminate
+    // throw the suicide note
+    throw reason
+  }
 
-  // logger.info(s"Started task ${dataMapping.id} at ${startTime}")
+}
+
+
+/* Local context per-task */
+case class TaskContext(
+  val message: Message,
+  val startTime: Deadline
+)(val ctx: GeneralContext) extends LazyLogging {
+  import ctx._
+
+  val dataMapping: SimpleDataMapping = upickle.default.read[SimpleDataMapping](message.body)
+
+  def timeSpent: FiniteDuration = -startTime.timeLeft
+
+
+  /* This is the main method that conbines all the other methods */
+  def processTask(): Future[FiniteDuration] = {
+
+    prepareInputData()
+      .flatMap(processFiles)
+      .flatMap(finishTask)
+      .flatMap { _ => timeSpent() }
+  }
+
 
   /* This method downloads one input data resource and returns the created file */
-  def downloadInput(name: String, resource: AnyRemoteResource): Future[File] = resource match {
+  private def downloadInput(name: String, resource: AnyRemoteResource): Future[File] = resource match {
     /* - if the resource is a message, we just write it to a file */
     case MessageResource(msg) => Future {
       logger.debug(s"Input [${name}]: writing message to a file")
@@ -125,7 +171,7 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
   }
 
   /* This downloads input files for the given datamapping. Multiple files will be downloaded in parallel. */
-  def prepareInputData(dataMapping: SimpleDataMapping): Future[Map[String, File]] = Future {
+  def prepareInputData(): Future[Map[String, File]] = Future {
 
     logger.debug(s"Cleaning up and preparing the working directory: ${workingDir.path}")
     workingDir.createIfNotExists(asDirectory = true, createParents = true)
@@ -156,7 +202,7 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
   }
 
   /* This method uploads one output file and returns the destination S3 address or `None` if the files was empty and could be skept */
-  def uploadOutput(file: File, destination: AnyS3Address): Future[Option[AnyS3Address]] = {
+  private def uploadOutput(file: File, destination: AnyS3Address): Future[Option[AnyS3Address]] = {
 
     // FIXME: file.isEmpty may fail on compressed files!
     if (config.skipEmptyResults && file.isEmpty) Future.success {
@@ -175,10 +221,7 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
   }
 
   /* This method uploads all output files, sends a success-message and (!) deletes the task-message from the input queue */
-  def finishTask(
-    message: Message,
-    outputFiles: Map[String, File]
-  ): Future[Unit] = {
+  def finishTask(outputFiles: Map[String, File]): Future[Unit] = {
     // TODO: this should be a part of the task-context
     val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
 
@@ -202,28 +245,8 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
   }
 
 
-  /* This is the main method that conbines all the other methods */
-  def processTask(message: Message): Future[FiniteDuration] = {
-    // FIXME: we can't measure time like this
-    // val startTime = Deadline.now
-    // def timeSpent: FiniteDuration = -startTime.timeLeft
-
-    val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
-
-    prepareInputData(
-      dataMapping
-    ).flatMap { inputFiles =>
-      processFiles(inputFiles)
-    }.flatMap { outputFiles =>
-      finishTask(message, outputFiles)
-    }
-
-    // timeSpent
-  }
-
-
-
-  def keepMessageInFlight(message: Message)(futureResult: Future[FiniteDuration]): Future[FiniteDuration] = {
+  /* This method is supposed to run in parallel with `processTask` to keep its message in-flight */
+  def keepMessageInFlight(futureResult: Future[FiniteDuration]): Future[FiniteDuration] = {
     val deadline: Deadline =
       config.terminationConfig
         .taskProcessingTimeout // either configured timeout
@@ -268,6 +291,7 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
     }
   }
 
+
   /* Publishes an error message to the SQS queue */
   def publishError(msg: String): Try[Unit] = {
     logger.error(msg)
@@ -277,26 +301,4 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
     errorQueue.sendOne(s"Instance: ${instance.id}; Task: ${dataMapping.id}; Reason: ${msg}")
   }
 
-  /* Enter the void... */
-  def suicide(reason: Throwable): Unit = {
-    // TODO: SNS notifications on critical failures
-    publishError(s"Instance is terminated due to a fatal exception: ${reason}")
-    instance.terminate
-    // throw the suicide note
-    throw reason
-  }
-
-  /* This is one _full_ cycle of the worker */
-  def taskIteration(): Future[FiniteDuration] = {
-
-    receiveMessage.flatMap { message =>
-
-      val futureResult = processTask(message)
-
-      Future.firstCompletedOf(Seq(
-        futureResult,
-        keepMessageInFlight(message, futureResult)
-      ))
-    }
-  }
 }
