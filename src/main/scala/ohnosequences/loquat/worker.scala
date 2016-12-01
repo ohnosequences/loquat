@@ -31,7 +31,13 @@ trait AnyWorkerBundle extends AnyBundle {
   )
 
   def instructions: AnyInstructions = LazyTry {
-    ???
+    // TODO: any better way to loop this?
+    taskIteration.onComplete {
+      case util.Success(_) => taskIteration
+      case util.Failure(ex) => suicide(ex) // shouldn't it be caught before?
+    }
+    // or just this?
+    // taskIteration.flatMap { _ => taskIteration }
   }
 }
 
@@ -97,7 +103,7 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
 
   // upickle.default.read[SimpleDataMapping](message.body)
 
-    // logger.info("DataProcessor started at " + instance.id)
+  // logger.info(s"Started task ${dataMapping.id} at ${startTime}")
 
   /* This method downloads one input data resource and returns the created file */
   def downloadInput(name: String, resource: AnyRemoteResource): Future[File] = resource match {
@@ -198,12 +204,21 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
 
   /* This is the main method that conbines all the other methods */
   def processTask(message: Message): Future[FiniteDuration] = {
-    val startTime = Deadline.now
-    def timeSpent: FiniteDuration = -startTime.timeLeft
+    // FIXME: we can't measure time like this
+    // val startTime = Deadline.now
+    // def timeSpent: FiniteDuration = -startTime.timeLeft
 
-    ??? // TODO
+    val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
 
-    timeSpent
+    prepareInputData(
+      dataMapping
+    ).flatMap { inputFiles =>
+      processFiles(inputFiles)
+    }.flatMap { outputFiles =>
+      finishTask(message, outputFiles)
+    }
+
+    // timeSpent
   }
 
 
@@ -253,16 +268,35 @@ case class Workflow(ctx: WorkContext) extends LazyLogging {
     }
   }
 
-  // logger.error("Fatal failure during dataMapping processing", t)
-  // errorQueue.sendOne(upickle.default.write(t.getMessage))
-  // terminateWorker
+  /* Publishes an error message to the SQS queue */
+  def publishError(msg: String): Try[Unit] = {
+    logger.error(msg)
+
+    // TODO: should publish relevant part of the log
+    // TODO: construct a JSON?
+    errorQueue.sendOne(s"Instance: ${instance.id}; Task: ${dataMapping.id}; Reason: ${msg}")
+  }
 
   /* Enter the void... */
   def suicide(reason: Throwable): Unit = {
-    logger.info(s"Instance will be terminated due to a fatal exception: ${reason}")
+    // TODO: SNS notifications on critical failures
+    publishError(s"Instance is terminated due to a fatal exception: ${reason}")
     instance.terminate
     // throw the suicide note
     throw reason
   }
 
+  /* This is one _full_ cycle of the worker */
+  def taskIteration(): Future[FiniteDuration] = {
+
+    receiveMessage.flatMap { message =>
+
+      val futureResult = processTask(message)
+
+      Future.firstCompletedOf(Seq(
+        futureResult,
+        keepMessageInFlight(message, futureResult)
+      ))
+    }
+  }
 }
