@@ -87,7 +87,7 @@ case class GeneralContext(
   /* Execution context for the futures */
   // TODO: probably download/upload futures need their own execution context (and AWS clients with more connectinos open)
   implicit lazy val fixedThreadPoolExecutionContext: ExecutionContext = {
-    val fixedThreadPool: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors * 2)
+    val fixedThreadPool: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors * 6)
     ExecutionContext.fromExecutor(fixedThreadPool)
     // TODO: use publishError as a reporter
   }
@@ -112,16 +112,17 @@ case class GeneralContext(
 
 
   /* Waits for a task-message from the input queue. It is supposed to wait and send requests as long as needed. */
-  def receiveMessage(): Future[Message] = Future {
+  def receiveMessage(): Future[Message] = Future.fromTry {
     logger.info("Data processor is waiting for new data...")
 
     inputQueue.poll(
       timeout = Duration.Inf,
       amountLimit = Some(1),
       adjustRequest = { _.withWaitTimeSeconds(10) }
-    ).get.head
+    ).map { _.head }
+  }
   // NOTE: for whatever reason it fails, the best we can do is just try again
-  }.fallbackTo(receiveMessage())
+  //.fallbackTo(receiveMessage())
 
 
 }
@@ -145,7 +146,10 @@ case class TaskContext(
     prepareInputData()
       .flatMap(processFiles)
       .flatMap(finishTask)
-      .map { _ => timeSpent }
+      .map { _ =>
+        logger.info(s"Task ${dataMapping.id} took ${timeSpent.toSeconds}s")
+        timeSpent
+      }
   }
 
 
@@ -164,7 +168,7 @@ case class TaskContext(
       transferManager.download(
         s3Address,
         (inputDir / name).toJava,
-        false // not silent
+        true // silent
       ).map { _.toScala }
     }
   }
@@ -214,7 +218,7 @@ case class TaskContext(
         file.toJava,
         destination,
         s3Metadata,
-        false // not silent
+        true // silent
       ).map { Some(_) }
     }
   }
@@ -269,6 +273,7 @@ case class TaskContext(
         /* - otherwise, data is still being processed and we try to keep the message in-flight */
         } else {
 
+          logger.info(s"Keeping message ${dataMapping.id} in flight")
           message.changeVisibility(
             messageTimeout.toSeconds.toInt
           ).recover {

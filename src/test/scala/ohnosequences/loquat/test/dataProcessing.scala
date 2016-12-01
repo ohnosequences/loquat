@@ -28,7 +28,7 @@ case object dataProcessing {
       val outFile: File = (context / s"${prfx}.transposed.txt").createIfNotExists()
 
       LazyTry {
-        sleep(2.minutes + 20.seconds)
+        sleep(24.seconds)
         val matrixRows = context.inputFile(matrix).lines
         val trans = matrixRows.map{ _.reverse }.toList.reverse
         outFile.createIfNotExists().overwrite(trans.mkString("\n"))

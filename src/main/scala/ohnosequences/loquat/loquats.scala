@@ -8,6 +8,7 @@ import com.amazonaws.services.autoscaling.model._
 
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
+import scala.concurrent.duration._
 import collection.JavaConversions._
 
 
@@ -139,13 +140,15 @@ case object LoquatOps extends LazyLogging {
 
         Seq(
           Step( s"Creating input queue: ${names.inputQueue}" )(
-            Try { aws.sqs.getOrCreateQueue(names.inputQueue) }
+            aws.sqs.getOrCreateQueue(names.inputQueue).map {
+              _.setVisibilityTimeout(5.seconds)
+            }
           ),
           Step( s"Creating output queue: ${names.outputQueue}" )(
-            Try { aws.sqs.getOrCreateQueue(names.outputQueue) }
+            aws.sqs.getOrCreateQueue(names.outputQueue)
           ),
           Step( s"Creating error queue: ${names.errorQueue}" )(
-            Try { aws.sqs.getOrCreateQueue(names.errorQueue) }
+            aws.sqs.getOrCreateQueue(names.errorQueue)
           ),
           Step( s"Checking the bucket: ${names.bucket}" )(
             Try {
