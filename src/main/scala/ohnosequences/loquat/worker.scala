@@ -16,6 +16,7 @@ import scala.util, util.Try
 import java.util.concurrent.{ Executors, ExecutorService }
 import upickle.Js
 
+import ExecutionContext.Implicits.global
 
 trait AnyWorkerBundle extends AnyBundle {
 
@@ -86,11 +87,12 @@ case class GeneralContext(
 
   /* Execution context for the futures */
   // TODO: probably download/upload futures need their own execution context (and AWS clients with more connectinos open)
-  implicit lazy val fixedThreadPoolExecutionContext: ExecutionContext = {
-    val fixedThreadPool: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors * 6)
-    ExecutionContext.fromExecutor(fixedThreadPool)
-    // TODO: use publishError as a reporter
-  }
+  // implicit lazy val globalContext = ExecutionContext.Implicits.global
+  // implicit lazy val fixedThreadPoolExecutionContext: ExecutionContext = {
+  //   val fixedThreadPool: ExecutorService = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors * 6)
+  //   ExecutionContext.fromExecutor(fixedThreadPool)
+  //   // TODO: use publishError as a reporter
+  // }
 
 
   /* This is a _full_ iteration of the task processing loop */
@@ -104,8 +106,8 @@ case class GeneralContext(
 
       // TODO: can this cause a situation when all threads are ocupied by the futureResult's inner futures and there's no thread left for the keepMessageInFlight, which is supposed to run in parallel with futureResult?
       Future.firstCompletedOf(Seq(
-        taskCtx.keepMessageInFlight(futureResult),
-        futureResult
+        futureResult,
+        taskCtx.keepMessageInFlight(futureResult)
       ))
     }
   }
