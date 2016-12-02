@@ -181,12 +181,27 @@ case class TaskContext(
     logger.debug(s"Cleaning up and preparing the working directory: ${workingDir.path}")
     workingDir.createIfNotExists(asDirectory = true, createParents = true)
     workingDir.clear()
-  }.flatMap { _ =>
+  }.map { _ =>
 
     logger.debug("Downloading input data...")
-    Future.traverse(dataMapping.inputs) { case (name, resource) =>
-      downloadInput(name, resource).map { name -> _ }
-    }.map { _.toMap }
+    // FIXME: this parallel downloading gets stuck on MessageResource file-writing for some reason
+    // Future.traverse(dataMapping.inputs) { case (name, resource) =>
+    //   downloadInput(name, resource).map { name -> _ }
+    // }.map { _.toMap }
+
+    // this doesn't work either:
+    // dataMapping.inputs.foldLeft(
+    //   Future.successful { Map[String, File]() }
+    // ) { case (accF, (name, resource)) =>
+    //   for {
+    //     acc <- accF
+    //     file <- downloadInput(name, resource)
+    //   } yield acc + (name -> file)
+    // }
+
+    dataMapping.inputs.map { case (name, resource) =>
+      name -> Await.result(downloadInput(name, resource), 5.minutes)
+    }
   }
 
   def processFiles(inputFiles: Map[String, File]): Future[Map[String, File]] = Future {
@@ -265,7 +280,9 @@ case class TaskContext(
 
         /* We sleep a bit less to prolong visibility timeout _before_ the message will return to the queue */
         // NOTE: probably this need some more careful "time-padding"
+        logger.debug(s"Going to sleep... zzzZzzZZZzzzz")
         sleep(messageTimeout * 0.95)
+        logger.debug(s"Slept ${messageTimeout * 0.95}")
 
         /* - if by the time we wake up everything is already done, no need to do anything else: we return the result (although it won't be used anywhere) */
         if (futureResult.isCompleted) futureResult
