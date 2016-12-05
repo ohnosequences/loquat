@@ -22,6 +22,7 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides ++= Set(
+  "ohnosequences" %% "aws-scala-tools" % "0.18.0-6-g26137be",
   "org.slf4j" % "slf4j-api" % "1.7.21"
 )
 
