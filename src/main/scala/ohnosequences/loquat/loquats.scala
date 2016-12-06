@@ -33,8 +33,8 @@ trait AnyLoquat { loquat =>
 
   case object managerCompat extends CompatibleWithPrefix(fullName)(config.amiEnv, manager, config.metadata)
 
-  final def check(user: LoquatUser): Unit = LoquatOps.check(config, user, dataMappings)
-  final def deploy(user: LoquatUser): Unit = LoquatOps.deploy(config, user, dataMappings, managerCompat.userScript)
+  final def check(user: LoquatUser): Unit = LoquatOps.check(config, user, dataProcessing, dataMappings)
+  final def deploy(user: LoquatUser): Unit = LoquatOps.deploy(config, user, dataProcessing, dataMappings, managerCompat.userScript)
   final def undeploy(user: LoquatUser): Unit =
     LoquatOps.undeploy(
       config,
@@ -58,6 +58,26 @@ abstract class Loquat[
 private[loquat]
 case object LoquatOps extends LazyLogging {
 
+  def checkDataKeys[DP <: AnyDataProcessingBundle](dataProcessing: DP): Seq[String] = {
+
+    logger.info("Checking data mapping keys...")
+
+    val inputKeys = dataProcessing.input.keys.types.asList.map { _.label }
+    val outputKeys = dataProcessing.output.keys.types.asList.map { _.label }
+
+    val inDiff = inputKeys diff inputKeys.toSet.toList
+    val outDiff = outputKeys diff outputKeys.toSet.toList
+
+    val errors = {
+      if (inDiff.isEmpty)  Seq() else Seq(s"Input dataset has duplicate key labels: ${inDiff}")
+    } ++ {
+      if (outDiff.isEmpty) Seq() else Seq(s"Input dataset has duplicate key labels: ${outDiff}")
+    }
+
+    errors foreach { msg => logger.error(msg) }
+    errors
+  }
+
   def checkInputData(aws: AWSClients, dataMappings: List[AnyDataMapping]): Seq[String] = {
 
     logger.info("Checking input S3 objects existence...")
@@ -80,17 +100,19 @@ case object LoquatOps extends LazyLogging {
     }
   }
 
-  // def checkDataMappings(aws: AWSClients, checkInputObjects: Boolean): Seq[String] = {
-  // }
-
-  def check(
+  def check[DP <: AnyDataProcessingBundle](
     config: AnyLoquatConfig,
     user: LoquatUser,
+    dataProcessing: DP,
     dataMappings: List[AnyDataMapping]
   ): Either[String, AWSClients] = {
 
-    if (Try( user.localCredentials.getCredentials ).isFailure) {
+    if (checkDataKeys(dataProcessing).nonEmpty) {
+      Left("DataMapping definition is invalid")
+
+    } else if (Try( user.localCredentials.getCredentials ).isFailure) {
       Left(s"Couldn't load local credentials: ${user.localCredentials}")
+
     } else {
       val aws = AWSClients(config.region, user.localCredentials)
 
@@ -122,14 +144,15 @@ case object LoquatOps extends LazyLogging {
   }
 
 
-  def deploy(
+  def deploy[DP <: AnyDataProcessingBundle](
     config: AnyLoquatConfig,
     user: LoquatUser,
+    dataProcessing: DP,
     dataMappings: List[AnyDataMapping],
     managerUserScript: String
   ): Unit = {
 
-    LoquatOps.check(config, user, dataMappings) match {
+    LoquatOps.check(config, user, dataProcessing, dataMappings) match {
       case Left(msg) => logger.error(msg)
       case Right(aws) => {
 
