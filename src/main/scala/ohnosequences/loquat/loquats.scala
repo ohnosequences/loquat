@@ -173,13 +173,15 @@ case object LoquatOps extends LazyLogging {
           Step( s"Creating error queue: ${names.errorQueue}" )(
             aws.sqs.getOrCreateQueue(names.errorQueue)
           ),
-          Step( s"Checking the bucket: ${names.bucket}" )(
+          Step( s"Checking logs bucket: ${names.logs}" )(
             Try {
-              if(aws.s3.doesBucketExist(names.bucket)) {
-                logger.info(s"Bucket [${names.bucket}] already exists.")
+              val logsBucket = names.logs.bucket
+
+              if(aws.s3.doesBucketExist(logsBucket)) {
+                logger.info(s"Bucket [${logsBucket}] already exists.")
               } else {
-                logger.info(s"Bucket [${names.bucket}] doesn't exists. Trying to create it.")
-                aws.s3.createBucket(names.bucket)
+                logger.info(s"Bucket [${logsBucket}] doesn't exists. Trying to create it.")
+                aws.s3.createBucket(logsBucket)
               }
             }
           ),

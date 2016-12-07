@@ -29,8 +29,8 @@ abstract class AnyLoquatConfig extends AnyConfig {
   /* IAM role that will be used by the autoscaling groups */
   val iamRoleName: String
 
-  /* An S3 bucket for saving logs */
-  val logsBucketName: String
+  /* An S3 folder for saving instance logs */
+  val logsS3Prefix: S3Folder
 
   /* Metadata generated for your loquat project */
   val metadata: AnyArtifactMetadata
@@ -64,7 +64,7 @@ abstract class AnyLoquatConfig extends AnyConfig {
   lazy final val artifactVersion: String = metadata.version.replace(".", "-").toLowerCase
   lazy final val loquatId: String = s"${loquatName}-${artifactName}-${artifactVersion}"
 
-  lazy final val resourceNames: ResourceNames = ResourceNames(loquatId, logsBucketName)
+  lazy final val resourceNames: ResourceNames = ResourceNames(loquatId, logsS3Prefix)
 
 
 

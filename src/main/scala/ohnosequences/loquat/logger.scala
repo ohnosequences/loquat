@@ -19,32 +19,22 @@ case class LogUploaderBundle(
   val scheduler: Scheduler
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = instanceAWSClients(config)
+  lazy val s3 = instanceAWSClients(config).s3
 
   lazy val logFile = file"/root/log.txt"
 
-  lazy val bucket = config.resourceNames.bucket
-  lazy val logS3: Try[S3Object] = getLocalMetadata("instance-id")
-    .map { id => S3Object(bucket, s"${config.loquatId}/${id}.log") }
-    // .getOrElse {
-    //   logger.error(s"Failed to get current instance ID")
-    // }
-
-  def uploadLog(): Try[Unit] = logS3.map { destination =>
-    aws.s3.putObject(destination.bucket, destination.key, logFile.toJava)
-    ()
-  }.recover {
-    case e => logger.error(s"Failed to upload the log to [${bucket}]: ${e}")
+  lazy val instanceID = getLocalMetadata("instance-id").getOrElse {
+    sys.error("Failed to get instance ID")
   }
 
+  lazy val logS3: S3Object = config.resourceNames.logs / s"${instanceID}.log"
+
   def instructions: AnyInstructions = LazyTry[Unit] {
-    if (aws.s3.doesBucketExist(bucket)) {
-      scheduler.repeat(
-        after = 30.seconds,
-        every = 30.seconds
-      )(uploadLog)
-      Success("Log uploader daemon started", ())
+    scheduler.repeat(
+      after = 30.seconds,
+      every = 30.seconds
+    ) {
+      s3.putObject(logS3.bucket, logS3.key, logFile.toJava)
     }
-    else Failure(s"Bucket [${bucket}] doesn't exist")
   }
 }
