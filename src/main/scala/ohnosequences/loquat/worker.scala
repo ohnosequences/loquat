@@ -25,13 +25,15 @@ trait AnyWorkerBundle extends AnyBundle {
 
   val scheduler = Scheduler(2)
 
+  lazy val loggerBundle = LogUploaderBundle(config, scheduler)
+
   val bundleDependencies: List[AnyBundle] = List(
-    instructionsBundle,
-    LogUploaderBundle(config, scheduler)
+    loggerBundle,
+    instructionsBundle
   )
 
   def instructions: AnyInstructions = LazyTry {
-    new DataProcessor(config, instructionsBundle).runLoop
+    new DataProcessor(config, loggerBundle, instructionsBundle).runLoop
   }
 }
 
@@ -50,6 +52,7 @@ abstract class WorkerBundle[
 // TODO: rewrite all this and make it Worker's install
 class DataProcessor(
   val config: AnyLoquatConfig,
+  val loggerBundle: LogUploaderBundle,
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
 
@@ -82,8 +85,9 @@ class DataProcessor(
     @scala.annotation.tailrec
     def waitMore(tries: Int): AnyResult = {
       if(timeSpent > taskProcessingTimeout) {
-        terminateWorker
-        Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
+        val msg = s"Timeout exceeded: ${timeSpent} spent"
+        terminateWorker(msg)
+        Failure(msg)
       } else {
         futureResult.value match {
           case None => {
@@ -112,10 +116,17 @@ class DataProcessor(
     }
   }
 
-  def terminateWorker(): Unit = {
+  def terminateWorker(msg: String): Unit = {
     stopped = true
-    // instance.foreach(_.createTag(StatusTag.terminating))
-    logger.info("Terminating instance")
+
+    val msgWithID = s"Worker instance ${instance.id}: ${msg}"
+
+    logger.error(msg)
+    logger.error("Terminating instance")
+
+    errorQueue.sendOne(msgWithID)
+    loggerBundle.failureNotification(msgWithID)
+
     instance.terminate
   }
 
@@ -216,10 +227,8 @@ class DataProcessor(
       }
     } catch {
       case t: Throwable => {
-        logger.error("Fatal failure during dataMapping processing", t)
-        errorQueue.sendOne(upickle.default.write(t.getMessage))
-        terminateWorker
-        Failure(Seq(t.getMessage))
+        terminateWorker(s"Fatal failure during dataMapping processing: ${t}")
+        Failure(Seq(t.toString))
       }
     }
   }
@@ -270,11 +279,7 @@ class DataProcessor(
 
         transferManager.shutdown()
       } catch {
-        case e: Throwable => {
-          logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
-          errorQueue.sendOne(upickle.default.write(e.getMessage))
-          terminateWorker
-        }
+        case t: Throwable => terminateWorker(s"Fatal failure during dataMapping processing: ${t}")
       }
     }
   }

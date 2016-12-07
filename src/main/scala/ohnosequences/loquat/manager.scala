@@ -175,19 +175,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       LazyTry {
         logger.error("Manager failed, trying to restart it")
 
-        val subject = s"Loquat ${config.loquatId} manager failed during installation"
-        val logTail = loggerBundle.logFile.lines.toSeq.takeRight(20).mkString("\n") // 20 last lines
-        val message = s"""${subject}. It will try to restart. If it's a fatal failure, you should manually undeploy the loquat.
-          |Full log is at [${loggerBundle.logS3}]
-          |Here is its tail:
-          |
-          |[...]
-          |${logTail}
-          |""".stripMargin
-
-        aws.sns
-          .getOrCreateTopic(names.notificationTopic)
-          .map { _.publish(message, subject) }
+        loggerBundle.failureNotification(
+          s"Loquat ${config.loquatId} manager failed during installation and will be restarted"
+        )
 
         aws.ec2.getCurrentInstance.foreach(_.terminate)
       } -&-

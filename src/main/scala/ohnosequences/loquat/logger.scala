@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._
 
 import ohnosequences.statika._
-import ohnosequences.awstools._, s3._, ec2._
+import ohnosequences.awstools._, s3._, ec2._, sns._
 // import com.amazonaws.services.s3.model.PutObjectResult
 
 import com.typesafe.scalalogging.LazyLogging
@@ -19,7 +19,7 @@ case class LogUploaderBundle(
   val scheduler: Scheduler
 ) extends Bundle() with LazyLogging {
 
-  lazy val s3 = instanceAWSClients(config).s3
+  lazy val aws = instanceAWSClients(config)
 
   lazy val logFile = file"/root/log.txt"
 
@@ -34,7 +34,28 @@ case class LogUploaderBundle(
       after = 30.seconds,
       every = 30.seconds
     ) {
-      s3.putObject(logS3.bucket, logS3.key, logFile.toJava)
+      aws.s3.putObject(logS3.bucket, logS3.key, logFile.toJava)
     }
+  }
+
+  def failureNotification(subject: String): Try[String] = {
+
+    val logTail = logFile.lines.toSeq.takeRight(20).mkString("\n") // 20 last lines
+
+    val tempLinkText: String = aws.s3.generateTemporaryLink(logS3, 1.day).map { url =>
+      s"Temporary download link: <${url}>"
+    }.getOrElse("")
+
+    val message = s"""${subject}. If it's a fatal failure, you should manually undeploy the loquat.
+      |Full log is at <${logS3}>. ${tempLinkText}
+      |Here is its tail:
+      |
+      |[...]
+      |${logTail}
+      |""".stripMargin
+
+    aws.sns
+      .getOrCreateTopic(config.resourceNames.notificationTopic)
+      .flatMap { _.publish(message, subject) }
   }
 }
