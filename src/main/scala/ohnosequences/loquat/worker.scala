@@ -28,9 +28,11 @@ trait AnyWorkerBundle extends AnyBundle {
 
   val scheduler = Scheduler(2)
 
+  lazy val loggerBundle = LogUploaderBundle(config, scheduler)
+
   val bundleDependencies: List[AnyBundle] = List(
-    instructionsBundle,
-    LogUploaderBundle(config, scheduler)
+    loggerBundle,
+    instructionsBundle
   )
 
   lazy val ctx = GeneralContext(config, instructionsBundle)
@@ -57,6 +59,7 @@ abstract class WorkerBundle[
 /* General context per-worker */
 case class GeneralContext(
   val config: AnyLoquatConfig,
+  val loggerBundle: LogUploaderBundle,
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging { ctx =>
 

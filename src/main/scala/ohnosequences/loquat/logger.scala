@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._
 
 import ohnosequences.statika._
-import ohnosequences.awstools._, s3._, ec2._
+import ohnosequences.awstools._, s3._, ec2._, sns._
 // import com.amazonaws.services.s3.model.PutObjectResult
 
 import com.typesafe.scalalogging.LazyLogging
@@ -23,28 +23,39 @@ case class LogUploaderBundle(
 
   lazy val logFile = file"/root/log.txt"
 
-  lazy val bucket = config.resourceNames.bucket
-  lazy val logS3: Try[S3Object] = getLocalMetadata("instance-id")
-    .map { id => S3Object(bucket, s"${config.loquatId}/${id}.log") }
-    // .getOrElse {
-    //   logger.error(s"Failed to get current instance ID")
-    // }
-
-  def uploadLog(): Try[Unit] = logS3.map { destination =>
-    aws.s3.putObject(destination.bucket, destination.key, logFile.toJava)
-    ()
-  }.recover {
-    case e => logger.error(s"Failed to upload the log to [${bucket}]: ${e}")
+  lazy val instanceID = getLocalMetadata("instance-id").getOrElse {
+    sys.error("Failed to get instance ID")
   }
 
+  lazy val logS3: S3Object = config.resourceNames.logs / s"${instanceID}.log"
+
   def instructions: AnyInstructions = LazyTry[Unit] {
-    if (aws.s3.doesBucketExist(bucket)) {
-      scheduler.repeat(
-        after = 30.seconds,
-        every = 30.seconds
-      )(uploadLog)
-      Success("Log uploader daemon started", ())
+    scheduler.repeat(
+      after = 30.seconds,
+      every = 30.seconds
+    ) {
+      aws.s3.putObject(logS3.bucket, logS3.key, logFile.toJava)
     }
-    else Failure(s"Bucket [${bucket}] doesn't exist")
+  }
+
+  def failureNotification(subject: String): Try[String] = {
+
+    val logTail = logFile.lines.toSeq.takeRight(20).mkString("\n") // 20 last lines
+
+    val tempLinkText: String = aws.s3.generateTemporaryLink(logS3, 1.day).map { url =>
+      s"Temporary download link: <${url}>"
+    }.getOrElse("")
+
+    val message = s"""${subject}. If it's a fatal failure, you should manually undeploy the loquat.
+      |Full log is at <${logS3}>. ${tempLinkText}
+      |Here is its tail:
+      |
+      |[...]
+      |${logTail}
+      |""".stripMargin
+
+    aws.sns
+      .getOrCreateTopic(config.resourceNames.notificationTopic)
+      .flatMap { _.publish(message, subject) }
   }
 }
