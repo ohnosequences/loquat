@@ -84,15 +84,15 @@ case class TerminationDaemonBundle(
       else None
 
 
-    reason.flatMap { _ =>
-
+    reason match {
+      case Some(sureReason) if (recheck) => {
+        logger.info(s"Termination reason: ${sureReason}")
+        LoquatOps.undeploy(config, aws, sureReason)
+        reason
+      }
       /* if there is a reason, we first run a more robust check (with accumulating queue numbers several times) */
-      val sureReason = checkConditions(recheck = true)
-
-      /* and if it confirms, we undeploy everything */
-      logger.info(s"Termination reason: ${sureReason}")
-      sureReason.foreach { LoquatOps.undeploy(config, aws, _) }
-      sureReason
+      case Some(unsureReason) => checkConditions(recheck = true)
+      case None => None
     }
   }
 
