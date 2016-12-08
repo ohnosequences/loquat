@@ -233,6 +233,16 @@ class DataProcessor(
     }
   }
 
+  def waitForTask(): Message = inputQueue.poll(
+    timeout = Duration.Inf,
+    amountLimit = Some(1),
+    adjustRequest = { _.withWaitTimeSeconds(10) }
+  ).toOption.flatMap { _.headOption }.getOrElse {
+    logger.info("Didn't get any input tasks. Probably the queue is empty. Retrying...")
+    Thread.sleep(1.minute.toMillis)
+    waitForTask()
+  }
+
   def runLoop(): Unit = {
 
     logger.info("DataProcessor started at " + instance.id)
@@ -246,14 +256,7 @@ class DataProcessor(
 
         logger.info("Data processor is waiting for new data")
 
-        var response: Try[Option[Message]] = inputQueue.poll(
-          timeout = Duration.Inf,
-          amountLimit = Some(1),
-          adjustRequest = { _.withWaitTimeSeconds(10) }
-        ).map { _.headOption }
-
-        // FIXME: if we haven't got a message instance should eighter stop or terminate, here it will fail and terminate:
-        val message = response.get.get
+        val message = waitForTask()
 
         // instance.foreach(_.createTag(StatusTag.processing))
         logger.info("DataProcessor: received message " + message)
