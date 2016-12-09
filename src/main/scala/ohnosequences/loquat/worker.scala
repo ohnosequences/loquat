@@ -144,7 +144,7 @@ class DataProcessor(
 
       logger.info("Preparing dataMapping input")
 
-      val inputDir = workingDir / "input"
+      val inputDir = (workingDir / "input").createDirectories()
 
       val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
 
@@ -153,7 +153,7 @@ class DataProcessor(
         resource match {
           case MessageResource(msg) => {
             val destination: File = inputDir / name
-            destination.createIfNotExists().overwrite(msg)
+            destination.createIfNotExists(createParents = true).overwrite(msg)
             (name -> destination)
           }
           case S3Resource(s3Address) => {
