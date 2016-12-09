@@ -29,13 +29,13 @@ case class LogUploaderBundle(
 
   lazy val logS3: S3Object = config.resourceNames.logs / s"${instanceID}.log"
 
+  def uploadLog() = aws.s3.putObject(logS3.bucket, logS3.key, logFile.toJava)
+
   def instructions: AnyInstructions = LazyTry[Unit] {
     scheduler.repeat(
       after = 30.seconds,
       every = 30.seconds
-    ) {
-      aws.s3.putObject(logS3.bucket, logS3.key, logFile.toJava)
-    }
+    )(uploadLog)
   }
 
   def failureNotification(subject: String): Try[String] = {

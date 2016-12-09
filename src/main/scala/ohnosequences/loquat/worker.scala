@@ -125,7 +125,11 @@ class DataProcessor(
     logger.error("Terminating instance")
 
     errorQueue.sendOne(msgWithID)
+
+    loggerBundle.uploadLog()
     loggerBundle.failureNotification(msgWithID)
+
+    Thread.sleep(15.minutes.toMillis)
 
     instance.terminate
   }
