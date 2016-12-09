@@ -127,7 +127,9 @@ class DataProcessor(
     errorQueue.sendOne(msgWithID)
 
     loggerBundle.uploadLog()
-    loggerBundle.failureNotification(msgWithID)
+    loggerBundle.failureNotification(msgWithID).recover { case e =>
+      logger.error(s"Couldn't send failure SNS notification: ${e}")
+    }
 
     Thread.sleep(15.minutes.toMillis)
 
