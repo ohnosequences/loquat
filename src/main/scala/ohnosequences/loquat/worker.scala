@@ -119,12 +119,13 @@ class DataProcessor(
   def terminateWorker(msg: String): Unit = {
     stopped = true
 
-    val msgWithID = s"Worker instance ${instance.id}: ${msg}"
-
     logger.error(msg)
     logger.error("Terminating instance")
 
-    errorQueue.sendOne(msgWithID)
+    val msgWithID = s"Worker instance ${instance.id}: ${msg}"
+    errorQueue.sendOne(msgWithID).recover { case e =>
+      logger.error(s"Couldn't send failure SQS message: ${e}")
+    }
 
     loggerBundle.uploadLog()
     loggerBundle.failureNotification(msgWithID).recover { case e =>
@@ -133,7 +134,9 @@ class DataProcessor(
 
     Thread.sleep(15.minutes.toMillis)
 
-    instance.terminate
+    instance.terminate.getOrElse {
+      logger.error(s"Couldn't teminate the instance")
+    }
   }
 
   private def processDataMapping(
