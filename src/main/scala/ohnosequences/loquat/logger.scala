@@ -21,7 +21,7 @@ case class LogUploaderBundle(
 
   lazy val aws = instanceAWSClients(config)
 
-  lazy val logFile = file"/root/log.txt"
+  lazy val logFile = file"/log.txt"
 
   lazy val instanceID = getLocalMetadata("instance-id").getOrElse {
     sys.error("Failed to get instance ID")
