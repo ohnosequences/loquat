@@ -93,7 +93,7 @@ class DataProcessor(
           case None => {
             // every 5min we extend it for 6min
             if (tries % (5*60) == 0) {
-              if (Try(message.changeVisibility(6*60)).isFailure)
+              if (Try(message.changeVisibility(6.minutes)).isFailure)
                 logger.warn("Couldn't change the visibility globalTimeout")
               // FIXME: something weird is happening here
             }
