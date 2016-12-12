@@ -2,11 +2,8 @@
 ```scala
 package ohnosequences.loquat
 
-import ohnosequences.awstools.AWSClients
-import ohnosequences.awstools.ec2.EC2
-
+import ohnosequences.awstools.ec2._
 import com.amazonaws.auth.AWSCredentialsProvider
-
 import scala.util.Try
 ```
 
@@ -45,7 +42,7 @@ keypair name for connecting to the loquat instances
       else Seq(s"User email [${email}] has invalid format")
 
     emailErr ++ {
-      if(aws.ec2.isKeyPairExists(keypairName)) Seq()
+      if(aws.ec2.keyPairExists(keypairName).isSuccess) Seq()
       else Seq(s"key pair: ${keypairName} doesn't exists")
     }
   }
@@ -58,6 +55,7 @@ keypair name for connecting to the loquat instances
 
 
 [main/scala/ohnosequences/loquat/configs/autoscaling.scala]: autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/awsClients.scala]: awsClients.scala.md
 [main/scala/ohnosequences/loquat/configs/general.scala]: general.scala.md
 [main/scala/ohnosequences/loquat/configs/loquat.scala]: loquat.scala.md
 [main/scala/ohnosequences/loquat/configs/resources.scala]: resources.scala.md

@@ -2,58 +2,21 @@
 ```scala
 package ohnosequences.loquat
 
-import ohnosequences.awstools.s3.S3Folder
-```
+import com.amazonaws.auth._
+import com.amazonaws.regions._
+import ohnosequences.awstools._, sqs._, sns._, s3._, ec2._, autoscaling._, regions._
 
-Configuration of resources
 
-```scala
-private[loquat]
-case class ResourceNames(prefix: String, logsS3Prefix: S3Folder) {
-```
+case class AWSClients(
+  region:      AwsRegionProvider      = new DefaultAwsRegionProviderChain(),
+  credentials: AWSCredentialsProvider = new DefaultAWSCredentialsProviderChain()
+) {
 
-name of queue with dataMappings
-
-```scala
-  val inputQueue: String = prefix + "-loquat-input"
-```
-
-name of topic for dataMappings result notifications
-
-```scala
-  val outputQueue: String = prefix + "-loquat-output"
-```
-
-name of queue with errors (will be subscribed to errorTopic)
-
-```scala
-  val errorQueue: String = prefix + "-loquat-errors"
-```
-
-name of bucket for logs files
-
-```scala
-  val logs: S3Folder = logsS3Prefix / prefix /
-```
-
-topic name to notify user about termination of loquat
-
-```scala
-  val notificationTopic: String = prefix + "-loquat-notifications"
-```
-
-name of the manager autoscaling group
-
-```scala
-  val managerGroup: String = prefix + "-loquat-manager"
-  val managerLaunchConfig: String = managerGroup + "-launch-configuration"
-```
-
-name of the workers autoscaling group
-
-```scala
-  val workersGroup: String = prefix + "-loquat-workers"
-  val workersLaunchConfig: String = workersGroup + "-launch-configuration"
+  lazy val ec2 = EC2Client(region, credentials)
+  lazy val sns = SNSClient(region, credentials)
+  lazy val sqs = SQSClient(region, credentials)
+  lazy val  s3 = S3Client(region, credentials)
+  lazy val  as = AutoScalingClient(region, credentials)
 }
 
 ```

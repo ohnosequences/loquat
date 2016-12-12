@@ -4,7 +4,7 @@ package ohnosequences.loquat
 
 import scala.concurrent.duration._
 
-import ohnosequences.awstools.AWSClients
+
 
 
 trait AnyTerminationReason {
@@ -15,14 +15,20 @@ trait AnyTerminationReason {
 case class TerminateAfterInitialDataMappings(
   val isOn: Boolean,
   val initialCount: Int,
-  val successfulCount: Int
+  val  inputQNumbers: QueueNumbers,
+  val outputQNumbers: QueueNumbers
 ) extends AnyTerminationReason {
 
-  def check: Boolean = isOn && (successfulCount >= initialCount)
+  def check: Boolean = { isOn &&
+    inputQNumbers.inFlight  == 0 &&
+    inputQNumbers.available == 0 &&
+    outputQNumbers.inFlight == 0 &&
+    outputQNumbers.available >= initialCount
+  }
 
   def msg: String = s"""|Termination after successfully processing all the initial data mappings.
     |  Initial data mappings count: ${initialCount}
-    |  Successful results: ${successfulCount}
+    |  Successful results: ${outputQNumbers.available}
     |""".stripMargin
 }
 
@@ -105,6 +111,7 @@ case class TerminationConfig(
 
 
 [main/scala/ohnosequences/loquat/configs/autoscaling.scala]: autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/awsClients.scala]: awsClients.scala.md
 [main/scala/ohnosequences/loquat/configs/general.scala]: general.scala.md
 [main/scala/ohnosequences/loquat/configs/loquat.scala]: loquat.scala.md
 [main/scala/ohnosequences/loquat/configs/resources.scala]: resources.scala.md

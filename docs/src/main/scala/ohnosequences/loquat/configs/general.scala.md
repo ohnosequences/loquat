@@ -3,8 +3,6 @@
 package ohnosequences.loquat
 
 import com.typesafe.scalalogging.LazyLogging
-
-import ohnosequences.awstools.AWSClients
 ```
 
 Any config here can validate itself (in runtime)
@@ -46,6 +44,7 @@ abstract class Config(val configLabel: String)(val subConfigs: AnyConfig*) exten
 
 
 [main/scala/ohnosequences/loquat/configs/autoscaling.scala]: autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/awsClients.scala]: awsClients.scala.md
 [main/scala/ohnosequences/loquat/configs/general.scala]: general.scala.md
 [main/scala/ohnosequences/loquat/configs/loquat.scala]: loquat.scala.md
 [main/scala/ohnosequences/loquat/configs/resources.scala]: resources.scala.md

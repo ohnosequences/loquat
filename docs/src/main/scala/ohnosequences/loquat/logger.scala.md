@@ -5,13 +5,12 @@ package ohnosequences.loquat
 import utils._
 
 import ohnosequences.statika._
+import ohnosequences.awstools._, s3._, ec2._, sns._
+// import com.amazonaws.services.s3.model.PutObjectResult
 
 import com.typesafe.scalalogging.LazyLogging
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration._
-
-import ohnosequences.awstools.s3._
 import java.util.concurrent._
+import scala.concurrent._, duration._
 import scala.util.Try
 import better.files._
 
@@ -24,27 +23,47 @@ case class LogUploaderBundle(
 
   lazy val aws = instanceAWSClients(config)
 
-  val logFile = file"/root/log.txt"
-  val bucket = config.resourceNames.bucket
+  lazy val logFile = file"/log.txt"
 
-  def uploadLog(): Unit = Try {
-    aws.ec2.getCurrentInstanceId.get
-  }.map { id =>
-    aws.s3.uploadFile(S3Object(bucket, s"${config.loquatId}/${id}.log"), logFile.toJava)
-    ()
-  }.getOrElse {
-    logger.error(s"Failed to upload the log to the bucket [${bucket}]")
+  lazy val instanceID = getLocalMetadata("instance-id").getOrElse {
+    sys.error("Failed to get instance ID")
+  }
+
+  lazy val logS3: S3Object = config.resourceNames.logs / s"${instanceID}.log"
+
+  def uploadLog(): Try[Unit] = Try {
+    aws.s3.putObject(logS3.bucket, logS3.key, logFile.toJava)
+    logger.info(s"Uploaded log to S3: [${logS3}]")
+  }.recover { case e =>
+    logger.error(s"Couldn't upload log to S3: ${e}")
   }
 
   def instructions: AnyInstructions = LazyTry[Unit] {
-    if (aws.s3.bucketExists(bucket)) {
-      scheduler.repeat(
-        after = 30.seconds,
-        every = 30.seconds
-      )(uploadLog)
-      Success("Log uploader daemon started", ())
-    }
-    else Failure(s"Bucket [${bucket}] doesn't exist")
+    scheduler.repeat(
+      after = 30.seconds,
+      every = 30.seconds
+    )(uploadLog)
+  }
+
+  def failureNotification(subject: String): Try[String] = {
+
+    val logTail = logFile.lines.toSeq.takeRight(20).mkString("\n") // 20 last lines
+
+    val tempLinkText: String = aws.s3.generateTemporaryLink(logS3, 1.day).map { url =>
+      s"Temporary download link: <${url}>"
+    }.getOrElse("")
+
+    val message = s"""${subject}. If it's a fatal failure, you should manually undeploy the loquat.
+      |Full log is at <${logS3}>. ${tempLinkText}
+      |Here is its tail:
+      |
+      |[...]
+      |${logTail}
+      |""".stripMargin
+
+    aws.sns
+      .getOrCreateTopic(config.resourceNames.notificationTopic)
+      .flatMap { _.publish(message, subject) }
   }
 }
 
@@ -54,6 +73,7 @@ case class LogUploaderBundle(
 
 
 [main/scala/ohnosequences/loquat/configs/autoscaling.scala]: configs/autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/awsClients.scala]: configs/awsClients.scala.md
 [main/scala/ohnosequences/loquat/configs/general.scala]: configs/general.scala.md
 [main/scala/ohnosequences/loquat/configs/loquat.scala]: configs/loquat.scala.md
 [main/scala/ohnosequences/loquat/configs/resources.scala]: configs/resources.scala.md

@@ -3,8 +3,9 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.loquat._
-import ohnosequences.awstools._, regions.Region._, ec2._, InstanceType._, autoscaling._
+import ohnosequences.awstools._, regions._, ec2._, autoscaling._, s3._
 import ohnosequences.statika._, aws._
+import test.dataProcessing._
 
 case object config {
 
@@ -15,35 +16,34 @@ case object config {
 
     // TODO: create a role for testing loquat
     val iamRoleName = "loquat.testing"
-    val logsBucketName = "loquat.testing"
+    val logsS3Prefix = s3"loquat.testing" /
 
-    // type AMI = defaultAMI.type
-    // lazy val ami: AMI = defaultAMI
-
-    val metadata: AnyArtifactMetadata = generated.metadata.Loquat
+    val metadata: AnyArtifactMetadata = ohnosequences.generated.metadata.loquat
 
     val  managerConfig = ManagerConfig(
-      InstanceSpecs(defaultAMI, m3.medium),
-      purchaseModel = Spot(maxPrice = Some(0.1))
+      defaultAMI,
+      m3.medium,
+      PurchaseModel.spot(0.1)
     )
 
     val workersConfig = WorkersConfig(
-      instanceSpecs = InstanceSpecs(defaultAMI, m3.medium),
-      purchaseModel = Spot(maxPrice = Some(0.1)),
-      groupSize = AutoScalingGroupSize(0, 1, 20)
+      defaultAMI,
+      m3.medium,
+      PurchaseModel.spot(0.1),
+      AutoScalingGroupSize(0, 1, 20)
     )
 
     val terminationConfig = TerminationConfig(
       terminateAfterInitialDataMappings = true
     )
 
-    val N = 10000
-    val dataMappings: List[AnyDataMapping] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
-
     override val checkInputObjects = false
   }
 
-  case object testLoquat extends Loquat(testConfig, test.dataProcessing.processingBundle)
+  val N = 100
+  val dataMappings: List[DataMapping[processingBundle.type]] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
+
+  case object testLoquat extends Loquat(testConfig, processingBundle)(dataMappings)
 
   val testUser = LoquatUser(
     email = "aalekhin@ohnosequences.com",
@@ -59,6 +59,7 @@ case object config {
 
 
 [main/scala/ohnosequences/loquat/configs/autoscaling.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/awsClients.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/awsClients.scala.md
 [main/scala/ohnosequences/loquat/configs/general.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/general.scala.md
 [main/scala/ohnosequences/loquat/configs/loquat.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/loquat.scala.md
 [main/scala/ohnosequences/loquat/configs/resources.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/resources.scala.md

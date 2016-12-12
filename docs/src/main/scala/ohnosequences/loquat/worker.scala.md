@@ -5,25 +5,16 @@ package ohnosequences.loquat
 import utils._
 
 import ohnosequences.statika._
-
 import ohnosequences.datasets._
 
-import ohnosequences.awstools.sqs.Message
-import ohnosequences.awstools.sqs.Queue
-import ohnosequences.awstools.s3._
+import com.amazonaws.services.s3.transfer.TransferManager
+import ohnosequences.awstools._, sqs._, s3._, ec2._
 
 import com.typesafe.scalalogging.LazyLogging
-
 import better.files._
-
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent._, duration._
 import scala.util.Try
-
 import upickle.Js
-
-import com.amazonaws.services.s3.transfer._
-import com.amazonaws.services.s3.model._
 
 
 trait AnyWorkerBundle extends AnyBundle {
@@ -36,13 +27,15 @@ trait AnyWorkerBundle extends AnyBundle {
 
   val scheduler = Scheduler(2)
 
+  lazy val loggerBundle = LogUploaderBundle(config, scheduler)
+
   val bundleDependencies: List[AnyBundle] = List(
-    instructionsBundle,
-    LogUploaderBundle(config, scheduler)
+    loggerBundle,
+    instructionsBundle
   )
 
   def instructions: AnyInstructions = LazyTry {
-    new DataProcessor(config, instructionsBundle).runLoop
+    new DataProcessor(config, loggerBundle, instructionsBundle).runLoop
   }
 }
 
@@ -61,6 +54,7 @@ abstract class WorkerBundle[
 // TODO: rewrite all this and make it Worker's install
 class DataProcessor(
   val config: AnyLoquatConfig,
+  val loggerBundle: LogUploaderBundle,
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
 
@@ -68,28 +62,15 @@ class DataProcessor(
 
   lazy val aws = instanceAWSClients(config)
 
-  // FIXME: don't use Option.get
-  val inputQueue = aws.sqs.getQueueByName(config.resourceNames.inputQueue).get
-  val errorQueue = aws.sqs.getQueueByName(config.resourceNames.errorQueue).get
-  val outputQueue = aws.sqs.getQueueByName(config.resourceNames.outputQueue).get
+  // FIXME: don't use Try.get
+  import ohnosequences.awstools.sqs._
+  val inputQueue = aws.sqs.getQueue(config.resourceNames.inputQueue).get
+  val errorQueue = aws.sqs.getQueue(config.resourceNames.errorQueue).get
+  val outputQueue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
 
-  val instance = aws.ec2.getCurrentInstance
+  val instance = aws.ec2.getCurrentInstance.get
 
   @volatile var stopped = false
-
-  def waitForDataMapping(queue: Queue): Message = {
-
-    var message: Option[Message] = queue.receiveMessage
-
-    while(message.isEmpty) {
-      logger.info("Data processor is waiting for new data")
-      // instance.foreach(_.createTag(StatusTag.idle))
-      Thread.sleep(10.seconds.toMillis)
-      message = queue.receiveMessage
-    }
-
-    message.get
-  }
 
   def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
     val startTime = System.currentTimeMillis.millis
@@ -106,14 +87,15 @@ class DataProcessor(
     @scala.annotation.tailrec
     def waitMore(tries: Int): AnyResult = {
       if(timeSpent > taskProcessingTimeout) {
-        terminateWorker
-        Failure(s"Timeout: ${timeSpent} > taskProcessingTimeout")
+        val msg = s"Timeout exceeded: ${timeSpent} spent"
+        terminateWorker(msg)
+        Failure(msg)
       } else {
         futureResult.value match {
           case None => {
             // every 5min we extend it for 6min
             if (tries % (5*60) == 0) {
-              if (Try(message.changeVisibilityTimeout(6*60)).isFailure)
+              if (Try(message.changeVisibility(6.minutes)).isFailure)
                 logger.warn("Couldn't change the visibility globalTimeout")
               // FIXME: something weird is happening here
             }
@@ -136,11 +118,27 @@ class DataProcessor(
     }
   }
 
-  def terminateWorker(): Unit = {
+  def terminateWorker(msg: String): Unit = {
     stopped = true
-    // instance.foreach(_.createTag(StatusTag.terminating))
-    logger.info("Terminating instance")
-    instance.foreach(_.terminate)
+
+    logger.error(msg)
+    logger.error("Terminating instance")
+
+    val msgWithID = s"Worker instance ${instance.id}: ${msg}"
+    errorQueue.sendOne(msgWithID).recover { case e =>
+      logger.error(s"Couldn't send failure SQS message: ${e}")
+    }
+
+    loggerBundle.uploadLog()
+    loggerBundle.failureNotification(msgWithID).recover { case e =>
+      logger.error(s"Couldn't send failure SNS notification: ${e}")
+    }
+
+    Thread.sleep(15.minutes.toMillis)
+
+    instance.terminate.getOrElse {
+      logger.error(s"Couldn't teminate the instance")
+    }
   }
 
   private def processDataMapping(
@@ -153,7 +151,7 @@ class DataProcessor(
 
       logger.info("Preparing dataMapping input")
 
-      val inputDir = workingDir / "input"
+      val inputDir = (workingDir / "input").createDirectories()
 
       val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
 
@@ -162,12 +160,16 @@ class DataProcessor(
         resource match {
           case MessageResource(msg) => {
             val destination: File = inputDir / name
-            destination.createIfNotExists().overwrite(msg)
+            destination.createIfNotExists(createParents = true).overwrite(msg)
             (name -> destination)
           }
           case S3Resource(s3Address) => {
             // FIXME: this shouldn't ignore the returned Try
-            val destination: File = transferManager.download(s3Address, inputDir / name).get
+            val destination: File = transferManager.download(
+              s3Address,
+              (inputDir / name).toJava,
+              false // not silent
+            ).get.toScala
             (name -> destination)
           }
         }
@@ -181,7 +183,7 @@ class DataProcessor(
       result match {
         case Failure(tr) => {
           logger.error(s"Script finished with non zero code: ${result}. publishing it to the error queue.")
-          errorQueue.sendMessage(upickle.default.write(resultDescription))
+          errorQueue.sendOne(upickle.default.write(resultDescription))
           result
         }
         case Success(tr, outputFileMap) => {
@@ -201,14 +203,15 @@ class DataProcessor(
                 logger.info(s"Publishing output object: [${file.name}]")
                 Some(
                   transferManager.upload(
-                    file,
+                    file.toJava,
                     s3Address,
                     Map(
                       "artifact-org"     -> config.metadata.organization,
                       "artifact-name"    -> config.metadata.artifact,
                       "artifact-version" -> config.metadata.version,
                       "artifact-url"     -> config.metadata.artifactUrl
-                    )
+                    ),
+                    false // not silent
                   )
                 )
               }
@@ -217,7 +220,7 @@ class DataProcessor(
             // TODO: check whether we can fold Try's here somehow
             if (uploadTries.forall(_.isSuccess)) {
               logger.info("Finished uploading output files. publishing message to the output queue.")
-              outputQueue.sendMessage(upickle.default.write(resultDescription))
+              outputQueue.sendOne(upickle.default.write(resultDescription))
               result //-&- success(s"task [${dataMapping.id}] is successfully finished", ())
             } else {
               logger.error(s"Some uploads failed: ${uploadTries.filter(_.isFailure)}")
@@ -235,26 +238,36 @@ class DataProcessor(
       }
     } catch {
       case t: Throwable => {
-        logger.error("Fatal failure during dataMapping processing", t)
-        errorQueue.sendMessage(upickle.default.write(t.getMessage))
-        terminateWorker
-        Failure(Seq(t.getMessage))
+        terminateWorker(s"Fatal failure during dataMapping processing: ${t}")
+        Failure(Seq(t.toString))
       }
     }
   }
 
+  def waitForTask(): Message = inputQueue.poll(
+    timeout = Duration.Inf,
+    amountLimit = Some(1),
+    adjustRequest = { _.withWaitTimeSeconds(10) }
+  ).toOption.flatMap { _.headOption }.getOrElse {
+    logger.info("Didn't get any input tasks. Probably the queue is empty. Retrying...")
+    Thread.sleep(1.minute.toMillis)
+    waitForTask()
+  }
+
   def runLoop(): Unit = {
 
-    logger.info("DataProcessor started at " + instance.map(_.getInstanceId))
+    logger.info("DataProcessor started at " + instance.id)
 
     logger.info("Creating working directory: " + workingDir.path)
     workingDir.createDirectories()
 
     while(!stopped) {
       try {
-        val transferManager = new TransferManager(aws.s3.s3)
+        val transferManager = aws.s3.createTransferManager
 
-        val message = waitForDataMapping(inputQueue)
+        logger.info("Data processor is waiting for new data")
+
+        val message = waitForTask()
 
         // instance.foreach(_.createTag(StatusTag.processing))
         logger.info("DataProcessor: received message " + message)
@@ -275,16 +288,12 @@ class DataProcessor(
         // FIXME: check this. what happens if result has failures?
         if (dataMappingResult.isSuccessful) {
           logger.info("Result was successful. deleting message from the input queue")
-          inputQueue.deleteMessage(message)
+          message.delete()
         }
 
-        transferManager.shutdownNow(false)
+        transferManager.shutdown()
       } catch {
-        case e: Throwable => {
-          logger.error(s"This instance will terminated due to a fatal error: ${e.getMessage}")
-          errorQueue.sendMessage(upickle.default.write(e.getMessage))
-          terminateWorker
-        }
+        case t: Throwable => terminateWorker(s"Fatal failure during dataMapping processing: ${t}")
       }
     }
   }
@@ -297,6 +306,7 @@ class DataProcessor(
 
 
 [main/scala/ohnosequences/loquat/configs/autoscaling.scala]: configs/autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/awsClients.scala]: configs/awsClients.scala.md
 [main/scala/ohnosequences/loquat/configs/general.scala]: configs/general.scala.md
 [main/scala/ohnosequences/loquat/configs/loquat.scala]: configs/loquat.scala.md
 [main/scala/ohnosequences/loquat/configs/resources.scala]: configs/resources.scala.md
