@@ -17,7 +17,7 @@ libraryDependencies ++= Seq(
   "com.github.pathikrit" %% "better-files" % "2.16.0",
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
-  "ohnosequences" %% "statika"     % "2.0.0-RC2",
+  "ohnosequences" %% "statika"     % "2.0.0",
   "ohnosequences" %% "datasets"    % "0.4.1"
 )
 
