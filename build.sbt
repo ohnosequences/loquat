@@ -14,7 +14,7 @@ libraryDependencies ++= Seq(
   // AWS:
   "ohnosequences" %% "aws-scala-tools" % "0.18.1",
   // files:
-  "com.github.pathikrit" %% "better-files" % "2.16.0",
+  "com.github.pathikrit" %% "better-files" % "2.17.1",
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
   "ohnosequences" %% "statika"     % "2.0.0",
