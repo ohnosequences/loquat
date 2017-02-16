@@ -166,8 +166,7 @@ class DataProcessor(
             // FIXME: this shouldn't ignore the returned Try
             val destination: File = transferManager.download(
               s3Address,
-              (inputDir / name).toJava,
-              false // not silent
+              (inputDir / name).toJava
             ).get.toScala
             (name -> destination)
           }
@@ -209,8 +208,7 @@ class DataProcessor(
                       "artifact-name"    -> config.metadata.artifact,
                       "artifact-version" -> config.metadata.version,
                       "artifact-url"     -> config.metadata.artifactUrl
-                    ),
-                    false // not silent
+                    )
                   )
                 )
               }
