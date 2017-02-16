@@ -194,7 +194,7 @@ class DataProcessor(
           if (outputMap.keys.forall(_.exists)) {
 
             val uploadTries = outputMap flatMap { case (file, s3Address) =>
-              if (config.skipEmptyResults && file.isEmpty) {
+              if (config.skipEmptyResults && Files.size(file)) {
                 logger.info(s"Output file [${file.name}] is empty. Skipping it.")
                 None
               } else {
