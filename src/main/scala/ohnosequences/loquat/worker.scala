@@ -129,7 +129,7 @@ class DataProcessor(
     }
 
     loggerBundle.uploadLog()
-    loggerBundle.failureNotification(msgWithID).recover { case e =>
+    loggerBundle.failureNotification(s"Worker instance ${instance.id} terminated with a fatal error").recover { case e =>
       logger.error(s"Couldn't send failure SNS notification: ${e}")
     }
 
