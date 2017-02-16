@@ -12,6 +12,7 @@ import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent._, duration._
 import scala.util.Try
+import java.nio.file.Files
 import upickle.Js
 
 
@@ -194,7 +195,7 @@ class DataProcessor(
           if (outputMap.keys.forall(_.exists)) {
 
             val uploadTries = outputMap flatMap { case (file, s3Address) =>
-              if (config.skipEmptyResults && Files.size(file)) {
+              if (config.skipEmptyResults && Files.size(file.path) == 0) {
                 logger.info(s"Output file [${file.name}] is empty. Skipping it.")
                 None
               } else {
