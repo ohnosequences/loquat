@@ -181,7 +181,7 @@ class DataProcessor(
       result match {
         case Failure(tr) => {
           logger.error(s"Script finished with non zero code: ${result}. publishing it to the error queue.")
-          errorQueue.sendOne(upickle.default.write(resultDescription))
+          errorQueue.sendOne(s"Worker instance ${instance.id}: ${resultDescription}")
           result
         }
         case Success(tr, outputFileMap) => {
