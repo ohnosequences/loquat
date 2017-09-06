@@ -14,6 +14,7 @@ import com.typesafe.scalalogging.LazyLogging
 import better.files._
 import scala.concurrent._, duration._
 import scala.util.Try
+import java.nio.file.Files
 import upickle.Js
 
 
@@ -130,7 +131,7 @@ class DataProcessor(
     }
 
     loggerBundle.uploadLog()
-    loggerBundle.failureNotification(msgWithID).recover { case e =>
+    loggerBundle.failureNotification(s"Worker instance ${instance.id} terminated with a fatal error").recover { case e =>
       logger.error(s"Couldn't send failure SNS notification: ${e}")
     }
 
@@ -167,8 +168,7 @@ class DataProcessor(
             // FIXME: this shouldn't ignore the returned Try
             val destination: File = transferManager.download(
               s3Address,
-              (inputDir / name).toJava,
-              false // not silent
+              (inputDir / name).toJava
             ).get.toScala
             (name -> destination)
           }
@@ -183,7 +183,7 @@ class DataProcessor(
       result match {
         case Failure(tr) => {
           logger.error(s"Script finished with non zero code: ${result}. publishing it to the error queue.")
-          errorQueue.sendOne(upickle.default.write(resultDescription))
+          errorQueue.sendOne(s"Worker instance ${instance.id}: ${resultDescription}")
           result
         }
         case Success(tr, outputFileMap) => {
@@ -196,7 +196,7 @@ class DataProcessor(
           if (outputMap.keys.forall(_.exists)) {
 
             val uploadTries = outputMap flatMap { case (file, s3Address) =>
-              if (config.skipEmptyResults && file.isEmpty) {
+              if (config.skipEmptyResults && Files.size(file.path) == 0) {
                 logger.info(s"Output file [${file.name}] is empty. Skipping it.")
                 None
               } else {
@@ -210,8 +210,7 @@ class DataProcessor(
                       "artifact-name"    -> config.metadata.artifact,
                       "artifact-version" -> config.metadata.version,
                       "artifact-url"     -> config.metadata.artifactUrl
-                    ),
-                    false // not silent
+                    )
                   )
                 )
               }
