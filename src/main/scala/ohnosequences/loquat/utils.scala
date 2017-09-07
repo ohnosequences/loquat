@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import ohnosequences.awstools._, ec2._, regions._, autoscaling._
-
+import ohnosequences.statika
 import better.files._
 import scala.collection.JavaConversions._
 import scala.util._
@@ -46,6 +46,11 @@ case object utils {
           Failure(e)
       }
     }
+  }
+
+  implicit def resultToTry[T](r: statika.Result[T]): Try[T] = r match {
+    case statika.Success(_, s) => util.Success(s)
+    case statika.Failure(e) => util.Failure(new RuntimeException(e.mkString("\n")))
   }
 
   // A minimal wrapper around the Java scheduling thing

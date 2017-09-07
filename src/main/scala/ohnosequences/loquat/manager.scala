@@ -98,11 +98,6 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         // TODO: better exception here?
         scala.util.Failure(new RuntimeException("Failed to upload initial dataMappings"))
       } else {
-        // NOTE: we tag manager group as running
-        aws.as.setTags(
-          names.managerGroup,
-          Map(StatusTag.label -> StatusTag.running.status)
-        )
         logger.info("Initial dataMappings are ready")
         scala.util.Success( () )
       }
@@ -110,82 +105,94 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   }
 
+  def prepareWorkers: AnyInstructions = {
+    LazyTry {
+      logger.debug("Creating workers launch configuration")
+      aws.as.getLaunchConfig(names.managerLaunchConfig) map { launchConfig =>
 
-  def instructions: AnyInstructions = {
-
-    lazy val normalScenario: Instructions[Unit] = {
-      LazyTry {
-        logger.debug("Uploading initial dataMappings to the input queue")
-
-        aws.as.tagValue(
-          names.managerGroup,
-          StatusTag.label
-        ) match {
-
-          case scala.util.Success(StatusTag.running.status) => {
-            logger.info("DataMappings are supposed to be in the queue already")
-            // scala.util.Success( () )
-          }
-
-          case _ => uploadInitialDataMappings
-        }
-      } -&-
-      LazyTry {
-        logger.debug("Creating workers launch configuration")
-        aws.as.getLaunchConfig(names.managerLaunchConfig) map { launchConfig =>
-
-          aws.as.createLaunchConfig(
-            names.workersLaunchConfig,
-            config.workersConfig.purchaseModel,
-            LaunchSpecs(
-              ami = config.workersConfig.ami,
-              instanceType = config.workersConfig.instanceType,
-              keyName = launchConfig.getKeyName,
-              userData = workerCompat.userScript,
-              iamProfileName = Some(config.iamRoleName),
-              deviceMappings = config.workersConfig.deviceMapping
-            )(config.workersConfig.supportsAMI)
-          ).recover {
-            case _: AlreadyExistsException => logger.warn(s"Workers launch configuration already exists")
-          }
-        }
-      } -&-
-      LazyTry {
-        logger.debug("Creating workers autoscaling group")
-        aws.as.createGroup(
-          names.workersGroup,
+        aws.as.createLaunchConfig(
           names.workersLaunchConfig,
-          config.workersConfig.groupSize,
-          if  (config.workersConfig.availabilityZones.isEmpty) aws.ec2.getAllAvailableZones
-          else config.workersConfig.availabilityZones
-        )
-      } -&-
-      LazyTry {
-        logger.debug("Creating tags for workers autoscaling group")
-        aws.as.setTags(names.workersGroup, Map(
-          "product" -> "loquat",
-          "group"   -> names.workersGroup,
-          StatusTag.label -> StatusTag.running.status
-        ))
-      } -&-
-      say("manager installed")
+          config.workersConfig.purchaseModel,
+          LaunchSpecs(
+            ami = config.workersConfig.ami,
+            instanceType = config.workersConfig.instanceType,
+            keyName = launchConfig.getKeyName,
+            userData = workerCompat.userScript,
+            iamProfileName = Some(config.iamRoleName),
+            deviceMappings = config.workersConfig.deviceMapping
+          )(config.workersConfig.supportsAMI)
+        ).recover {
+          case _: AlreadyExistsException => logger.warn(s"Workers launch configuration already exists")
+        }
+      }
+    } -&-
+    LazyTry {
+      logger.debug("Creating workers autoscaling group")
+      aws.as.createGroup(
+        names.workersGroup,
+        names.workersLaunchConfig,
+        config.workersConfig.groupSize,
+        if  (config.workersConfig.availabilityZones.isEmpty) aws.ec2.getAllAvailableZones
+        else config.workersConfig.availabilityZones
+      )
+    } -&-
+    LazyTry {
+      logger.debug("Creating tags for workers autoscaling group")
+      aws.as.setTags(names.workersGroup, Map(
+        "product" -> "loquat",
+        "group"   -> names.workersGroup,
+        StatusTag.label -> StatusTag.running.status
+      ))
     }
-
-    lazy val failScenario = {
-      LazyTry {
-        logger.error("Manager failed, trying to restart it")
-
-        loggerBundle.failureNotification(
-          s"Loquat ${config.loquatId} manager failed during installation and will be restarted"
-        )
-
-        aws.ec2.getCurrentInstance.foreach(_.terminate)
-      } -&-
-      failure[Unit]("Manager failed during installation")
-    }
-
-    normalScenario -|- failScenario
   }
+
+  def localInstructions: AnyInstructions = {
+    LazyTry {
+      logger.debug("Uploading initial dataMappings to the input queue")
+      uploadInitialDataMappings.get
+    } -&-
+    prepareWorkers -&-
+    terminationBundle.instructions
+  }
+
+  private def normalScenario: Instructions[Unit] = {
+    LazyTry {
+      logger.debug("Uploading initial dataMappings to the input queue")
+
+      aws.as.tagValue(
+        names.managerGroup,
+        StatusTag.label
+      ) match {
+        case scala.util.Success(StatusTag.running.status) => {
+          logger.info("DataMappings are supposed to be in the queue already")
+        }
+        case _ => uploadInitialDataMappings map { _ =>
+          logger.info("Tagging manager group as running")
+          aws.as.setTags(
+            names.managerGroup,
+            Map(StatusTag.label -> StatusTag.running.status)
+          )
+        }
+      }
+    } -&-
+    prepareWorkers -&-
+    say("manager installed")
+  }
+
+  private def failScenario: Instructions[Unit] = {
+    LazyTry {
+      logger.error("Manager failed, trying to restart it")
+
+      loggerBundle.failureNotification(
+        s"Loquat ${config.loquatId} manager failed during installation and will be restarted"
+      )
+
+      aws.ec2.getCurrentInstance.foreach(_.terminate)
+    } -&-
+    failure[Unit]("Manager failed during installation")
+  }
+
+  def instructions: AnyInstructions = normalScenario -|- failScenario
 }
 
 private[loquat]

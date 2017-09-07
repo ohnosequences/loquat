@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
 import scala.concurrent.duration._
 import collection.JavaConversions._
-
+import java.nio.file.{ Files, Paths }
 
 trait AnyLoquat { loquat =>
 
@@ -41,6 +41,8 @@ trait AnyLoquat { loquat =>
       AWSClients(config.region, user.localCredentials),
       TerminateManually
     )
+  final def launchLocally(user: LoquatUser): Unit =
+    LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager)
 }
 
 abstract class Loquat[
@@ -143,23 +145,18 @@ case object LoquatOps extends LazyLogging {
 
   }
 
-
-  def deploy[DP <: AnyDataProcessingBundle](
+  def prepareResourcesSteps(
     config: AnyLoquatConfig,
     user: LoquatUser,
-    dataProcessing: DP,
-    dataMappings: List[AnyDataMapping],
-    managerUserScript: String
-  ): Unit = {
-
-    LoquatOps.check(config, user, dataProcessing, dataMappings) match {
-      case Left(msg) => logger.error(msg)
-      case Right(aws) => {
+    // dataProcessing: DP,
+    // dataMappings: List[AnyDataMapping]
+    aws: AWSClients
+  ): Seq[Step[_]] = {
+    // LoquatOps.check(config, user, dataProcessing, dataMappings) match {
+    //   case Left(msg) => logger.error(msg)
+    //   case Right(aws) => {
 
         val names = config.resourceNames
-
-        logger.info(s"Deploying loquat: ${config.loquatId}")
-
 
         Seq(
           Step( s"Creating input queue: ${names.inputQueue}" )(
@@ -195,7 +192,68 @@ case object LoquatOps extends LazyLogging {
                 logger.info("Check your email and confirm subscription")
               }
             }
-          ),
+          )
+        )
+        // .foldLeft[Try[_]] {
+        //   logger.info("Preparing resources...")
+        //   util.Success(true)
+        // } { (result: Try[_], next: Step[_]) =>
+        //   result.flatMap(_ => next.execute)
+        // }
+    //   }
+    // }
+  }
+
+  def launchLocally(
+    config: AnyLoquatConfig,
+    user: LoquatUser,
+    dataProcessing: AnyDataProcessingBundle,
+    dataMappings: List[AnyDataMapping],
+    manager: AnyManagerBundle
+  ): Unit = {
+
+    LoquatOps.check(config, user, dataProcessing, dataMappings) match {
+      case Left(msg) => logger.error(msg)
+      case Right(aws) => {
+
+        val names = config.resourceNames
+        val workingDir = Files.createTempDirectory(Paths.get("target/"), "loquat.").toFile
+
+        logger.info(s"Launching loquat locally: ${config.loquatId}")
+
+        val steps = prepareResourcesSteps(config, user, aws) ++ Seq(
+          Step("Launching manager locally") {
+            resultToTry(manager.localInstructions.run(workingDir))
+          }
+        )
+
+        steps.foldLeft[Try[_]] {
+          util.Success(true)
+        } { (result: Try[_], next: Step[_]) =>
+          result.flatMap(_ => next.execute)
+        }
+      }
+    }
+  }
+
+
+  def deploy[DP <: AnyDataProcessingBundle](
+    config: AnyLoquatConfig,
+    user: LoquatUser,
+    dataProcessing: DP,
+    dataMappings: List[AnyDataMapping],
+    managerUserScript: String
+  ): Unit = {
+
+    LoquatOps.check(config, user, dataProcessing, dataMappings) match {
+      case Left(msg) => logger.error(msg)
+      case Right(aws) => {
+
+        val names = config.resourceNames
+
+        logger.info(s"Deploying loquat: ${config.loquatId}")
+
+        val steps = prepareResourcesSteps(config, user, aws) ++ Seq(
           Step( s"Creating manager launch configuration: ${names.managerLaunchConfig}" )(
 
             aws.as.createLaunchConfig(
@@ -232,9 +290,10 @@ case object LoquatOps extends LazyLogging {
           Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(
             util.Success(true)
           )
-        ).foldLeft[Try[_]] {
-          logger.info("Creating resources...")
-            util.Success(true)
+        )
+
+        steps.foldLeft[Try[_]] {
+          util.Success(true)
         } { (result: Try[_], next: Step[_]) =>
           result.flatMap(_ => next.execute)
         }
