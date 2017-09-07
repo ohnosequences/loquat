@@ -5,7 +5,6 @@ import ohnosequences.loquat._, test.data._
 import ohnosequences.statika._
 import ohnosequences.datasets._, FileResource._
 import ohnosequences.cosas._, klists._, types._, records._
-import better.files._
 
 case object dataProcessing {
 
@@ -24,12 +23,12 @@ case object dataProcessing {
       val txt: String = context.inputFile(text).contentAsString
       val prfx: String = context.inputFile(prefix).contentAsString
 
-      val outFile: File = (context / s"${prfx}.transposed.txt").createIfNotExists()
+      val outFile: File = (context / s"${prfx}.transposed.txt").createFile
 
       LazyTry {
         val matrixRows = context.inputFile(matrix).lines
         val trans = matrixRows.map{ _.reverse }.toList.reverse
-        outFile.createIfNotExists().overwrite(trans.mkString("\n"))
+        outFile.createFile.overwrite(trans.mkString("\n"))
         outFile.append(txt)
       } -&-
       success("transposed",

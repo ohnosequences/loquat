@@ -1,16 +1,11 @@
 package ohnosequences.loquat
 
 import utils._
-
 import ohnosequences.datasets._
-
 import ohnosequences.cosas._, types._, typeUnions._, records._, fns._, klists._
-// import ops.typeSets._
-
 import ohnosequences.statika._
-
 import upickle.Js
-import better.files._
+import java.io.File
 
 
 trait AnyProcessingContext {
@@ -26,7 +21,7 @@ trait AnyProcessingContext {
   ): File = inputFiles(key.label)
 
   /* or create a file instance in the orking directory */
-  def /(name: String): File = workingDir / name
+  def /(name: String): File = new File(workingDir, name)
 }
 
 case class ProcessingContext[D <: AnyDataSet](
@@ -51,10 +46,10 @@ trait AnyDataProcessingBundle extends AnyBundle {
 
   final def runProcess(workingDir: File, inputFiles: Map[String, File]): Result[Map[String, File]] = {
     process(ProcessingContext[Input](workingDir, inputFiles))
-      .run(workingDir.toJava) match {
+      .run(workingDir) match {
         case Failure(tr) => Failure(tr)
         case Success(tr, of) => Success(tr,
-          of.asList.map { d => (d.tpe.label, d.value.resource.toScala) }.toMap
+          of.asList.map { d => (d.tpe.label, d.value.resource) }.toMap
         )
       }
   }

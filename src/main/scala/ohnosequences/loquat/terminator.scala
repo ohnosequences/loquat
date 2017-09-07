@@ -1,21 +1,14 @@
 package ohnosequences.loquat
 
 import utils._
-
 import ohnosequences.statika._
-
 import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-
 import ohnosequences.awstools._, sqs._, autoscaling._
-
 import com.amazonaws.{ services => amzn }
-
 import scala.collection.JavaConversions._
 import scala.util.Try
-
-import better.files._
 
 
 private[loquat]

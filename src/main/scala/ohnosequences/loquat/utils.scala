@@ -8,13 +8,13 @@ import com.typesafe.scalalogging.LazyLogging
 import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import ohnosequences.awstools._, ec2._, regions._, autoscaling._
-
-import better.files._
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.util._
 import scala.concurrent.duration._
 import java.util.concurrent._
-
+import java.io.File
+import java.nio.file.{ Files, Path, Paths }
+import java.nio.charset.Charset
 
 case object utils {
 
@@ -82,4 +82,44 @@ case object utils {
     // case object failed      extends StatusTag("failed")
   }
 
+  private[loquat] case object FileUtils {
+    def file(path: String): File = new File(path)
+
+    implicit def pathToFile(path: Path): File = path.toFile()
+
+    implicit class FileOps(val file: File) extends AnyVal {
+      def path: Path = file.toPath()
+
+      def /(suffix: String): File =
+        new File(file, suffix)
+
+      /** Creates directory with all parents */
+      def createDirectory: File = {
+        if (file.exists()) file
+        else Files.createDirectories( path )
+      }
+
+      /** Creates a file if it doesn't exist with all parent directories */
+      def createFile: File = {
+        if (file.exists()) file
+        else {
+          Files.createDirectories( path.getParent() )
+          Files.createFile( path )
+        }
+      }
+
+      def overwrite(text: String): File =
+        Files.write(path, text.getBytes(Charset.defaultCharset))
+
+      def deleteRecursively(): Unit = {
+        if (file.isDirectory) {
+          file.listFiles.foreach { _.deleteRecursively() }
+        }
+        file.delete()
+      }
+
+      def lines: Iterator[String] =
+        Files.lines(path).iterator.asScala
+    }
+  }
 }
