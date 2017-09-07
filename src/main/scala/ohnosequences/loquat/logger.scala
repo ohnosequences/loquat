@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._
 
 import ohnosequences.statika._
-import ohnosequences.awstools._, s3._, ec2._, sns._
+import ohnosequences.awstools._, s3._, ec2._, sns._, regions._
 // import com.amazonaws.services.s3.model.PutObjectResult
 
 import com.typesafe.scalalogging.LazyLogging
@@ -19,7 +19,7 @@ case class LogUploaderBundle(
   val scheduler: Scheduler
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = instanceAWSClients(config)
+  lazy val aws = AWSClients(config.region)
 
   lazy val logFile = file"/log.txt"
 

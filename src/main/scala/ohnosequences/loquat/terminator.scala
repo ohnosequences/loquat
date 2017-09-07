@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-import ohnosequences.awstools._, sqs._, autoscaling._
+import ohnosequences.awstools._, sqs._, autoscaling._, regions._
 
 import com.amazonaws.{ services => amzn }
 
@@ -25,7 +25,7 @@ case class TerminationDaemonBundle(
   val initialCount: Int
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = instanceAWSClients(config)
+  lazy val aws = AWSClients(config.region)
 
   lazy val managerCreationTime: Option[FiniteDuration] =
     aws.as.getGroup(config.resourceNames.managerGroup)

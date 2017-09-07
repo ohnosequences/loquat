@@ -5,7 +5,6 @@ import ohnosequences.cosas._, types._, klists._
 
 import com.typesafe.scalalogging.LazyLogging
 
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import ohnosequences.awstools._, ec2._, regions._, autoscaling._
 import ohnosequences.statika
@@ -29,11 +28,6 @@ case object utils {
   def toMap[V <: AnyDataResource](l: Map[AnyData, V]): Map[String, V] =
     l.map{ case (d, v) => (d.tpe.label, v) }
 
-
-  def instanceAWSClients(config: AnyLoquatConfig) = AWSClients(
-    config.region,
-    InstanceProfileCredentialsProvider.getInstance()
-  )
 
   trait AnyStep extends LazyLogging
   case class Step[T](msg: String)(action: => Try[T]) extends AnyStep {

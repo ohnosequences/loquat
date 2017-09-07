@@ -6,10 +6,10 @@ import ohnosequences.statika._
 
 import com.typesafe.scalalogging.LazyLogging
 
+import com.amazonaws.auth._
 import com.amazonaws.PredefinedClientConfigurations
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
 import com.amazonaws.services.autoscaling.model._
-import ohnosequences.awstools._, sqs._, sns._, ec2._, autoscaling._
+import ohnosequences.awstools._, sqs._, sns._, ec2._, autoscaling._, regions._
 
 import java.util.concurrent.Executors
 import scala.concurrent._, duration._
@@ -47,7 +47,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     terminationBundle
   )
 
-  lazy val aws = instanceAWSClients(config)
+  lazy val aws = AWSClients(config.region)
 
   lazy val names = config.resourceNames
 
@@ -55,7 +55,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
     val sqs = SQSClient(
       config.ami.region,
-      InstanceProfileCredentialsProvider.getInstance(),
+      new DefaultAWSCredentialsProviderChain(),
       // TODO: 100 connections? more?
       PredefinedClientConfigurations.defaultConfig.withMaxConnections(100)
     )
