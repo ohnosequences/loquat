@@ -9,6 +9,9 @@ import ohnosequences.awstools.s3._
 
 import better.files._
 
+import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
+import java.util.Base64
+import java.nio.charset.StandardCharsets.UTF_8
 
 trait AnyDataMapping { dataMapping =>
 
@@ -76,34 +79,30 @@ private[loquat] case class SimpleDataMapping(
   val id: String,
   val inputs: Map[String, AnyRemoteResource],
   val outputs: Map[String, S3Resource]
-) {
-  import java.io._
+) extends Serializable {
 
   def serialize: String = {
     val byteStream = new ByteArrayOutputStream()
+
     val objOutStream = new ObjectOutputStream(byteStream)
-
     objOutStream.writeObject(this)
-    val str = byteStream.toString
-
     objOutStream.close()
-    byteStream.close()
 
-    str
+    new String(
+      Base64.getEncoder.encode(byteStream.toByteArray),
+      UTF_8
+    )
   }
 }
 
 case object SimpleDataMapping {
-  import java.io._
 
   def deserialize(str: String): SimpleDataMapping = {
-    val byteStream = new ByteArrayInputStream(str.getBytes)
-    val objInStream = new ObjectInputStream(byteStream)
+    val bytes = Base64.getDecoder.decode(str.getBytes(UTF_8))
 
+    val objInStream = new ObjectInputStream(new ByteArrayInputStream(bytes))
     val sdm = objInStream.readObject.asInstanceOf[SimpleDataMapping]
-
     objInStream.close()
-    byteStream.close()
 
     sdm
   }
