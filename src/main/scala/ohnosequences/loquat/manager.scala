@@ -105,26 +105,24 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   }
 
-  def prepareWorkers: AnyInstructions = {
+  def prepareWorkers(keypairName: String): AnyInstructions = {
     LazyTry {
       logger.debug("Creating workers launch configuration")
-      aws.as.getLaunchConfig(names.managerLaunchConfig) map { launchConfig =>
 
-        aws.as.createLaunchConfig(
-          names.workersLaunchConfig,
-          config.workersConfig.purchaseModel,
-          LaunchSpecs(
-            ami = config.workersConfig.ami,
-            instanceType = config.workersConfig.instanceType,
-            keyName = launchConfig.getKeyName,
-            userData = workerCompat.userScript,
-            iamProfileName = Some(config.iamRoleName),
-            deviceMappings = config.workersConfig.deviceMapping
-          )(config.workersConfig.supportsAMI)
-        ).recover {
-          case _: AlreadyExistsException => logger.warn(s"Workers launch configuration already exists")
-        }
-      }
+      aws.as.createLaunchConfig(
+        names.workersLaunchConfig,
+        config.workersConfig.purchaseModel,
+        LaunchSpecs(
+          ami = config.workersConfig.ami,
+          instanceType = config.workersConfig.instanceType,
+          keyName = keypairName,
+          userData = workerCompat.userScript,
+          iamProfileName = Some(config.iamRoleName),
+          deviceMappings = config.workersConfig.deviceMapping
+        )(config.workersConfig.supportsAMI)
+      ).recover {
+        case _: AlreadyExistsException => logger.warn(s"Workers launch configuration already exists")
+      }.get
     } -&-
     LazyTry {
       logger.debug("Creating workers autoscaling group")
@@ -134,7 +132,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         config.workersConfig.groupSize,
         if  (config.workersConfig.availabilityZones.isEmpty) aws.ec2.getAllAvailableZones
         else config.workersConfig.availabilityZones
-      )
+      ).get
     } -&-
     LazyTry {
       logger.debug("Creating tags for workers autoscaling group")
@@ -142,16 +140,16 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         "product" -> "loquat",
         "group"   -> names.workersGroup,
         StatusTag.label -> StatusTag.running.status
-      ))
+      )).get
     }
   }
 
-  def localInstructions: AnyInstructions = {
+  def localInstructions(keypairName: String): AnyInstructions = {
     LazyTry {
       logger.debug("Uploading initial dataMappings to the input queue")
       uploadInitialDataMappings.get
     } -&-
-    prepareWorkers -&-
+    prepareWorkers(keypairName) -&-
     terminationBundle.instructions
   }
 
@@ -175,7 +173,9 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         }
       }
     } -&-
-    prepareWorkers -&-
+    prepareWorkers(
+      aws.as.getLaunchConfig(names.managerLaunchConfig).map(_.getKeyName).get
+    ) -&-
     say("manager installed")
   }
 
