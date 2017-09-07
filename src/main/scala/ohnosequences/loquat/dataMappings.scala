@@ -1,13 +1,9 @@
 package ohnosequences.loquat
 
 import utils._
-
 import ohnosequences.datasets._
-
 import ohnosequences.cosas._, records._, fns._, types._, klists._
 import ohnosequences.awstools.s3._
-
-import better.files._
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
 import java.util.Base64

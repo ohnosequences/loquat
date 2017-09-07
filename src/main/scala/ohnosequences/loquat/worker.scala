@@ -1,19 +1,13 @@
 package ohnosequences.loquat
 
-import utils._
-
+import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-
 import com.amazonaws.services.s3.transfer.TransferManager
 import ohnosequences.awstools._, sqs._, s3._, ec2._
-
 import com.typesafe.scalalogging.LazyLogging
-import better.files._
 import scala.concurrent._, duration._
 import scala.util.Try
-import java.nio.file.Files
-
 
 trait AnyWorkerBundle extends AnyBundle {
 
@@ -56,7 +50,7 @@ class DataProcessor(
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging {
 
-  final val workingDir: File = file"/media/ephemeral0/applicator/loquat"
+  final val workingDir = file("/media/ephemeral0/applicator/loquat")
 
   lazy val aws = instanceAWSClients(config)
 
@@ -148,7 +142,7 @@ class DataProcessor(
     try {
       logger.debug("Preparing dataMapping input")
 
-      val inputDir = (workingDir / "input").createDirectories()
+      val inputDir = (workingDir / "input").createDirectory
 
       val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
 
@@ -157,15 +151,15 @@ class DataProcessor(
         resource match {
           case MessageResource(msg) => {
             val destination: File = inputDir / name
-            destination.createIfNotExists(createParents = true).overwrite(msg)
+            destination.createFile.overwrite(msg)
             (name -> destination)
           }
           case S3Resource(s3Address) => {
             // FIXME: this shouldn't ignore the returned Try
             val destination: File = transferManager.download(
               s3Address,
-              (inputDir / name).toJava
-            ).get.toScala
+              inputDir / name
+            ).get
             (name -> destination)
           }
         }
@@ -192,14 +186,14 @@ class DataProcessor(
           if (outputMap.keys.forall(_.exists)) {
 
             val uploadTries = outputMap flatMap { case (file, s3Address) =>
-              if (config.skipEmptyResults && Files.size(file.path) == 0) {
-                logger.info(s"Output file [${file.name}] is empty. Skipping it.")
+              if (config.skipEmptyResults && file.isEmpty) {
+                logger.info(s"Output file [${file.getName}] is empty. Skipping it.")
                 None
               } else {
-                logger.info(s"Publishing output object: [${file.name}]")
+                logger.info(s"Publishing output object: [${file.getName}]")
                 Some(
                   transferManager.upload(
-                    file.toJava,
+                    file,
                     s3Address,
                     Map(
                       "artifact-org"     -> config.metadata.organization,
@@ -253,8 +247,13 @@ class DataProcessor(
 
     logger.info("DataProcessor started at " + instance.id)
 
+    if (workingDir.exists) {
+      logger.debug("Deleting working directory: " + workingDir.path)
+      workingDir.deleteRecursively()
+    }
+
     logger.info("Creating working directory: " + workingDir.path)
-    workingDir.createDirectories()
+    workingDir.createDirectory
 
     while(!stopped) {
       try {
@@ -276,9 +275,6 @@ class DataProcessor(
 
         // NOTE: this is blocking until the Future gets a result
         val dataMappingResult = waitForResult(futureResult, message)
-
-        logger.debug("Clearing working directory: " + workingDir.path)
-        workingDir.clear()
 
         // FIXME: check this. what happens if result has failures?
         if (dataMappingResult.isSuccessful) {
