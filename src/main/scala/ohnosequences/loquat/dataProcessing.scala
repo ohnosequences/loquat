@@ -1,12 +1,10 @@
 package ohnosequences.loquat
 
-import utils._
+import utils._, files._
 import ohnosequences.datasets._
 import ohnosequences.cosas._, types._, typeUnions._, records._, fns._, klists._
 import ohnosequences.statika._
 import upickle.Js
-import java.io.File
-
 
 trait AnyProcessingContext {
 
@@ -21,7 +19,7 @@ trait AnyProcessingContext {
   ): File = inputFiles(key.label)
 
   /* or create a file instance in the orking directory */
-  def /(name: String): File = new File(workingDir, name)
+  def /(name: String): File = workingDir / name
 }
 
 case class ProcessingContext[D <: AnyDataSet](

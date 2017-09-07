@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import utils._, FileUtils._
+import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.datasets._
 import com.amazonaws.services.s3.transfer.TransferManager
@@ -8,8 +8,6 @@ import ohnosequences.awstools._, sqs._, s3._, ec2._
 import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._, duration._
 import scala.util.Try
-import java.io.File
-import java.nio.file.Files
 import upickle.Js
 
 
@@ -191,7 +189,7 @@ class DataProcessor(
           if (outputMap.keys.forall(_.exists)) {
 
             val uploadTries = outputMap flatMap { case (file, s3Address) =>
-              if (config.skipEmptyResults && Files.size(file.path) == 0) {
+              if (config.skipEmptyResults && file.isEmpty) {
                 logger.info(s"Output file [${file.getName}] is empty. Skipping it.")
                 None
               } else {

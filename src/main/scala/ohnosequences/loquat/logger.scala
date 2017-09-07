@@ -1,6 +1,6 @@
 package ohnosequences.loquat
 
-import utils._, FileUtils._
+import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.awstools._, s3._, ec2._, sns._
 import com.typesafe.scalalogging.LazyLogging

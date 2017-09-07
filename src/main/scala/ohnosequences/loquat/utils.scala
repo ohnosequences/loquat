@@ -13,7 +13,7 @@ import scala.util._
 import scala.concurrent.duration._
 import java.util.concurrent._
 import java.io.File
-import java.nio.file.{ Files, Path, Paths }
+import java.nio.file.{ Files, Path, Paths, StandardOpenOption }
 import java.nio.charset.Charset
 
 case object utils {
@@ -82,7 +82,11 @@ case object utils {
     // case object failed      extends StatusTag("failed")
   }
 
-  private[loquat] case object FileUtils {
+
+  case object files {
+
+    type File = java.io.File
+
     def file(path: String): File = new File(path)
 
     implicit def pathToFile(path: Path): File = path.toFile()
@@ -108,8 +112,17 @@ case object utils {
         }
       }
 
+      def isEmpty: Boolean = {
+        if (file.isDirectory) file.listFiles.isEmpty
+        else if (file.isFile) file.length() == 0 // Files.size(path) == 0
+        else !file.exists
+      }
+
       def overwrite(text: String): File =
         Files.write(path, text.getBytes(Charset.defaultCharset))
+
+      def append(text: String): File =
+        Files.write(path, text.getBytes(Charset.defaultCharset), StandardOpenOption.APPEND)
 
       def deleteRecursively(): Unit = {
         if (file.isDirectory) {
