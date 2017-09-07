@@ -8,7 +8,6 @@ import ohnosequences.cosas._, records._, fns._, types._, klists._
 import ohnosequences.awstools.s3._
 
 import better.files._
-import upickle.Js
 
 
 trait AnyDataMapping { dataMapping =>
@@ -77,4 +76,35 @@ private[loquat] case class SimpleDataMapping(
   val id: String,
   val inputs: Map[String, AnyRemoteResource],
   val outputs: Map[String, S3Resource]
-)
+) {
+  import java.io._
+
+  def serialize: String = {
+    val byteStream = new ByteArrayOutputStream()
+    val objOutStream = new ObjectOutputStream(byteStream)
+
+    objOutStream.writeObject(this)
+    val str = byteStream.toString
+
+    objOutStream.close()
+    byteStream.close()
+
+    str
+  }
+}
+
+case object SimpleDataMapping {
+  import java.io._
+
+  def deserialize(str: String): SimpleDataMapping = {
+    val byteStream = new ByteArrayInputStream(str.getBytes)
+    val objInStream = new ObjectInputStream(byteStream)
+
+    val sdm = objInStream.readObject.asInstanceOf[SimpleDataMapping]
+
+    objInStream.close()
+    byteStream.close()
+
+    sdm
+  }
+}

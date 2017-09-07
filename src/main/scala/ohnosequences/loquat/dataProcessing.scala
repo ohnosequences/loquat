@@ -9,7 +9,6 @@ import ohnosequences.cosas._, types._, typeUnions._, records._, fns._, klists._
 
 import ohnosequences.statika._
 
-import upickle.Js
 import better.files._
 
 
