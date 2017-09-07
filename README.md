@@ -10,3 +10,5 @@
 [**Nispero**](https://github.com/ohnosequences/nispero) is a Scala library designed for scaling stateless computations using [Amazon Web Services](http://aws.amazon.com).
 
 **Loquat** is a fork of Nispero. See [release notes](notes/2.0.0.markdown) for the list of changes.
+
+![](https://cloud.githubusercontent.com/assets/766656/17685265/b7c70a1e-6362-11e6-9944-b7a511d469b0.png)

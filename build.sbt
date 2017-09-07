@@ -9,8 +9,6 @@ libraryDependencies ++= Seq(
   // logging:
   "ch.qos.logback"              % "logback-classic" % "1.1.8",
   "com.typesafe.scala-logging" %% "scala-logging"   % "3.5.0",
-  // json:
-  "com.lihaoyi" %% "upickle" % "0.4.4",
   // AWS:
   "ohnosequences" %% "aws-scala-tools" % "0.18.1",
   // internal structure:

@@ -8,8 +8,6 @@ import ohnosequences.awstools._, sqs._, s3._, ec2._
 import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._, duration._
 import scala.util.Try
-import upickle.Js
-
 
 trait AnyWorkerBundle extends AnyBundle {
 
@@ -142,14 +140,13 @@ class DataProcessor(
   ): AnyResult = {
 
     try {
-
-      logger.info("Preparing dataMapping input")
+      logger.debug("Preparing dataMapping input")
 
       val inputDir = (workingDir / "input").createDirectory
 
       val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
 
-        logger.debug(s"Trying to create input object [${name}]")
+        logger.debug(s"Trying to create input object [${name}] from \n${resource}")
 
         resource match {
           case MessageResource(msg) => {
@@ -168,7 +165,7 @@ class DataProcessor(
         }
       }
 
-      logger.info("Processing data in: " + workingDir.path)
+      // logger.debug("Processing data in: " + workingDir.path)
       val result = instructionsBundle.runProcess(workingDir, inputFiles)
 
       val resultDescription = ProcessingResult(dataMapping.id, result.toString)
@@ -212,7 +209,7 @@ class DataProcessor(
             // TODO: check whether we can fold Try's here somehow
             if (uploadTries.forall(_.isSuccess)) {
               logger.info("Finished uploading output files. publishing message to the output queue.")
-              outputQueue.sendOne(upickle.default.write(resultDescription))
+              outputQueue.sendOne(resultDescription.toString)
               result //-&- success(s"task [${dataMapping.id}] is successfully finished", ())
             } else {
               logger.error(s"Some uploads failed: ${uploadTries.filter(_.isFailure)}")
@@ -262,15 +259,15 @@ class DataProcessor(
       try {
         val transferManager = aws.s3.createTransferManager
 
-        logger.info("Data processor is waiting for new data")
+        logger.info("Waiting for new data")
 
         val message = waitForTask()
 
         // instance.foreach(_.createTag(StatusTag.processing))
-        logger.info("DataProcessor: received message " + message)
-        val dataMapping = upickle.default.read[SimpleDataMapping](message.body)
+        val dataMapping = SimpleDataMapping.deserialize(message.body)
 
-        logger.info("DataProcessor processing message")
+        logger.info(s"Processing message [${dataMapping.id}]")
+
         import scala.concurrent.ExecutionContext.Implicits._
         val futureResult = Future {
           processDataMapping(transferManager, dataMapping, workingDir)

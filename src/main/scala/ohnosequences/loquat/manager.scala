@@ -67,13 +67,11 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       }
 
     val msgs: Iterator[String] = dataMappings.toIterator.zipWithIndex.map { case (dataMapping, ix) =>
-      upickle.default.write[SimpleDataMapping](
-        SimpleDataMapping(
-          id = ix.toString,
-          inputs = toMap(dataMapping.remoteInput),
-          outputs = toMap(dataMapping.remoteOutput)
-        )
-      )
+      SimpleDataMapping(
+        id = ix.toString,
+        inputs = toMap(dataMapping.remoteInput),
+        outputs = toMap(dataMapping.remoteOutput)
+      ).serialize
     }
 
 
