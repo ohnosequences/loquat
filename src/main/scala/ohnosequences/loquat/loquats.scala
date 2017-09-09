@@ -164,7 +164,7 @@ case object LoquatOps extends LazyLogging {
         Seq(
           Step( s"Creating input queue: ${names.inputQueue}" )(
             aws.sqs.getOrCreateQueue(names.inputQueue).map {
-              _.setVisibilityTimeout(30.minutes)
+              _.setVisibilityTimeout(config.sqsInitialTimeout)
             }
           ),
           Step( s"Creating output queue: ${names.outputQueue}" )(
