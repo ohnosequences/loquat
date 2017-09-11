@@ -51,11 +51,12 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   lazy val names = config.resourceNames
 
-  def uploadInitialDataMappings: Try[Unit] = {
+
+  def uploadInitialDataMappings(credentials: AWSCredentialsProvider): Try[Unit] = {
 
     val sqs = SQSClient(
-      config.ami.region,
-      new DefaultAWSCredentialsProviderChain(),
+      config.region,
+      credentials,
       // TODO: 100 connections? more?
       PredefinedClientConfigurations.defaultConfig.withMaxConnections(100)
     )
@@ -105,7 +106,8 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   }
 
-  def prepareWorkers(keypairName: String): AnyInstructions = {
+  // NOTE: it can take either manager.aws or those based on the local user credentials
+  def prepareWorkers(aws: AWSClients, keypairName: String): AnyInstructions = {
     LazyTry {
       logger.debug("Creating workers launch configuration")
 
@@ -144,12 +146,15 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     }
   }
 
-  def localInstructions(keypairName: String): AnyInstructions = {
+  def localInstructions(user: LoquatUser): AnyInstructions = {
     LazyTry {
       logger.debug("Uploading initial dataMappings to the input queue")
-      uploadInitialDataMappings.get
+      uploadInitialDataMappings(user.localCredentials).get
     } -&-
-    prepareWorkers(keypairName) -&-
+    prepareWorkers(
+      AWSClients(credentials = user.localCredentials),
+      user.keypairName
+    ) -&-
     terminationBundle.instructions
   }
 
@@ -157,16 +162,16 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     LazyTry {
       logger.debug("Uploading initial dataMappings to the input queue")
 
-      aws.as.tagValue(
+      manager.aws.as.tagValue(
         names.managerGroup,
         StatusTag.label
       ) match {
         case scala.util.Success(StatusTag.running.status) => {
           logger.info("DataMappings are supposed to be in the queue already")
         }
-        case _ => uploadInitialDataMappings map { _ =>
+        case _ => uploadInitialDataMappings(new DefaultAWSCredentialsProviderChain()) map { _ =>
           logger.info("Tagging manager group as running")
-          aws.as.setTags(
+          manager.aws.as.setTags(
             names.managerGroup,
             Map(StatusTag.label -> StatusTag.running.status)
           )
@@ -174,7 +179,8 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       }
     } -&-
     prepareWorkers(
-      aws.as.getLaunchConfig(names.managerLaunchConfig).map(_.getKeyName).get
+      manager.aws,
+      manager.aws.as.getLaunchConfig(names.managerLaunchConfig).map(_.getKeyName).get
     ) -&-
     say("manager installed")
   }
@@ -187,7 +193,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
         s"Loquat ${config.loquatId} manager failed during installation and will be restarted"
       )
 
-      aws.ec2.getCurrentInstance.foreach(_.terminate)
+      manager.aws.ec2.getCurrentInstance.foreach(_.terminate)
     } -&-
     failure[Unit]("Manager failed during installation")
   }

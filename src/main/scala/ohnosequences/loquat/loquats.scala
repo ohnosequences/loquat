@@ -213,7 +213,7 @@ case object LoquatOps extends LazyLogging {
         val steps = prepareResourcesSteps(config, user, aws) ++ Seq(
           Step("Launching manager locally") {
             resultToTry(
-              manager.localInstructions(user.keypairName).run(localTargetTmpDir())
+              manager.localInstructions(user).run(localTargetTmpDir())
             )
           }
         )
