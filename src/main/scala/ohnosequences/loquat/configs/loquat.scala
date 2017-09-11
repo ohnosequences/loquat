@@ -4,20 +4,14 @@ import utils._
 
 import ohnosequences.statika.AnyArtifactMetadata
 import ohnosequences.statika.aws._
-
-
 import ohnosequences.awstools.regions._
 import ohnosequences.awstools.ec2.AnyAmazonLinuxAMI
 import ohnosequences.awstools.s3._
-
 import ohnosequences.datasets._
-
 import ohnosequences.cosas._, types._
-
-import better.files._
-
 import scala.util.Try
 import scala.collection.JavaConversions._
+import scala.concurrent.duration._
 import java.net.URI
 
 
@@ -48,6 +42,8 @@ abstract class AnyLoquatConfig extends AnyConfig {
   /* This setting determines whether empty output files will be uploaded or not */
   val skipEmptyResults: Boolean = true
 
+  /* This setting defines the default SQS messages timeout that will be set on deploy */
+  val sqsInitialTimeout: FiniteDuration = 30.minutes
 
 
   /* Here follow all the values that are dependent on those defined on top */

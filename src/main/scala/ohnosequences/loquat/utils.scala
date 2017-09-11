@@ -2,19 +2,17 @@ package ohnosequences.loquat
 
 import ohnosequences.datasets._
 import ohnosequences.cosas._, types._, klists._
-
-import com.typesafe.scalalogging.LazyLogging
-
-import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import ohnosequences.awstools._, ec2._, regions._, autoscaling._
 import ohnosequences.statika
-import better.files._
-import scala.collection.JavaConversions._
+import com.typesafe.scalalogging.LazyLogging
+import com.amazonaws.services.autoscaling.AmazonAutoScaling
+import scala.collection.JavaConverters._
 import scala.util._
 import scala.concurrent.duration._
 import java.util.concurrent._
-import java.nio.file._
 import java.io.File
+import java.nio.file.{ Files, Path, Paths, StandardOpenOption }
+import java.nio.charset.Charset
 
 case object utils {
 
@@ -84,4 +82,57 @@ case object utils {
     // case object failed      extends StatusTag("failed")
   }
 
+
+  case object files {
+
+    type File = java.io.File
+
+    def file(path: String): File = new File(path)
+
+    implicit def pathToFile(path: Path): File = path.toFile()
+
+    implicit class FileOps(val file: File) extends AnyVal {
+      def path: Path = file.toPath()
+
+      def /(suffix: String): File =
+        new File(file, suffix)
+
+      /** Creates directory with all parents */
+      def createDirectory: File = {
+        if (file.exists()) file
+        else Files.createDirectories( path )
+      }
+
+      /** Creates a file if it doesn't exist with all parent directories */
+      def createFile: File = {
+        if (file.exists()) file
+        else {
+          Files.createDirectories( path.getParent() )
+          Files.createFile( path )
+        }
+      }
+
+      def isEmpty: Boolean = {
+        if (file.isDirectory) file.listFiles.isEmpty
+        else if (file.isFile) file.length() == 0 // Files.size(path) == 0
+        else !file.exists
+      }
+
+      def overwrite(text: String): File =
+        Files.write(path, text.getBytes(Charset.defaultCharset))
+
+      def append(text: String): File =
+        Files.write(path, text.getBytes(Charset.defaultCharset), StandardOpenOption.APPEND)
+
+      def deleteRecursively(): Unit = {
+        if (file.isDirectory) {
+          file.listFiles.foreach { _.deleteRecursively() }
+        }
+        file.delete()
+      }
+
+      def lines: Iterator[String] =
+        Files.lines(path).iterator.asScala
+    }
+  }
 }
