@@ -11,6 +11,7 @@ import scala.util.Try
 import scala.concurrent.duration._
 import collection.JavaConversions._
 import java.nio.file.{ Files, Paths }
+import java.util.NoSuchElementException
 
 trait AnyLoquat { loquat =>
 
@@ -329,11 +330,19 @@ case object LoquatOps extends LazyLogging {
     ).execute
 
     Step(s"deleting manager group: ${names.managerGroup}")(
-      aws.as.deleteGroup(names.managerGroup)
+      aws.as.getGroup(names.managerGroup)
+        .flatMap { _ => aws.as.deleteGroup(names.managerGroup) }
+        .recover { case _: NoSuchElementException =>
+          logger.warn("Manager launch configuration doesn't exist")
+        }
     ).execute
 
     Step(s"deleting manager launch config: ${names.managerLaunchConfig}")(
-      aws.as.deleteLaunchConfig(names.managerLaunchConfig)
+      aws.as.getLaunchConfig(names.managerLaunchConfig)
+        .flatMap { _ => aws.as.deleteLaunchConfig(names.managerLaunchConfig) }
+        .recover { case _: NoSuchElementException =>
+          logger.warn("Manager launch configuration doesn't exist")
+        }
     ).execute
 
     logger.info("Loquat is undeployed")
