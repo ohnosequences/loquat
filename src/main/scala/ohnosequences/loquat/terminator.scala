@@ -31,12 +31,23 @@ case class TerminationDaemonBundle(
   lazy val outputQueue: Queue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
   lazy val errorQueue:  Queue = aws.sqs.getQueue(config.resourceNames.errorQueue).get
 
-  def instructions: AnyInstructions = LazyTry[Unit] {
-    scheduler.repeat(
-      after = 1.minute,
-      every = 3.minutes
-    ){ checkConditions(recheck = false) }
-  } -&- say("Termination daemon started")
+  def instructions: AnyInstructions =
+    LazyTry[Unit] {
+      checkAndTerminate(
+        after = 1.minute,
+        every = 3.minutes
+      )
+    } -&- say("Termination daemon started")
+
+
+  def checkAndTerminate(
+    after: FiniteDuration,
+    every: FiniteDuration
+  ) = {
+    scheduler.repeat(after, every){
+      checkConditions(recheck = false)
+    }
+  }
 
 
   def checkConditions(recheck: Boolean): Option[AnyTerminationReason] = {

@@ -45,9 +45,12 @@ trait AnyLoquat { loquat =>
   final def launchLocally(user: LoquatUser): Unit =
     LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager)
 
-  final def monitorProgress(): Unit = {
-    manager.terminationBundle.instructions.run(localTargetTmpDir())
-  }
+  final def monitorProgress(interval: FiniteDuration = 3.minutes): Unit =
+    LoquatOps.monitorProgress(
+      config,
+      dataMappings.length,
+      interval
+    )
 }
 
 abstract class Loquat[
@@ -215,6 +218,9 @@ case object LoquatOps extends LazyLogging {
             resultToTry(
               manager.localInstructions(user).run(localTargetTmpDir())
             )
+          },
+          Step("Launching manager locally") {
+            Try { monitorProgress(config, dataMappings.length, 3.minutes) }
           }
         )
 
@@ -227,6 +233,18 @@ case object LoquatOps extends LazyLogging {
     }
   }
 
+  // For running the terminator manually
+  def monitorProgress(
+    config: AnyLoquatConfig,
+    tasksCount: Int,
+    interval: FiniteDuration
+  ): Unit = {
+    TerminationDaemonBundle(config, Scheduler(1), tasksCount)
+      .checkAndTerminate(
+        after = 1.second,
+        every = interval
+      )
+  }
 
   def deploy[DP <: AnyDataProcessingBundle](
     config: AnyLoquatConfig,

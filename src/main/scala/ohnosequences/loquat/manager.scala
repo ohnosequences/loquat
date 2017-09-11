@@ -152,8 +152,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     prepareWorkers(
       AWSClients(credentials = user.localCredentials),
       user.keypairName
-    ) -&-
-    terminationBundle.instructions
+    )
   }
 
   private def normalScenario: Instructions[Unit] = {
