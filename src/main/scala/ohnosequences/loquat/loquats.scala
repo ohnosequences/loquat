@@ -148,60 +148,46 @@ case object LoquatOps extends LazyLogging {
   def prepareResourcesSteps(
     config: AnyLoquatConfig,
     user: LoquatUser,
-    // dataProcessing: DP,
-    // dataMappings: List[AnyDataMapping]
     aws: AWSClients
   ): Seq[Step[_]] = {
-    // LoquatOps.check(config, user, dataProcessing, dataMappings) match {
-    //   case Left(msg) => logger.error(msg)
-    //   case Right(aws) => {
+    val names = config.resourceNames
 
-        val names = config.resourceNames
+    Seq(
+      Step( s"Creating input queue: ${names.inputQueue}" )(
+        aws.sqs.getOrCreateQueue(names.inputQueue).map {
+          _.setVisibilityTimeout(30.minutes)
+        }
+      ),
+      Step( s"Creating output queue: ${names.outputQueue}" )(
+        aws.sqs.getOrCreateQueue(names.outputQueue)
+      ),
+      Step( s"Creating error queue: ${names.errorQueue}" )(
+        aws.sqs.getOrCreateQueue(names.errorQueue)
+      ),
+      Step( s"Checking logs bucket: ${names.logs}" )(
+        Try {
+          val logsBucket = names.logs.bucket
 
-        Seq(
-          Step( s"Creating input queue: ${names.inputQueue}" )(
-            aws.sqs.getOrCreateQueue(names.inputQueue).map {
-              _.setVisibilityTimeout(30.minutes)
-            }
-          ),
-          Step( s"Creating output queue: ${names.outputQueue}" )(
-            aws.sqs.getOrCreateQueue(names.outputQueue)
-          ),
-          Step( s"Creating error queue: ${names.errorQueue}" )(
-            aws.sqs.getOrCreateQueue(names.errorQueue)
-          ),
-          Step( s"Checking logs bucket: ${names.logs}" )(
-            Try {
-              val logsBucket = names.logs.bucket
+          if(aws.s3.doesBucketExist(logsBucket)) {
+            logger.info(s"Bucket [${logsBucket}] already exists.")
+          } else {
+            logger.info(s"Bucket [${logsBucket}] doesn't exists. Trying to create it.")
+            aws.s3.createBucket(logsBucket)
+          }
+        }
+      ),
+      Step( s"Creating notification topic: ${names.notificationTopic}" )(
+        aws.sns.getOrCreateTopic(names.notificationTopic).map { topic =>
 
-              if(aws.s3.doesBucketExist(logsBucket)) {
-                logger.info(s"Bucket [${logsBucket}] already exists.")
-              } else {
-                logger.info(s"Bucket [${logsBucket}] doesn't exists. Trying to create it.")
-                aws.s3.createBucket(logsBucket)
-              }
-            }
-          ),
-          Step( s"Creating notification topic: ${names.notificationTopic}" )(
-            aws.sns.getOrCreateTopic(names.notificationTopic).map { topic =>
+          if (!topic.subscribed(Subscriber.email(user.email.toString))) {
 
-              if (!topic.subscribed(Subscriber.email(user.email.toString))) {
-
-                logger.info(s"Subscribing [${user.email}] to the notification topic")
-                topic.subscribe(Subscriber.email(user.email.toString))
-                logger.info("Check your email and confirm subscription")
-              }
-            }
-          )
-        )
-        // .foldLeft[Try[_]] {
-        //   logger.info("Preparing resources...")
-        //   util.Success(true)
-        // } { (result: Try[_], next: Step[_]) =>
-        //   result.flatMap(_ => next.execute)
-        // }
-    //   }
-    // }
+            logger.info(s"Subscribing [${user.email}] to the notification topic")
+            topic.subscribe(Subscriber.email(user.email.toString))
+            logger.info("Check your email and confirm subscription")
+          }
+        }
+      )
+    )
   }
 
   def launchLocally(
