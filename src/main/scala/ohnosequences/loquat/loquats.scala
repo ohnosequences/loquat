@@ -44,6 +44,10 @@ trait AnyLoquat { loquat =>
     )
   final def launchLocally(user: LoquatUser): Unit =
     LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager)
+
+  final def monitorProgress(): Unit = {
+    manager.terminationBundle.instructions.run(localTargetTmpDir())
+  }
 }
 
 abstract class Loquat[
@@ -143,7 +147,6 @@ case object LoquatOps extends LazyLogging {
         }
       }
     }
-
   }
 
   def prepareResourcesSteps(
@@ -204,14 +207,13 @@ case object LoquatOps extends LazyLogging {
       case Right(aws) => {
 
         val names = config.resourceNames
-        val workingDir = Files.createTempDirectory(Paths.get("target/"), "loquat.").toFile
 
         logger.info(s"Launching loquat locally: ${config.loquatId}")
 
         val steps = prepareResourcesSteps(config, user, aws) ++ Seq(
           Step("Launching manager locally") {
             resultToTry(
-              manager.localInstructions(user.keypairName).run(workingDir)
+              manager.localInstructions(user.keypairName).run(localTargetTmpDir())
             )
           }
         )
@@ -286,11 +288,8 @@ case object LoquatOps extends LazyLogging {
         } { (result: Try[_], next: Step[_]) =>
           result.flatMap(_ => next.execute)
         }
-
       }
-
     }
-
   }
 
 

@@ -13,7 +13,8 @@ import scala.collection.JavaConversions._
 import scala.util._
 import scala.concurrent.duration._
 import java.util.concurrent._
-
+import java.nio.file._
+import java.io.File
 
 case object utils {
 
@@ -28,6 +29,8 @@ case object utils {
   def toMap[V <: AnyDataResource](l: Map[AnyData, V]): Map[String, V] =
     l.map{ case (d, v) => (d.tpe.label, v) }
 
+  def localTargetTmpDir(): File =
+    Files.createTempDirectory(Paths.get("target/"), "loquat.").toFile
 
   trait AnyStep extends LazyLogging
   case class Step[T](msg: String)(action: => Try[T]) extends AnyStep {
