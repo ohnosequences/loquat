@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
   "ohnosequences" %% "aws-scala-tools" % "0.18.1",
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
-  "ohnosequences" %% "statika"     % "2.0.0",
+  "ohnosequences" %% "statika"     % "2.0.0-5-g2d4b05c",
   "ohnosequences" %% "datasets"    % "0.4.1"
 )
 
