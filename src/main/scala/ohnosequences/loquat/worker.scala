@@ -3,8 +3,8 @@ package ohnosequences.loquat
 import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.datasets._
+import ohnosequences.awstools._, sqs._, s3._, ec2._, regions._
 import com.amazonaws.services.s3.transfer.TransferManager
-import ohnosequences.awstools._, sqs._, s3._, ec2._
 import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._, duration._
 import scala.util.Try
@@ -52,7 +52,7 @@ class DataProcessor(
 
   final val workingDir = file("/media/ephemeral0/applicator/loquat")
 
-  lazy val aws = instanceAWSClients(config)
+  lazy val aws = AWSClients(config.region)
 
   // FIXME: don't use Try.get
   import ohnosequences.awstools.sqs._

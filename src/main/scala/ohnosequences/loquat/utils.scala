@@ -2,12 +2,10 @@ package ohnosequences.loquat
 
 import ohnosequences.datasets._
 import ohnosequences.cosas._, types._, klists._
-
-import com.typesafe.scalalogging.LazyLogging
-
-import com.amazonaws.auth.InstanceProfileCredentialsProvider
-import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import ohnosequences.awstools._, ec2._, regions._, autoscaling._
+import ohnosequences.statika
+import com.typesafe.scalalogging.LazyLogging
+import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import scala.collection.JavaConverters._
 import scala.util._
 import scala.concurrent.duration._
@@ -29,11 +27,8 @@ case object utils {
   def toMap[V <: AnyDataResource](l: Map[AnyData, V]): Map[String, V] =
     l.map{ case (d, v) => (d.tpe.label, v) }
 
-
-  def instanceAWSClients(config: AnyLoquatConfig) = AWSClients(
-    config.region,
-    InstanceProfileCredentialsProvider.getInstance()
-  )
+  def localTargetTmpDir(): File =
+    Files.createTempDirectory(Paths.get("target/"), "loquat.").toFile
 
   trait AnyStep extends LazyLogging
   case class Step[T](msg: String)(action: => Try[T]) extends AnyStep {
@@ -46,6 +41,11 @@ case object utils {
           Failure(e)
       }
     }
+  }
+
+  implicit def resultToTry[T](r: statika.Result[T]): Try[T] = r match {
+    case statika.Success(_, s) => util.Success(s)
+    case statika.Failure(e) => util.Failure(new RuntimeException(e.mkString("\n")))
   }
 
   // A minimal wrapper around the Java scheduling thing
