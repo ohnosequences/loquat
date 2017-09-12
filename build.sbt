@@ -7,22 +7,17 @@ scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
   // logging:
-  "ch.qos.logback"              % "logback-classic" % "1.1.7",
+  "ch.qos.logback"              % "logback-classic" % "1.1.8",
   "com.typesafe.scala-logging" %% "scala-logging"   % "3.5.0",
-  // json:
-  "com.lihaoyi" %% "upickle" % "0.4.4",
   // AWS:
-  "ohnosequences" %% "aws-scala-tools" % "0.18.0",
-  // files:
-  "com.github.pathikrit" %% "better-files" % "2.16.0",
+  "ohnosequences" %% "aws-scala-tools" % "0.18.1",
   // internal structure:
   "ohnosequences" %% "cosas"       % "0.8.0",
-  "ohnosequences" %% "statika"     % "2.0.0-RC1",
-  "ohnosequences" %% "datasets"    % "0.4.0"
+  "ohnosequences" %% "statika"     % "2.0.0",
+  "ohnosequences" %% "datasets"    % "0.4.1"
 )
 
 dependencyOverrides ++= Set(
-  "ohnosequences" %% "aws-scala-tools" % "0.18.0-6-g26137be",
   "org.slf4j" % "slf4j-api" % "1.7.21"
 )
 

@@ -1,21 +1,14 @@
 package ohnosequences.loquat
 
 import utils._
-
 import ohnosequences.statika._
-
+import ohnosequences.awstools._, sqs._, autoscaling._, regions._
 import com.typesafe.scalalogging.LazyLogging
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-
-import ohnosequences.awstools._, sqs._, autoscaling._
-
 import com.amazonaws.{ services => amzn }
-
 import scala.collection.JavaConversions._
 import scala.util.Try
-
-import better.files._
 
 
 private[loquat]
@@ -25,7 +18,7 @@ case class TerminationDaemonBundle(
   val initialCount: Int
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = instanceAWSClients(config)
+  lazy val aws = AWSClients(config.region)
 
   lazy val managerCreationTime: Option[FiniteDuration] =
     aws.as.getGroup(config.resourceNames.managerGroup)
@@ -38,12 +31,23 @@ case class TerminationDaemonBundle(
   lazy val outputQueue: Queue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
   lazy val errorQueue:  Queue = aws.sqs.getQueue(config.resourceNames.errorQueue).get
 
-  def instructions: AnyInstructions = LazyTry[Unit] {
-    scheduler.repeat(
-      after = 1.minute,
-      every = 3.minutes
-    ){ checkConditions(recheck = false) }
-  } -&- say("Termination daemon started")
+  def instructions: AnyInstructions =
+    LazyTry[Unit] {
+      checkAndTerminate(
+        after = 1.minute,
+        every = 3.minutes
+      )
+    } -&- say("Termination daemon started")
+
+
+  def checkAndTerminate(
+    after: FiniteDuration,
+    every: FiniteDuration
+  ) = {
+    scheduler.repeat(after, every){
+      checkConditions(recheck = false)
+    }
+  }
 
 
   def checkConditions(recheck: Boolean): Option[AnyTerminationReason] = {
@@ -84,15 +88,15 @@ case class TerminationDaemonBundle(
       else None
 
 
-    reason.flatMap { _ =>
-
+    reason match {
+      case Some(sureReason) if (recheck) => {
+        logger.info(s"Termination reason: ${sureReason}")
+        LoquatOps.undeploy(config, aws, sureReason)
+        reason
+      }
       /* if there is a reason, we first run a more robust check (with accumulating queue numbers several times) */
-      val sureReason = checkConditions(recheck = true)
-
-      /* and if it confirms, we undeploy everything */
-      logger.info(s"Termination reason: ${sureReason}")
-      sureReason.foreach { LoquatOps.undeploy(config, aws, _) }
-      sureReason
+      case Some(unsureReason) => checkConditions(recheck = true)
+      case None => None
     }
   }
 

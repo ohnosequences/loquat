@@ -10,7 +10,8 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
 import scala.concurrent.duration._
 import collection.JavaConversions._
-
+import java.nio.file.{ Files, Paths }
+import java.util.NoSuchElementException
 
 trait AnyLoquat { loquat =>
 
@@ -40,6 +41,15 @@ trait AnyLoquat { loquat =>
       config,
       AWSClients(config.region, user.localCredentials),
       TerminateManually
+    )
+  final def launchLocally(user: LoquatUser): Unit =
+    LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager)
+
+  final def monitorProgress(interval: FiniteDuration = 3.minutes): Unit =
+    LoquatOps.monitorProgress(
+      config,
+      dataMappings.length,
+      interval
     )
 }
 
@@ -140,9 +150,101 @@ case object LoquatOps extends LazyLogging {
         }
       }
     }
-
   }
 
+  def prepareResourcesSteps(
+    config: AnyLoquatConfig,
+    user: LoquatUser,
+    aws: AWSClients
+  ): Seq[Step[_]] = {
+    val names = config.resourceNames
+
+    Seq(
+      Step( s"Creating input queue: ${names.inputQueue}" )(
+        aws.sqs.getOrCreateQueue(names.inputQueue).map {
+          _.setVisibilityTimeout(30.minutes)
+        }
+      ),
+      Step( s"Creating output queue: ${names.outputQueue}" )(
+        aws.sqs.getOrCreateQueue(names.outputQueue)
+      ),
+      Step( s"Creating error queue: ${names.errorQueue}" )(
+        aws.sqs.getOrCreateQueue(names.errorQueue)
+      ),
+      Step( s"Checking logs bucket: ${names.logs}" )(
+        Try {
+          val logsBucket = names.logs.bucket
+
+          if(aws.s3.doesBucketExist(logsBucket)) {
+            logger.info(s"Bucket [${logsBucket}] already exists.")
+          } else {
+            logger.info(s"Bucket [${logsBucket}] doesn't exists. Trying to create it.")
+            aws.s3.createBucket(logsBucket)
+          }
+        }
+      ),
+      Step( s"Creating notification topic: ${names.notificationTopic}" )(
+        aws.sns.getOrCreateTopic(names.notificationTopic).map { topic =>
+
+          if (!topic.subscribed(Subscriber.email(user.email.toString))) {
+
+            logger.info(s"Subscribing [${user.email}] to the notification topic")
+            topic.subscribe(Subscriber.email(user.email.toString))
+            logger.info("Check your email and confirm subscription")
+          }
+        }
+      )
+    )
+  }
+
+  def launchLocally(
+    config: AnyLoquatConfig,
+    user: LoquatUser,
+    dataProcessing: AnyDataProcessingBundle,
+    dataMappings: List[AnyDataMapping],
+    manager: AnyManagerBundle
+  ): Unit = {
+
+    LoquatOps.check(config, user, dataProcessing, dataMappings) match {
+      case Left(msg) => logger.error(msg)
+      case Right(aws) => {
+
+        val names = config.resourceNames
+
+        logger.info(s"Launching loquat locally: ${config.loquatId}")
+
+        val steps = prepareResourcesSteps(config, user, aws) ++ Seq(
+          Step("Launching manager locally") {
+            resultToTry(
+              manager.localInstructions(user).run(localTargetTmpDir())
+            )
+          },
+          Step("Launching manager locally") {
+            Try { monitorProgress(config, dataMappings.length, 3.minutes) }
+          }
+        )
+
+        steps.foldLeft[Try[_]] {
+          util.Success(true)
+        } { (result: Try[_], next: Step[_]) =>
+          result.flatMap(_ => next.execute)
+        }
+      }
+    }
+  }
+
+  // For running the terminator manually
+  def monitorProgress(
+    config: AnyLoquatConfig,
+    tasksCount: Int,
+    interval: FiniteDuration
+  ): Unit = {
+    TerminationDaemonBundle(config, Scheduler(1), tasksCount)
+      .checkAndTerminate(
+        after = 1.second,
+        every = interval
+      )
+  }
 
   def deploy[DP <: AnyDataProcessingBundle](
     config: AnyLoquatConfig,
@@ -160,42 +262,7 @@ case object LoquatOps extends LazyLogging {
 
         logger.info(s"Deploying loquat: ${config.loquatId}")
 
-
-        Seq(
-          Step( s"Creating input queue: ${names.inputQueue}" )(
-            aws.sqs.getOrCreateQueue(names.inputQueue).map {
-              _.setVisibilityTimeout(5.seconds)
-            }
-          ),
-          Step( s"Creating output queue: ${names.outputQueue}" )(
-            aws.sqs.getOrCreateQueue(names.outputQueue)
-          ),
-          Step( s"Creating error queue: ${names.errorQueue}" )(
-            aws.sqs.getOrCreateQueue(names.errorQueue)
-          ),
-          Step( s"Checking logs bucket: ${names.logs}" )(
-            Try {
-              val logsBucket = names.logs.bucket
-
-              if(aws.s3.doesBucketExist(logsBucket)) {
-                logger.info(s"Bucket [${logsBucket}] already exists.")
-              } else {
-                logger.info(s"Bucket [${logsBucket}] doesn't exists. Trying to create it.")
-                aws.s3.createBucket(logsBucket)
-              }
-            }
-          ),
-          Step( s"Creating notification topic: ${names.notificationTopic}" )(
-            aws.sns.getOrCreateTopic(names.notificationTopic).map { topic =>
-
-              if (!topic.subscribed(Subscriber.email(user.email.toString))) {
-
-                logger.info(s"Subscribing [${user.email}] to the notification topic")
-                topic.subscribe(Subscriber.email(user.email.toString))
-                logger.info("Check your email and confirm subscription")
-              }
-            }
-          ),
+        val steps = prepareResourcesSteps(config, user, aws) ++ Seq(
           Step( s"Creating manager launch configuration: ${names.managerLaunchConfig}" )(
 
             aws.as.createLaunchConfig(
@@ -232,17 +299,15 @@ case object LoquatOps extends LazyLogging {
           Step("Loquat is running, now go to the amazon console and keep an eye on the progress")(
             util.Success(true)
           )
-        ).foldLeft[Try[_]] {
-          logger.info("Creating resources...")
-            util.Success(true)
+        )
+
+        steps.foldLeft[Try[_]] {
+          util.Success(true)
         } { (result: Try[_], next: Step[_]) =>
           result.flatMap(_ => next.execute)
         }
-
       }
-
     }
-
   }
 
 
@@ -282,11 +347,19 @@ case object LoquatOps extends LazyLogging {
     ).execute
 
     Step(s"deleting manager group: ${names.managerGroup}")(
-      aws.as.deleteGroup(names.managerGroup)
+      aws.as.getGroup(names.managerGroup)
+        .flatMap { _ => aws.as.deleteGroup(names.managerGroup) }
+        .recover { case _: NoSuchElementException =>
+          logger.warn("Manager launch configuration doesn't exist")
+        }
     ).execute
 
     Step(s"deleting manager launch config: ${names.managerLaunchConfig}")(
-      aws.as.deleteLaunchConfig(names.managerLaunchConfig)
+      aws.as.getLaunchConfig(names.managerLaunchConfig)
+        .flatMap { _ => aws.as.deleteLaunchConfig(names.managerLaunchConfig) }
+        .recover { case _: NoSuchElementException =>
+          logger.warn("Manager launch configuration doesn't exist")
+        }
     ).execute
 
     logger.info("Loquat is undeployed")

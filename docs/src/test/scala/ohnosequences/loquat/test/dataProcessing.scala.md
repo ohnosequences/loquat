@@ -35,7 +35,7 @@ case object dataProcessing {
         outFile.append(txt)
       } -&-
       success("transposed",
-        transposed(outFile) ::
+        transposed(outFile.toJava) ::
         *[AnyDenotation { type Value <: FileResource }]
       )
     }
@@ -49,6 +49,7 @@ case object dataProcessing {
 
 
 [main/scala/ohnosequences/loquat/configs/autoscaling.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/awsClients.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/awsClients.scala.md
 [main/scala/ohnosequences/loquat/configs/general.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/general.scala.md
 [main/scala/ohnosequences/loquat/configs/loquat.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/loquat.scala.md
 [main/scala/ohnosequences/loquat/configs/resources.scala]: ../../../../../main/scala/ohnosequences/loquat/configs/resources.scala.md

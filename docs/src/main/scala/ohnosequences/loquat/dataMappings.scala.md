@@ -90,6 +90,7 @@ private[loquat] case class SimpleDataMapping(
 
 
 [main/scala/ohnosequences/loquat/configs/autoscaling.scala]: configs/autoscaling.scala.md
+[main/scala/ohnosequences/loquat/configs/awsClients.scala]: configs/awsClients.scala.md
 [main/scala/ohnosequences/loquat/configs/general.scala]: configs/general.scala.md
 [main/scala/ohnosequences/loquat/configs/loquat.scala]: configs/loquat.scala.md
 [main/scala/ohnosequences/loquat/configs/resources.scala]: configs/resources.scala.md

@@ -1,12 +1,11 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.datasets._
-import ohnosequences.loquat._, test.data._, utils._
+import ohnosequences.loquat._, utils.files._, test.data._
 import ohnosequences.statika._
 import ohnosequences.datasets._, FileResource._
 import ohnosequences.cosas._, klists._, types._, records._
 import concurrent.duration._
-import better.files._
 
 case object dataProcessing {
 
@@ -22,20 +21,20 @@ case object dataProcessing {
 
     def process(context: ProcessingContext[Input]): AnyInstructions { type Out <: OutputFiles } = {
 
-      val txt: String = context.inputFile(text).contentAsString
-      val prfx: String = context.inputFile(prefix).contentAsString
+      val txt: String  = context.inputFile(text).lines.mkString("\n")
+      val prfx: String = context.inputFile(prefix).lines.mkString("\n")
 
-      val outFile: File = (context / s"${prfx}.transposed.txt").createIfNotExists()
+      val outFile: File = (context / s"${prfx}.transposed.txt").createFile
 
       LazyTry {
         sleep(24.seconds)
         val matrixRows = context.inputFile(matrix).lines
         val trans = matrixRows.map{ _.reverse }.toList.reverse
-        outFile.createIfNotExists().overwrite(trans.mkString("\n"))
+        outFile.createFile.overwrite(trans.mkString("\n"))
         outFile.append(txt)
       } -&-
       success("transposed",
-        transposed(outFile.toJava) ::
+        transposed(outFile) ::
         *[AnyDenotation { type Value <: FileResource }]
       )
     }

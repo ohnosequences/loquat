@@ -1,20 +1,17 @@
 package ohnosequences.loquat
 
-import utils._
-
+import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-
+import ohnosequences.awstools._, sqs._, s3._, ec2._, regions._
 import com.amazonaws.services.s3.transfer.TransferManager
 import com.amazonaws.services.sqs.model.ReceiptHandleIsInvalidException
 import ohnosequences.awstools._, sqs._, s3._, ec2._
 
 import com.typesafe.scalalogging.LazyLogging
-import better.files._
 import scala.concurrent._, duration._
 import scala.util, util.Try
 import java.util.concurrent.{ Executors, ExecutorService }
-import upickle.Js
 
 import ExecutionContext.Implicits.global
 
@@ -35,7 +32,7 @@ trait AnyWorkerBundle extends AnyBundle {
     instructionsBundle
   )
 
-  lazy val ctx = GeneralContext(config, instructionsBundle)
+  lazy val ctx = GeneralContext(config, loggerBundle, instructionsBundle)
 
   def instructions: AnyInstructions = LazyTry {
     import ctx._
@@ -63,12 +60,12 @@ case class GeneralContext(
   val instructionsBundle: AnyDataProcessingBundle
 ) extends LazyLogging { ctx =>
 
-  lazy val workingDir: File = file"/media/ephemeral0/applicator/loquat"
+  lazy val workingDir: File = file("/media/ephemeral0/applicator/loquat")
   lazy val inputDir:  File = workingDir / "input"
   lazy val outputDir: File = workingDir / "output"
 
   /* AWS related things */
-  lazy val aws = instanceAWSClients(config)
+  lazy val aws = AWSClients(config.region)
 
   val inputQueue  = aws.sqs.getQueue(config.resourceNames.inputQueue).get
   val errorQueue  = aws.sqs.getQueue(config.resourceNames.errorQueue).get
@@ -140,7 +137,7 @@ case class TaskContext(
 )(val ctx: GeneralContext) extends LazyLogging {
   import ctx._
 
-  val dataMapping: SimpleDataMapping = upickle.default.read[SimpleDataMapping](message.body)
+  val dataMapping = SimpleDataMapping.deserialize(message.body)
 
   def timeSpent: FiniteDuration = -startTime.timeLeft
 
@@ -163,7 +160,7 @@ case class TaskContext(
     /* - if the resource is a message, we just write it to a file */
     case MessageResource(msg) => Future {
       logger.debug(s"Input [${name}]: writing message to a file")
-      val f = (inputDir / name).write(msg)
+      val f = (inputDir / name).overwrite(msg)
       logger.debug(s"Input [${name}]: written to ${f.path}")
       f
     }
@@ -174,9 +171,8 @@ case class TaskContext(
       import ohnosequences.awstools.s3._
       transferManager.download(
         s3Address,
-        (inputDir / name).toJava,
-        true // silent
-      ).map { _.toScala }
+        inputDir / name
+      )
     }
   }
 
@@ -184,8 +180,8 @@ case class TaskContext(
   def prepareInputData(): Future[Map[String, File]] = Future {
 
     logger.debug(s"Cleaning up and preparing the working directory: ${workingDir.path}")
-    workingDir.createIfNotExists(asDirectory = true, createParents = true)
-    workingDir.clear()
+    workingDir.deleteRecursively()
+    workingDir.createDirectory
   }.map { _ =>
 
     logger.debug("Downloading input data...")
@@ -217,10 +213,10 @@ case class TaskContext(
       case Failure(errors) => {
 
         logger.error(s"Data processing failed, publishing it to the error queue")
-        errorQueue.sendOne(upickle.default.write(
+        errorQueue.sendOne(
           // TODO: attach normall log
-          ProcessingResult(instance.id, errors.mkString("\n"))
-        ))
+          ProcessingResult(instance.id, errors.mkString("\n")).toString
+        )
         // TODO: make a specific exception
         throw new Throwable(errors.mkString("\n"))
       }
@@ -232,13 +228,13 @@ case class TaskContext(
 
     // FIXME: file.isEmpty may fail on compressed files!
     if (config.skipEmptyResults && file.isEmpty) Future.successful {
-      logger.info(s"Output file [${file.name}] is empty. Skipping it.")
+      logger.info(s"Output file [${file.getName}] is empty. Skipping it.")
       None
     } else Future.fromTry {
 
-      logger.info(s"Publishing output object: [${file.name}]")
+      logger.info(s"Publishing output object: [${file.getName}]")
       transferManager.upload(
-        file.toJava,
+        file,
         destination,
         s3Metadata,
         true // silent
@@ -258,9 +254,10 @@ case class TaskContext(
 
       logger.info("Finished uploading output files. Publishing message to the output queue.")
       Future.fromTry {
-        outputQueue.sendOne(upickle.default.write(
-          ProcessingResult(instance.id, dataMapping.id)
-        ))
+        outputQueue.sendOne(
+          // TODO: attach normall log
+          ProcessingResult(instance.id, dataMapping.id).toString
+        )
       }
     }.flatMap { _ =>
       Future.fromTry { message.delete() }
@@ -299,9 +296,7 @@ case class TaskContext(
         } else {
 
           logger.info(s"Keeping message ${dataMapping.id} in flight")
-          message.changeVisibility(
-            messageTimeout.toSeconds.toInt
-          ).recover {
+          message.changeVisibility(messageTimeout).recover {
 
             /* The message likely doesn't exist, i.e. already successfuly processed (possibly by somebody else) */
             // NOTE: as we don't have any civilized way to stop ongoing parallel computation, we just terminate the instance
