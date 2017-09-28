@@ -97,9 +97,11 @@ case object SimpleDataMapping {
     val bytes = Base64.getDecoder.decode(str.getBytes(UTF_8))
 
     val objInStream = new ObjectInputStream(new ByteArrayInputStream(bytes))
-    val sdm = objInStream.readObject.asInstanceOf[SimpleDataMapping]
-    objInStream.close()
 
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    val sdm = objInStream.readObject.asInstanceOf[SimpleDataMapping]
+
+    objInStream.close()
     sdm
   }
 }

@@ -62,6 +62,7 @@ class DataProcessor(
 
   val instance = aws.ec2.getCurrentInstance.get
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile var stopped = false
 
   def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
@@ -96,7 +97,7 @@ class DataProcessor(
             waitMore(tries + 1)
           }
           case Some(scala.util.Success(r)) => {
-            logger.info("Got a result: " + r.trace.toString)
+            logger.info(s"Got a result: ${r.trace.toString}")
             r
           }
           case Some(scala.util.Failure(t)) => Failure(s"future error: ${t.getMessage}")
@@ -245,14 +246,14 @@ class DataProcessor(
 
   def runLoop(): Unit = {
 
-    logger.info("DataProcessor started at " + instance.id)
+    logger.info(s"DataProcessor started at ${instance.id}")
 
     if (workingDir.exists) {
-      logger.debug("Deleting working directory: " + workingDir.path)
+      logger.debug(s"Deleting working directory: ${workingDir.path}")
       workingDir.deleteRecursively()
     }
 
-    logger.info("Creating working directory: " + workingDir.path)
+    logger.info(s"Creating working directory: ${workingDir.path}")
     workingDir.createDirectory
 
     while(!stopped) {
