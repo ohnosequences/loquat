@@ -2,7 +2,7 @@ package ohnosequences.loquat
 
 import utils._, files._
 import ohnosequences.datasets._
-import ohnosequences.cosas._, types._, typeUnions._, records._, fns._, klists._
+import ohnosequences.cosas._, typeUnions._
 import ohnosequences.statika._
 
 trait AnyProcessingContext {

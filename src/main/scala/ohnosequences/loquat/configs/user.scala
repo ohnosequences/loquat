@@ -2,8 +2,6 @@ package ohnosequences.loquat
 
 import ohnosequences.awstools.ec2._
 import com.amazonaws.auth.AWSCredentialsProvider
-import scala.util.Try
-
 
 /* Simple type to separate user-related data from the config */
 case class LoquatUser(

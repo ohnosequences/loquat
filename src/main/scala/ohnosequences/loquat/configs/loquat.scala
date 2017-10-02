@@ -1,16 +1,10 @@
 package ohnosequences.loquat
 
-import utils._
-
 import ohnosequences.statika.AnyArtifactMetadata
 import ohnosequences.statika.aws._
 import ohnosequences.awstools.regions._
 import ohnosequences.awstools.ec2.AnyAmazonLinuxAMI
 import ohnosequences.awstools.s3._
-import ohnosequences.datasets._
-import ohnosequences.cosas._, types._
-import scala.util.Try
-import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import java.net.URI
 

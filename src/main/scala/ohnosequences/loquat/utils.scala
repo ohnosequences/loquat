@@ -1,11 +1,9 @@
 package ohnosequences.loquat
 
 import ohnosequences.datasets._
-import ohnosequences.cosas._, types._, klists._
-import ohnosequences.awstools._, ec2._, regions._, autoscaling._
+import ohnosequences.cosas._, types._
 import ohnosequences.statika
 import com.typesafe.scalalogging.LazyLogging
-import com.amazonaws.services.autoscaling.AmazonAutoScaling
 import scala.collection.JavaConverters._
 import scala.util._
 import scala.concurrent.duration._

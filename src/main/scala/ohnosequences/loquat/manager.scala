@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.LazyLogging
 import com.amazonaws.auth._
 import com.amazonaws.PredefinedClientConfigurations
 import com.amazonaws.services.autoscaling.model._
-import ohnosequences.awstools._, sqs._, sns._, ec2._, autoscaling._, regions._
+import ohnosequences.awstools._, sqs._, ec2._, autoscaling._, regions._
 
 import java.util.concurrent.Executors
 import scala.concurrent._, duration._

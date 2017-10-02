@@ -2,8 +2,6 @@ package ohnosequences.loquat
 
 import ohnosequences.awstools.ec2._
 import ohnosequences.awstools.autoscaling._
-import com.amazonaws.services.autoscaling.model._
-
 
 trait AnyAutoScalingConfig extends AnyConfig { conf =>
 

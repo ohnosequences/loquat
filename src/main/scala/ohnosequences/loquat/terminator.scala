@@ -4,12 +4,7 @@ import utils._
 import ohnosequences.statika._
 import ohnosequences.awstools._, sqs._, autoscaling._, regions._
 import com.typesafe.scalalogging.LazyLogging
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-import com.amazonaws.{ services => amzn }
-import scala.collection.JavaConversions._
-import scala.util.Try
-
 
 private[loquat]
 case class TerminationDaemonBundle(

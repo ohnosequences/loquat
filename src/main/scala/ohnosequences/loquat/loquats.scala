@@ -9,8 +9,6 @@ import com.amazonaws.services.autoscaling.model._
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
 import scala.concurrent.duration._
-import collection.JavaConversions._
-import java.nio.file.{ Files, Paths }
 import java.util.NoSuchElementException
 
 trait AnyLoquat { loquat =>
@@ -175,7 +173,7 @@ case object LoquatOps extends LazyLogging {
         Try {
           val logsBucket = names.logs.bucket
 
-          if(aws.s3.doesBucketExist(logsBucket)) {
+          if(aws.s3.doesBucketExistV2(logsBucket)) {
             logger.info(s"Bucket [${logsBucket}] already exists.")
           } else {
             logger.info(s"Bucket [${logsBucket}] doesn't exists. Trying to create it.")
@@ -208,9 +206,6 @@ case object LoquatOps extends LazyLogging {
     LoquatOps.check(config, user, dataProcessing, dataMappings) match {
       case Left(msg) => logger.error(msg)
       case Right(aws) => {
-
-        val names = config.resourceNames
-
         logger.info(s"Launching loquat locally: ${config.loquatId}")
 
         val steps = prepareResourcesSteps(config, user, aws) ++ Seq(

@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools._, sqs._, s3._, ec2._, regions._
+import ohnosequences.awstools._, s3._, ec2._, regions._
 import com.amazonaws.services.s3.transfer.TransferManager
 import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._, duration._
