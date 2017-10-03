@@ -19,6 +19,10 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.4" % Test
 )
 
+dependencyOverrides ++= Seq(
+  "ohnosequences" %% "cosas" % "0.9.0-2-gdeb2ae4",
+  "ohnosequences" %% "datasets" % "0.5.0-2-g770944e"
+)
 
 wartremoverErrors in (Compile, compile) --= Seq(
   Wart.TryPartial

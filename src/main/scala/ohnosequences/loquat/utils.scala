@@ -15,9 +15,7 @@ import java.nio.charset.Charset
 case object utils {
 
   type ResourcesSet[D <: AnyDataSet, R <: AnyDataResource] =
-    D#Keys#Raw { type Bound = AnyDenotation { type Value <: R } }
-    // with AnyKList.withBound[AnyDenotation { type Value <: R }]
-
+    D#Raw { type Bound = AnyDenotation { type Value <: R } }
 
   // def toMap[V <: AnyDataResource](l: AnyKList.Of[AnyDenotation { type Value <: V }]): Map[String, V] =
   //   l.asList.map{ d => (d.tpe.label, d.value) }.toMap
