@@ -118,14 +118,18 @@ class DataProcessor(
     logger.error("Terminating instance")
 
     val msgWithID = s"Worker instance ${instance.id}: ${msg}"
-    errorQueue.sendOne(msgWithID).recover { case e =>
-      logger.error(s"Couldn't send failure SQS message: ${e}")
-    }
+    errorQueue.sendOne(msgWithID)
+      .map { _ => () }
+      .recover { case e: Throwable =>
+        logger.error(s"Couldn't send failure SQS message: ${e}")
+      }
 
     loggerBundle.uploadLog()
-    loggerBundle.failureNotification(s"Worker instance ${instance.id} terminated with a fatal error").recover { case e =>
-      logger.error(s"Couldn't send failure SNS notification: ${e}")
-    }
+    loggerBundle.failureNotification(s"Worker instance ${instance.id} terminated with a fatal error")
+      .map { _ => () }
+      .recover { case e: Throwable =>
+        logger.error(s"Couldn't send failure SNS notification: ${e}")
+      }
 
     Thread.sleep(15.minutes.toMillis)
 
