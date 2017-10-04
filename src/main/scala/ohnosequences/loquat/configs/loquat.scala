@@ -26,9 +26,8 @@ abstract class AnyLoquatConfig extends AnyConfig {
   val managerConfig: AnyManagerConfig
   val workersConfig: AnyWorkersConfig
 
-  val terminationConfig: TerminationConfig
-
-  // val dataMappings: List[AnyDataMapping]
+  /* This settings can be changed to alter termination conditions */
+  val terminationConfig: TerminationConfig = TerminationConfig.default()
 
   /* This setting switches the check of existence of the input S3 objects */
   val checkInputObjects: Boolean = true

@@ -43,12 +43,15 @@ trait AnyLoquat { loquat =>
   final def launchLocally(user: LoquatUser): Unit =
     LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager)
 
-  final def monitorProgress(interval: FiniteDuration = 3.minutes): Unit =
+  final def monitorProgress(interval: FiniteDuration): Unit =
     LoquatOps.monitorProgress(
       config,
       dataMappings.length,
       interval
     )
+
+  final def monitorProgress(): Unit =
+    monitorProgress(interval = 3.minutes)
 }
 
 abstract class Loquat[

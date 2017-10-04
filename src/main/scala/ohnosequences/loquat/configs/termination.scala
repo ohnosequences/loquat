@@ -68,11 +68,11 @@ case class TerminationConfig(
   // if true loquat will terminate after solving all initial tasks
   terminateAfterInitialDataMappings: Boolean,
   // if true loquat will terminate after errorQueue will contain more unique messages then threshold
-  errorsThreshold: Option[Int] = None,
+  errorsThreshold: Option[Int],
   // maximum time for processing one task
-  taskProcessingTimeout: Option[FiniteDuration] = None,
+  taskProcessingTimeout: Option[FiniteDuration],
   // maximum time for everything
-  globalTimeout: Option[FiniteDuration] = None
+  globalTimeout: Option[FiniteDuration]
 ) extends Config("Termination config")() {
 
   def validationErrors(aws: AWSClients): Seq[String] = {
@@ -99,4 +99,14 @@ case class TerminationConfig(
 
     treshholdErr ++ localTimeoutErr ++ globalTimeoutErr
   }
+}
+
+case object TerminationConfig {
+
+  def default(): TerminationConfig = TerminationConfig(
+    terminateAfterInitialDataMappings = true,
+    errorsThreshold = None,
+    taskProcessingTimeout = None,
+    globalTimeout = None
+  )
 }

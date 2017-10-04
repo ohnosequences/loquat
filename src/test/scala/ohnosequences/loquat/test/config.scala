@@ -31,10 +31,6 @@ case object config {
       AutoScalingGroupSize(0, 1, 20)
     )
 
-    val terminationConfig = TerminationConfig(
-      terminateAfterInitialDataMappings = true
-    )
-
     override val checkInputObjects = false
   }
 

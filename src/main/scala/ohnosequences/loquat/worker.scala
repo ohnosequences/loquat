@@ -125,6 +125,7 @@ class DataProcessor(
       }
 
     loggerBundle.uploadLog()
+
     loggerBundle.failureNotification(s"Worker instance ${instance.id} terminated with a fatal error")
       .map { _ => () }
       .recover { case e: Throwable =>
