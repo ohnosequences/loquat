@@ -3,25 +3,23 @@ description  := "🍋"
 organization := "ohnosequences"
 bucketSuffix := "era7.com"
 
-scalaVersion := "2.11.11"
+crossScalaVersions := Seq("2.11.11", "2.12.3")
+scalaVersion  := crossScalaVersions.value.last
 
 libraryDependencies ++= Seq(
-  // logging:
+  // Internal:
+  "ohnosequences" %% "aws-statika"     % "2.0.0",
+  "ohnosequences" %% "datasets"        % "0.5.1",
+  // Logging:
   "ch.qos.logback"              % "logback-classic" % "1.2.3",
   "com.typesafe.scala-logging" %% "scala-logging"   % "3.7.2",
-  // AWS:
-  "ohnosequences" %% "aws-scala-tools" % "0.18.1",
-  // internal structure:
-  "ohnosequences" %% "cosas"       % "0.8.0",
-  "ohnosequences" %% "statika"     % "2.0.0-5-g2d4b05c",
-  "ohnosequences" %% "datasets"    % "0.4.1"
+  // Testing
+  "org.scalatest" %% "scalatest" % "3.0.4" % Test
 )
 
-
-// FIXME: warts should be turn on back after the code clean up
-wartremoverErrors in (Compile, compile) := Seq()
-wartremoverErrors in (Test,    compile) := Seq()
-
+wartremoverErrors in (Compile, compile) --= Seq(
+  Wart.TryPartial
+)
 
 generateStatikaMetadataIn(Test)
 

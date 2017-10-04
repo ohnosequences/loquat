@@ -1,6 +1,6 @@
 package ohnosequences.loquat.test
 
-import ohnosequences.loquat._, utils._, test.data._, dataMappings._
+import ohnosequences.loquat._, utils._, dataMappings._
 
 class Serialization extends org.scalatest.FunSuite {
 

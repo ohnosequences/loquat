@@ -1,8 +1,7 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.awstools.s3._
-import ohnosequences.datasets._, S3Resource._
-import ohnosequences.cosas._, klists._, types._
+import ohnosequences.datasets._
 import ohnosequences.loquat._, test.data._, test.dataProcessing._
 
 case object dataMappings {
@@ -11,7 +10,7 @@ case object dataMappings {
   val output = S3Folder("loquat.testing", "output")
 
   val dataMapping = DataMapping("foo", processingBundle)(
-    remoteInput = Map(
+    remoteInput = Map[AnyData, AnyRemoteResource](
       prefix -> MessageResource("viva-loquat"),
       text -> MessageResource("""bluh-blah!!!
       |foo bar

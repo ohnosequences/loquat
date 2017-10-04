@@ -1,10 +1,7 @@
 package ohnosequences.loquat
 
-import utils._
 import ohnosequences.datasets._
-import ohnosequences.cosas._, records._, fns._, types._, klists._
-import ohnosequences.awstools.s3._
-
+import ohnosequences.cosas._, types._, records._
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream }
 import java.util.Base64
 import java.nio.charset.StandardCharsets.UTF_8
@@ -97,9 +94,11 @@ case object SimpleDataMapping {
     val bytes = Base64.getDecoder.decode(str.getBytes(UTF_8))
 
     val objInStream = new ObjectInputStream(new ByteArrayInputStream(bytes))
-    val sdm = objInStream.readObject.asInstanceOf[SimpleDataMapping]
-    objInStream.close()
 
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    val sdm = objInStream.readObject.asInstanceOf[SimpleDataMapping]
+
+    objInStream.close()
     sdm
   }
 }

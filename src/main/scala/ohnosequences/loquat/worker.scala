@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools._, sqs._, s3._, ec2._, regions._
+import ohnosequences.awstools._, s3._, ec2._, regions._
 import com.amazonaws.services.s3.transfer.TransferManager
 import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._, duration._
@@ -52,7 +52,7 @@ class DataProcessor(
 
   final val workingDir = file("/media/ephemeral0/applicator/loquat")
 
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   // FIXME: don't use Try.get
   import ohnosequences.awstools.sqs._
@@ -62,6 +62,7 @@ class DataProcessor(
 
   val instance = aws.ec2.getCurrentInstance.get
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile var stopped = false
 
   def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
@@ -96,7 +97,7 @@ class DataProcessor(
             waitMore(tries + 1)
           }
           case Some(scala.util.Success(r)) => {
-            logger.info("Got a result: " + r.trace.toString)
+            logger.info(s"Got a result: ${r.trace.toString}")
             r
           }
           case Some(scala.util.Failure(t)) => Failure(s"future error: ${t.getMessage}")
@@ -117,14 +118,19 @@ class DataProcessor(
     logger.error("Terminating instance")
 
     val msgWithID = s"Worker instance ${instance.id}: ${msg}"
-    errorQueue.sendOne(msgWithID).recover { case e =>
-      logger.error(s"Couldn't send failure SQS message: ${e}")
-    }
+    errorQueue.sendOne(msgWithID)
+      .map { _ => () }
+      .recover { case e: Throwable =>
+        logger.error(s"Couldn't send failure SQS message: ${e}")
+      }
 
     loggerBundle.uploadLog()
-    loggerBundle.failureNotification(s"Worker instance ${instance.id} terminated with a fatal error").recover { case e =>
-      logger.error(s"Couldn't send failure SNS notification: ${e}")
-    }
+
+    loggerBundle.failureNotification(s"Worker instance ${instance.id} terminated with a fatal error")
+      .map { _ => () }
+      .recover { case e: Throwable =>
+        logger.error(s"Couldn't send failure SNS notification: ${e}")
+      }
 
     Thread.sleep(15.minutes.toMillis)
 
@@ -245,14 +251,14 @@ class DataProcessor(
 
   def runLoop(): Unit = {
 
-    logger.info("DataProcessor started at " + instance.id)
+    logger.info(s"DataProcessor started at ${instance.id}")
 
     if (workingDir.exists) {
-      logger.debug("Deleting working directory: " + workingDir.path)
+      logger.debug(s"Deleting working directory: ${workingDir.path}")
       workingDir.deleteRecursively()
     }
 
-    logger.info("Creating working directory: " + workingDir.path)
+    logger.info(s"Creating working directory: ${workingDir.path}")
     workingDir.createDirectory
 
     while(!stopped) {

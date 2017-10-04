@@ -3,8 +3,8 @@ package ohnosequences.loquat.test
 import ohnosequences.datasets._
 import ohnosequences.loquat._, utils.files._, test.data._
 import ohnosequences.statika._
-import ohnosequences.datasets._, FileResource._
-import ohnosequences.cosas._, klists._, types._, records._
+import ohnosequences.datasets._
+import ohnosequences.cosas._, types._, records._
 
 case object dataProcessing {
 
@@ -18,7 +18,7 @@ case object dataProcessing {
 
     def instructions: AnyInstructions = say("horay!")
 
-    def process(context: ProcessingContext[Input]): AnyInstructions { type Out <: OutputFiles } = {
+    def process(context: ProcessingContext[Input]): AnyInstructions.withBound[OutputFiles] = {
 
       val txt: String  = context.inputFile(text).lines.mkString("\n")
       val prfx: String = context.inputFile(prefix).lines.mkString("\n")
@@ -33,7 +33,7 @@ case object dataProcessing {
       } -&-
       success("transposed",
         transposed(outFile) ::
-        *[AnyDenotation { type Value <: FileResource }]
+        Resources[FileResource]
       )
     }
   }

@@ -4,12 +4,7 @@ import utils._
 import ohnosequences.statika._
 import ohnosequences.awstools._, sqs._, autoscaling._, regions._
 import com.typesafe.scalalogging.LazyLogging
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-import com.amazonaws.{ services => amzn }
-import scala.collection.JavaConversions._
-import scala.util.Try
-
 
 private[loquat]
 case class TerminationDaemonBundle(
@@ -18,7 +13,7 @@ case class TerminationDaemonBundle(
   val initialCount: Int
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   lazy val managerCreationTime: Option[FiniteDuration] =
     aws.as.getGroup(config.resourceNames.managerGroup)

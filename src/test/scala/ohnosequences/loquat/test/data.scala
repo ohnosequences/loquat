@@ -1,7 +1,6 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.datasets._
-import ohnosequences.cosas._, klists._, types._, records._
 
 case object data {
 
