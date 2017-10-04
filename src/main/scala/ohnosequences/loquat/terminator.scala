@@ -55,26 +55,26 @@ case class TerminationDaemonBundle(
 
     logger.info(s"Queues state:\n${numbers.toString}")
 
-    logger.info(s"Checking termination conditions")
+    logger.info(s"Checking termination conditions:")
     lazy val afterInitial = TerminateAfterInitialDataMappings(
       config.terminationConfig.terminateAfterInitialDataMappings,
       initialCount,
       numbers.inputQ,
       numbers.outputQ
     )
-    logger.info(s"Terminate after initial tasks:  ${afterInitial.check}")
+    logger.info(s"Terminating after initial tasks:  ${afterInitial.check}")
 
     lazy val tooManyErrors = TerminateWithTooManyErrors(
       config.terminationConfig.errorsThreshold,
       numbers.errorQ.available
     )
-    logger.info(s"Terminate with too many errors: ${tooManyErrors.check}")
+    logger.info(s"Terminating with too many errors: ${tooManyErrors.check}")
 
     lazy val globalTimeout = TerminateAfterGlobalTimeout(
       config.terminationConfig.globalTimeout,
       managerCreationTime
     )
-    logger.info(s"Terminate after global timeout: ${globalTimeout.check}")
+    logger.info(s"Terminating after global timeout: ${globalTimeout.check}")
 
     val reason: Option[AnyTerminationReason] =
            if (afterInitial.check) Some(afterInitial)
