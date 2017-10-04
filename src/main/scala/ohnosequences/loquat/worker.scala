@@ -52,7 +52,7 @@ class DataProcessor(
 
   final val workingDir = file("/media/ephemeral0/applicator/loquat")
 
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   // FIXME: don't use Try.get
   import ohnosequences.awstools.sqs._

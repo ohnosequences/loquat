@@ -13,7 +13,7 @@ case class TerminationDaemonBundle(
   val initialCount: Int
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   lazy val managerCreationTime: Option[FiniteDuration] =
     aws.as.getGroup(config.resourceNames.managerGroup)

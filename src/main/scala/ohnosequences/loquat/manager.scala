@@ -47,21 +47,22 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
     terminationBundle
   )
 
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   lazy val names = config.resourceNames
 
 
   def uploadInitialDataMappings(credentials: AWSCredentialsProvider): Try[Unit] = {
 
-    val sqs = SQSClient(
-      config.region,
-      credentials,
-      // TODO: 100 connections? more?
-      PredefinedClientConfigurations.defaultConfig.withMaxConnections(100)
-    )
+    val sqsClient = sqs.clientBuilder
+      .withCredentials(credentials)
+      .withRegion(config.region.getName)
+      .withClientConfiguration(
+        // TODO: 100 connections? more?
+        PredefinedClientConfigurations.defaultConfig.withMaxConnections(100)
+      ).build()
 
-    val queue: Try[Queue] = sqs.getQueue(names.inputQueue)
+    val queue: Try[Queue] = sqsClient.getQueue(names.inputQueue)
       .recoverWith { case t =>
         logger.error(s"Couldn't access input queue: ${names.inputQueue}")
         scala.util.Failure[Queue](t)
@@ -150,7 +151,7 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
       uploadInitialDataMappings(user.localCredentials).get
     } -&-
     prepareWorkers(
-      AWSClients(credentials = user.localCredentials),
+      AWSClients.withCredentials(user.localCredentials),
       user.keypairName
     )
   }

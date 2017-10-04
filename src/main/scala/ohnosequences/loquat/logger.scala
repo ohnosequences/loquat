@@ -13,7 +13,7 @@ case class LogUploaderBundle(
   val scheduler: Scheduler
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   lazy val logFile = file("/log.txt")
 
