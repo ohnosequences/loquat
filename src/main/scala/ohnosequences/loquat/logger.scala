@@ -7,7 +7,6 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._, duration._
 import scala.util.Try
 
-private[loquat]
 case class LogUploaderBundle(
   val config: AnyLoquatConfig,
   val scheduler: Scheduler

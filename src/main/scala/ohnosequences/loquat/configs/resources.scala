@@ -3,7 +3,6 @@ package ohnosequences.loquat
 import ohnosequences.awstools.s3.S3Folder
 
 /* Configuration of resources */
-private[loquat]
 case class ResourceNames(prefix: String, logsS3Prefix: S3Folder) {
   /* name of queue with dataMappings */
   val inputQueue: String = prefix + "-loquat-input"

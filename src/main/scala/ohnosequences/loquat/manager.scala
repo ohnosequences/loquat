@@ -17,7 +17,6 @@ import scala.util.Try
 
 
 // We don't want it to be used outside of this project
-private[loquat]
 trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
 
   val fullName: String
@@ -199,7 +198,6 @@ trait AnyManagerBundle extends AnyBundle with LazyLogging { manager =>
   def instructions: AnyInstructions = normalScenario -|- failScenario
 }
 
-private[loquat]
 abstract class ManagerBundle[W <: AnyWorkerBundle](val worker: W)
   (val dataMappings: List[DataMapping[W#DataProcessingBundle]])
   extends AnyManagerBundle { type Worker = W }
