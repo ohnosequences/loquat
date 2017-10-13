@@ -66,7 +66,6 @@ abstract class Loquat[
 
 
 
-private[loquat]
 case object LoquatOps extends LazyLogging {
 
   def checkDataKeys[DP <: AnyDataProcessingBundle](dataProcessing: DP): Seq[String] = {
