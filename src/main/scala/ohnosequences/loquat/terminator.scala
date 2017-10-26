@@ -6,7 +6,6 @@ import ohnosequences.awstools._, sqs._, autoscaling._, regions._
 import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent.duration._
 
-private[loquat]
 case class TerminationDaemonBundle(
   val config: AnyLoquatConfig,
   val scheduler: Scheduler,
