@@ -1,7 +1,7 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.datasets._
-import ohnosequences.loquat._, utils.files._, test.data._
+import ohnosequences.loquat._, utils._, utils.files._, test.data._
 import ohnosequences.statika._
 import ohnosequences.datasets._, FileResource._
 import ohnosequences.cosas._, klists._, types._, records._
