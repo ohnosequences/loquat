@@ -4,21 +4,15 @@ import utils._
 import ohnosequences.statika._
 import ohnosequences.awstools._, sqs._, autoscaling._, regions._
 import com.typesafe.scalalogging.LazyLogging
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-import com.amazonaws.{ services => amzn }
-import scala.collection.JavaConversions._
-import scala.util.Try
 
-
-private[loquat]
 case class TerminationDaemonBundle(
   val config: AnyLoquatConfig,
   val scheduler: Scheduler,
   val initialCount: Int
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   lazy val managerCreationTime: Option[FiniteDuration] =
     aws.as.getGroup(config.resourceNames.managerGroup)
@@ -60,26 +54,26 @@ case class TerminationDaemonBundle(
 
     logger.info(s"Queues state:\n${numbers.toString}")
 
-    logger.info(s"Checking termination conditions")
+    logger.info(s"Checking termination conditions:")
     lazy val afterInitial = TerminateAfterInitialDataMappings(
       config.terminationConfig.terminateAfterInitialDataMappings,
       initialCount,
       numbers.inputQ,
       numbers.outputQ
     )
-    logger.info(s"Terminate after initial tasks:  ${afterInitial.check}")
+    logger.info(s"Terminating after initial tasks:  ${afterInitial.check}")
 
     lazy val tooManyErrors = TerminateWithTooManyErrors(
       config.terminationConfig.errorsThreshold,
       numbers.errorQ.available
     )
-    logger.info(s"Terminate with too many errors: ${tooManyErrors.check}")
+    logger.info(s"Terminating with too many errors: ${tooManyErrors.check}")
 
     lazy val globalTimeout = TerminateAfterGlobalTimeout(
       config.terminationConfig.globalTimeout,
       managerCreationTime
     )
-    logger.info(s"Terminate after global timeout: ${globalTimeout.check}")
+    logger.info(s"Terminating after global timeout: ${globalTimeout.check}")
 
     val reason: Option[AnyTerminationReason] =
            if (afterInitial.check) Some(afterInitial)

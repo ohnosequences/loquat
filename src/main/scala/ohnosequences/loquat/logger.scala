@@ -4,17 +4,15 @@ import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.awstools._, s3._, ec2._, sns._, regions._
 import com.typesafe.scalalogging.LazyLogging
-import java.util.concurrent._
 import scala.concurrent._, duration._
 import scala.util.Try
 
-private[loquat]
 case class LogUploaderBundle(
   val config: AnyLoquatConfig,
   val scheduler: Scheduler
 ) extends Bundle() with LazyLogging {
 
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   lazy val logFile = file("/log.txt")
 

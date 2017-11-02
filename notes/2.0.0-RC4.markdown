@@ -1,0 +1,2 @@
+- Made LoquatOps public
+- Made other components public too

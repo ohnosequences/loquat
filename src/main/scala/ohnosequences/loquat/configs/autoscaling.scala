@@ -2,8 +2,6 @@ package ohnosequences.loquat
 
 import ohnosequences.awstools.ec2._
 import ohnosequences.awstools.autoscaling._
-import com.amazonaws.services.autoscaling.model._
-
 
 trait AnyAutoScalingConfig extends AnyConfig { conf =>
 
@@ -59,8 +57,7 @@ case class ManagerConfig[
   A <: AnyAmazonLinuxAMI
 ](ami: A,
   instanceType: T,
-  purchaseModel: PurchaseModel,
-  availabilityZones: Set[String] = Set()
+  purchaseModel: PurchaseModel
 )(implicit
   val supportsAMI: T SupportsAMI A
 ) extends AnyManagerConfig {
@@ -71,6 +68,9 @@ case class ManagerConfig[
 
   val groupSize = AutoScalingGroupSize(1, 1, 1)
   val deviceMapping = Map[String, String]()
+
+  // NOTE: you may want to override this if you need particular availability zone
+  val availabilityZones: Set[String] = Set()
 }
 
 /* Workers autoscaling group configuration */
@@ -82,9 +82,7 @@ case class WorkersConfig[
 ](ami: A,
   instanceType: T,
   purchaseModel: PurchaseModel,
-  groupSize: AutoScalingGroupSize,
-  availabilityZones: Set[String] = Set(),
-  deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
+  groupSize: AutoScalingGroupSize
 )(implicit
   val supportsAMI: T SupportsAMI A
 ) extends AnyWorkersConfig {
@@ -92,4 +90,9 @@ case class WorkersConfig[
 
   type AMI = A
   type InstanceType = T
+
+  // NOTE: you may want to override this if you need particular availability zone
+  val availabilityZones: Set[String] = Set()
+  // NOTE: you may want to override this if you need a different device mapping
+  val deviceMapping: Map[String, String] = Map("/dev/sdb" -> "ephemeral0")
 }

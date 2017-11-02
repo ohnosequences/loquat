@@ -3,33 +3,31 @@ description  := "🍋"
 organization := "ohnosequences"
 bucketSuffix := "era7.com"
 
-scalaVersion := "2.11.8"
+crossScalaVersions := Seq("2.11.11", "2.12.3")
+scalaVersion  := crossScalaVersions.value.last
 
 libraryDependencies ++= Seq(
-  // logging:
-  "ch.qos.logback"              % "logback-classic" % "1.1.8",
-  "com.typesafe.scala-logging" %% "scala-logging"   % "3.5.0",
-  // AWS:
-  "ohnosequences" %% "aws-scala-tools" % "0.18.1",
-  // internal structure:
-  "ohnosequences" %% "cosas"       % "0.8.0",
-  "ohnosequences" %% "statika"     % "2.0.0",
-  "ohnosequences" %% "datasets"    % "0.4.1"
+  // Internal:
+  "ohnosequences" %% "aws-statika"     % "2.0.1",
+  "ohnosequences" %% "datasets"        % "0.5.2",
+  // Logging:
+  "ch.qos.logback"              % "logback-classic" % "1.2.3",
+  "com.typesafe.scala-logging" %% "scala-logging"   % "3.7.2",
+  // Testing
+  "org.scalatest" %% "scalatest" % "3.0.4" % Test
 )
 
-dependencyOverrides ++= Set(
-  "org.slf4j" % "slf4j-api" % "1.7.21"
+dependencyOverrides ++= Seq(
+  // scala-logging 3.7.2 is bound to scala 2.12.2, check this after updating scala-logging
+  "org.scala-lang" % "scala-library" % scalaVersion.value,
+  "org.scala-lang" % "scala-reflect" % scalaVersion.value
 )
 
-// FIXME: warts should be turn on back after the code clean up
-wartremoverErrors in (Compile, compile) := Seq()
-wartremoverErrors in (Test,    compile) := Seq()
-
+wartremoverErrors in (Compile, compile) --= Seq(
+  Wart.TryPartial
+)
 
 generateStatikaMetadataIn(Test)
 
 // This includes tests sources in the assembled fat-jar:
 fullClasspath in assembly := (fullClasspath in Test).value
-
-// This turns on fat-jar publishing during release process:
-// publishFatArtifact in Release := true

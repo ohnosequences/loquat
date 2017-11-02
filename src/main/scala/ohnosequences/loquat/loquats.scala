@@ -9,8 +9,6 @@ import com.amazonaws.services.autoscaling.model._
 import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
 import scala.concurrent.duration._
-import collection.JavaConversions._
-import java.nio.file.{ Files, Paths }
 import java.util.NoSuchElementException
 
 trait AnyLoquat { loquat =>
@@ -45,12 +43,15 @@ trait AnyLoquat { loquat =>
   final def launchLocally(user: LoquatUser): Unit =
     LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager)
 
-  final def monitorProgress(interval: FiniteDuration = 3.minutes): Unit =
+  final def monitorProgress(interval: FiniteDuration): Unit =
     LoquatOps.monitorProgress(
       config,
       dataMappings.length,
       interval
     )
+
+  final def monitorProgress(): Unit =
+    monitorProgress(interval = 3.minutes)
 }
 
 abstract class Loquat[
@@ -65,7 +66,6 @@ abstract class Loquat[
 
 
 
-private[loquat]
 case object LoquatOps extends LazyLogging {
 
   def checkDataKeys[DP <: AnyDataProcessingBundle](dataProcessing: DP): Seq[String] = {
@@ -162,7 +162,7 @@ case object LoquatOps extends LazyLogging {
     Seq(
       Step( s"Creating input queue: ${names.inputQueue}" )(
         aws.sqs.getOrCreateQueue(names.inputQueue).map {
-          _.setVisibilityTimeout(30.minutes)
+          _.setVisibilityTimeout(config.sqsInitialTimeout)
         }
       ),
       Step( s"Creating output queue: ${names.outputQueue}" )(
@@ -175,7 +175,7 @@ case object LoquatOps extends LazyLogging {
         Try {
           val logsBucket = names.logs.bucket
 
-          if(aws.s3.doesBucketExist(logsBucket)) {
+          if(aws.s3.doesBucketExistV2(logsBucket)) {
             logger.info(s"Bucket [${logsBucket}] already exists.")
           } else {
             logger.info(s"Bucket [${logsBucket}] doesn't exists. Trying to create it.")
@@ -208,9 +208,6 @@ case object LoquatOps extends LazyLogging {
     LoquatOps.check(config, user, dataProcessing, dataMappings) match {
       case Left(msg) => logger.error(msg)
       case Right(aws) => {
-
-        val names = config.resourceNames
-
         logger.info(s"Launching loquat locally: ${config.loquatId}")
 
         val steps = prepareResourcesSteps(config, user, aws) ++ Seq(

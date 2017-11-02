@@ -3,7 +3,7 @@ package ohnosequences.loquat
 import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.datasets._
-import ohnosequences.awstools._, sqs._, s3._, ec2._, regions._
+import ohnosequences.awstools._, s3._, ec2._, regions._
 import com.amazonaws.services.s3.transfer.TransferManager
 import com.amazonaws.services.sqs.model.ReceiptHandleIsInvalidException
 import ohnosequences.awstools._, sqs._, s3._, ec2._
@@ -64,8 +64,7 @@ case class GeneralContext(
   lazy val inputDir:  File = workingDir / "input"
   lazy val outputDir: File = workingDir / "output"
 
-  /* AWS related things */
-  lazy val aws = AWSClients(config.region)
+  lazy val aws = AWSClients.withRegion(config.region)
 
   val inputQueue  = aws.sqs.getQueue(config.resourceNames.inputQueue).get
   val errorQueue  = aws.sqs.getQueue(config.resourceNames.errorQueue).get
@@ -114,6 +113,7 @@ case class GeneralContext(
 
 
   /* Waits for a task-message from the input queue. It is supposed to wait and send requests as long as needed. */
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def receiveMessage(): Future[Message] = Future.fromTry {
     logger.info("Data processor is waiting for new data...")
 

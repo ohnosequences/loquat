@@ -19,7 +19,7 @@ case object dataProcessing {
 
     def instructions: AnyInstructions = say("horay!")
 
-    def process(context: ProcessingContext[Input]): AnyInstructions { type Out <: OutputFiles } = {
+    def process(context: ProcessingContext[Input]): AnyInstructions.withBound[OutputFiles] = {
 
       val txt: String  = context.inputFile(text).lines.mkString("\n")
       val prfx: String = context.inputFile(prefix).lines.mkString("\n")
@@ -35,7 +35,7 @@ case object dataProcessing {
       } -&-
       success("transposed",
         transposed(outFile) ::
-        *[AnyDenotation { type Value <: FileResource }]
+        Resources[FileResource]
       )
     }
   }
