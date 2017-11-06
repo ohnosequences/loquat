@@ -4,6 +4,7 @@ import ohnosequences.loquat._
 import ohnosequences.awstools._, regions._, ec2._, autoscaling._, s3._
 import ohnosequences.statika._
 import test.dataProcessing._
+import scala.concurrent._, duration._
 
 case object config {
 
@@ -28,13 +29,15 @@ case object config {
       defaultAMI,
       m3.medium,
       PurchaseModel.spot(0.1),
-      AutoScalingGroupSize(0, 1, 20)
+      AutoScalingGroupSize(0, 5, 20)
     )
 
     override val checkInputObjects = false
+
+    override val sqsInitialTimeout: FiniteDuration = 20.seconds
   }
 
-  val N = 1000
+  val N = 100
   val dataMappings: List[DataMapping[processingBundle.type]] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
 
   case object testLoquat extends Loquat(testConfig, processingBundle)(dataMappings)
