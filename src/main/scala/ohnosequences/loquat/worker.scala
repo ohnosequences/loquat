@@ -11,7 +11,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._, duration._
 import scala.util, util.Try
 import java.util.concurrent.ScheduledFuture
-
+import java.util.concurrent.Executors
 
 trait AnyWorkerBundle extends AnyBundle {
 
@@ -21,21 +21,19 @@ trait AnyWorkerBundle extends AnyBundle {
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  val scheduler = Scheduler(3)
-
-  lazy val loggerBundle = LogUploaderBundle(config, scheduler)
+  lazy val loggerBundle = LogUploaderBundle(config, Scheduler(1))
 
   val bundleDependencies: List[AnyBundle] = List(
     loggerBundle,
     instructionsBundle
   )
 
-  lazy val ctx = GeneralContext(config, loggerBundle, instructionsBundle, scheduler)
+  lazy val workerContex = WorkerContext(config, instructionsBundle)
 
   def instructions: AnyInstructions = LazyTry {
-    import ctx._
-    // Await.result(taskLoop(ExecutionContext.Implicits.global), 12.hours)
-    taskLoop(ExecutionContext.Implicits.global)
+    // TODO: choose better execution context
+    // workerContex.taskLoop(ExecutionContext.Implicits.global)
+    workerContex.taskLoop(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(3)))
   }
 }
 
@@ -52,12 +50,12 @@ abstract class WorkerBundle[
 
 
 /* General context per-worker */
-case class GeneralContext(
+case class WorkerContext(
   val config: AnyLoquatConfig,
-  val loggerBundle: LogUploaderBundle,
-  val instructionsBundle: AnyDataProcessingBundle,
-  val scheduler: Scheduler
-) extends LazyLogging { ctx =>
+  val instructionsBundle: AnyDataProcessingBundle
+) extends LazyLogging { workerContex =>
+  // This scheduler wiil be used to keep SQS message in-flight
+  val scheduler = Scheduler(1)
 
   lazy val workingDir: File = file("/media/ephemeral0/applicator/loquat")
   lazy val inputDir:  File = workingDir / "input"
@@ -83,21 +81,9 @@ case class GeneralContext(
     "artifact-url"     -> config.metadata.artifactUrl
   )
 
-  /* This is a _full_ iteration of the task processing loop */
-  def taskLoop(implicit ec: ExecutionContext): Future[FiniteDuration] = {
-
-    receiveMessage.flatMap { message =>
-      TaskContext(
-        message,
-        Deadline.now
-      )(ctx).processTask
-    }.flatMap { _ => taskLoop }
-  }
-
-
   /* Waits for a task-message from the input queue. It is supposed to wait and send requests as long as needed. */
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def receiveMessage(implicit ec: ExecutionContext): Future[Message] = Future.fromTry {
+  def receiveMessage: Try[Message] = {
     logger.info("Data processor is waiting for new data...")
 
     inputQueue.poll(
@@ -107,6 +93,20 @@ case class GeneralContext(
     ).map { _.head }
   }
 
+  /* This is a _full_ iteration of the task processing loop */
+  def taskLoop(implicit ec: ExecutionContext): Future[FiniteDuration] = {
+
+    Future.fromTry(receiveMessage)
+      .flatMap { message =>
+        TaskContext(
+          message,
+          Deadline.now
+        )(workerContex).processTask
+      }
+      .flatMap { _ =>
+        taskLoop
+      }
+  }
 }
 
 
@@ -114,19 +114,20 @@ case class GeneralContext(
 case class TaskContext(
   val message: Message,
   val startTime: Deadline
-)(val ctx: GeneralContext) extends LazyLogging {
-  import ctx._
+)(val workerContex: WorkerContext) extends LazyLogging {
+  import workerContex._
 
   val dataMapping = SimpleDataMapping.deserialize(message.body)
 
   def timeSpent: FiniteDuration = -startTime.timeLeft
 
+  // This timer keeps task message in-flight while the data is being processed
   val keeper: ScheduledFuture[_] = scheduler.repeat(
-    after = 1.second,
-    every = 7.seconds
+    after = 0.seconds,
+    every = (config.sqsInitialTimeout.toMillis * 0.9).millis
   ) {
     logger.debug(s"Keeping message ${dataMapping.id} in flight (${timeSpent.toSeconds}s)")
-    message.changeVisibility(8.seconds).recover {
+    message.changeVisibility(config.sqsInitialTimeout).recover {
       case ex: ReceiptHandleIsInvalidException => {
         logger.warn(s"Task ${dataMapping.id} is already done by somebody")
         keeper.cancel(true)
@@ -138,18 +139,14 @@ case class TaskContext(
   /* This is the main method that conbines all the other methods */
   def processTask(implicit ec: ExecutionContext): Future[FiniteDuration] = {
     logger.info(s"Started task ${dataMapping.id}")
-
-    Future(taskPipeline).map { _ =>
-      keeper.cancel(true)
-      logger.info(s"Task ${dataMapping.id} took ${timeSpent.toSeconds}s")
-      timeSpent
-    }
-  }
-
-  def taskPipeline(): Unit = {
-    val input = prepareInputData
-    val output = processFiles(input)
-    finishTask(output)
+    prepareInputData
+      .map(processFiles)
+      .flatMap(finishTask)
+      .map { _ =>
+        keeper.cancel(true)
+        logger.info(s"Task ${dataMapping.id} took ${timeSpent.toSeconds}s")
+        timeSpent
+      }
   }
 
   /* This method downloads one input data resource and returns the created file */
@@ -178,21 +175,17 @@ case class TaskContext(
     }
   }
 
-  /* This downloads input files for the given datamapping. Multiple files will be downloaded in parallel. */
-  // def prepareInputData(implicit ec: ExecutionContext): Future[Map[String, File]] = {
-  def prepareInputData(): Map[String, File] = {
+  /* This downloads input files for the given datamapping in parallel. */
+  def prepareInputData(implicit ec: ExecutionContext): Future[Map[String, File]] = {
     logger.debug(s"Cleaning up...")
     workingDir.deleteRecursively()
     inputDir.createDirectory
     outputDir.createDirectory
 
     logger.debug("Downloading input data...")
-    // Future.traverse(dataMapping.inputs) { case (name, resource) =>
-      // downloadInput(name, resource).map { name -> _ }
-    dataMapping.inputs.map { case (name, resource) =>
-      name -> downloadInput(name, resource)
-    }
-    // }.map { _.toMap }
+    Future.traverse(dataMapping.inputs) { case (name, resource) =>
+      Future(name -> downloadInput(name, resource))
+    }.map { _.toMap }
   }
 
   def processFiles(
@@ -234,33 +227,27 @@ case class TaskContext(
   }
 
   /* This method uploads all output files, sends a success-message and (!) deletes the task-message from the input queue */
-  // def finishTask(outputFiles: Map[String, File])(implicit ec: ExecutionContext): Future[Unit] = {
-  def finishTask(outputFiles: Map[String, File]): Unit = {
-    // NOTE: this method could be split, but the point of it is to control that task is successfully finished _only_ if the output files are successfully uploaded. Then we can delete the task-message and the task is "announced" as done.
+  def finishTask(
+    outputFiles: Map[String, File]
+  )(implicit ec: ExecutionContext): Future[Unit] = {
     logger.info("Uploading output files...")
-    // Future.traverse(outputFiles) { case (name, file) =>
-      outputFiles.map { case (name, file) =>
-        uploadOutput(file, dataMapping.outputs(name).resource)
-      }
-    // }.map { _ =>
-      notifyOutputQueue()
-    // }.map { _ =>
+    Future.traverse(outputFiles) { case (name, file) =>
+      Future(uploadOutput(file, dataMapping.outputs(name).resource))
+    }.map { _ =>
+      logger.debug("Sending success message to the output queue...")
+      outputQueue.sendOne(
+        // TODO: attach normall log
+        ProcessingResult(instance.id, dataMapping.id).toString
+      ).get
+    }.map { _ =>
+      logger.debug("Deleting task message from the input queue...")
       message.delete().get
-    // }
-  }
-
-  def notifyOutputQueue(): Unit = {
-    logger.info("Finished uploading output files. Publishing message to the output queue.")
-    outputQueue.sendOne(
-      // TODO: attach normall log
-      ProcessingResult(instance.id, dataMapping.id).toString
-    ).get
+    }
   }
 
   /* Publishes an error message to the SQS queue */
   def publishError(msg: String): Try[MessageId] = {
     logger.error(msg)
-
     // TODO: should publish relevant part of the log
     // TODO: construct a JSON?
     errorQueue.sendOne(s"Instance: ${instance.id}; Task: ${dataMapping.id}; Reason: ${msg}")
