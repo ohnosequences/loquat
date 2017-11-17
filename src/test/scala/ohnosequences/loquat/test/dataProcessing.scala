@@ -1,10 +1,11 @@
 package ohnosequences.loquat.test
 
 import ohnosequences.datasets._
-import ohnosequences.loquat._, utils.files._, test.data._
+import ohnosequences.loquat._, utils._, utils.files._, test.data._
 import ohnosequences.statika._
-import ohnosequences.datasets._
-import ohnosequences.cosas._, types._, records._
+import ohnosequences.datasets._, FileResource._
+import ohnosequences.cosas._, klists._, types._, records._
+import concurrent.duration._
 
 case object dataProcessing {
 
@@ -26,6 +27,7 @@ case object dataProcessing {
       val outFile: File = (context / s"${prfx}.transposed.txt").createFile
 
       LazyTry {
+        sleep(65.seconds)
         val matrixRows = context.inputFile(matrix).lines
         val trans = matrixRows.map{ _.reverse }.toList.reverse
         outFile.createFile.overwrite(trans.mkString("\n"))

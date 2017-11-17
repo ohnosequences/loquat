@@ -114,7 +114,7 @@ case class TerminationDaemonBundle(
 
       if (triesLeft > 0) {
 
-        Thread.sleep(5.seconds.toMillis)
+        sleep(5.seconds)
         getAverage(triesLeft - 1, getNumbers +: acc)
       } else {
 
@@ -144,7 +144,7 @@ case class QueueNumbers(
   val inFlight: Int
 ) {
 
-  override def toString = s"${available} available, ${inFlight} in flight"
+  override def toString: String = s"${available} available, ${inFlight} in flight"
 }
 
 case class AllQueuesNumbers(
@@ -153,7 +153,7 @@ case class AllQueuesNumbers(
   val errorQ: QueueNumbers
 ) {
 
-  override def toString = Seq(
+  override def toString: String = Seq(
     s"input  queue: ${inputQ}",
     s"output queue: ${outputQ}",
     s"error  queue: ${errorQ}"

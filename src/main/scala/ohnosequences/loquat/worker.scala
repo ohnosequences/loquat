@@ -4,10 +4,14 @@ import utils._, files._
 import ohnosequences.statika._
 import ohnosequences.datasets._
 import ohnosequences.awstools._, s3._, ec2._, regions._
-import com.amazonaws.services.s3.transfer.TransferManager
+import com.amazonaws.services.sqs.model.ReceiptHandleIsInvalidException
+import ohnosequences.awstools._, sqs._, s3._, ec2._
+
 import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._, duration._
-import scala.util.Try
+import scala.util, util.Try
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.Executors
 
 trait AnyWorkerBundle extends AnyBundle {
 
@@ -17,17 +21,19 @@ trait AnyWorkerBundle extends AnyBundle {
   type Config <: AnyLoquatConfig
   val  config: Config
 
-  val scheduler = Scheduler(2)
-
-  lazy val loggerBundle = LogUploaderBundle(config, scheduler)
+  lazy val loggerBundle = LogUploaderBundle(config, Scheduler(1))
 
   val bundleDependencies: List[AnyBundle] = List(
     loggerBundle,
     instructionsBundle
   )
 
+  lazy val workerContex = WorkerContext(config, instructionsBundle)
+
   def instructions: AnyInstructions = LazyTry {
-    new DataProcessor(config, loggerBundle, instructionsBundle).runLoop
+    // TODO: choose better execution context
+    // workerContex.taskLoop(ExecutionContext.Implicits.global)
+    workerContex.taskLoop(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(3)))
   }
 }
 
@@ -43,256 +49,217 @@ abstract class WorkerBundle[
 }
 
 
-// TODO: rewrite all this and make it Worker's install
-class DataProcessor(
+/* General context per-worker */
+case class WorkerContext(
   val config: AnyLoquatConfig,
-  val loggerBundle: LogUploaderBundle,
   val instructionsBundle: AnyDataProcessingBundle
-) extends LazyLogging {
+) extends LazyLogging { workerContex =>
+  // This scheduler wiil be used to keep SQS message in-flight
+  val scheduler = Scheduler(1)
 
-  final val workingDir = file("/media/ephemeral0/applicator/loquat")
+  lazy val workingDir: File = file("/media/ephemeral0/applicator/loquat")
+  lazy val inputDir:  File = workingDir / "input"
+  lazy val outputDir: File = workingDir / "output"
 
   lazy val aws = AWSClients.withRegion(config.region)
 
-  // FIXME: don't use Try.get
-  import ohnosequences.awstools.sqs._
-  val inputQueue = aws.sqs.getQueue(config.resourceNames.inputQueue).get
-  val errorQueue = aws.sqs.getQueue(config.resourceNames.errorQueue).get
+  val inputQueue  = aws.sqs.getQueue(config.resourceNames.inputQueue).get
+  val errorQueue  = aws.sqs.getQueue(config.resourceNames.errorQueue).get
   val outputQueue = aws.sqs.getQueue(config.resourceNames.outputQueue).get
+
+  val transferManager = aws.s3.createTransferManager
+  // TODO: it should be shutdown explicitly at some point
+  // transferManager.shutdown()
 
   val instance = aws.ec2.getCurrentInstance.get
 
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  @volatile var stopped = false
+  /* This metadata will be attached to each uploaded S3 object */
+  val s3Metadata: Map[String, String] = Map(
+    "artifact-org"     -> config.metadata.organization,
+    "artifact-name"    -> config.metadata.artifact,
+    "artifact-version" -> config.metadata.version,
+    "artifact-url"     -> config.metadata.artifactUrl
+  )
 
-  def waitForResult[R <: AnyResult](futureResult: Future[R], message: Message): Result[FiniteDuration] = {
-    val startTime = System.currentTimeMillis.millis
-    val step = 5.seconds
+  /* Waits for a task-message from the input queue. It is supposed to wait and send requests as long as needed. */
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def receiveMessage: Try[Message] = {
+    logger.info("Data processor is waiting for new data...")
 
-    def timeSpent: FiniteDuration = {
-      val currentTime = System.currentTimeMillis.millis
-      (currentTime - startTime).toSeconds.seconds
-    }
+    inputQueue.poll(
+      timeout = Duration.Inf,
+      amountLimit = Some(1),
+      adjustRequest = { _.withWaitTimeSeconds(10) }
+    ).map { _.head }
+  }
 
-    val taskProcessingTimeout: FiniteDuration =
-      config.terminationConfig.taskProcessingTimeout.getOrElse(12.hours)
+  /* This is a _full_ iteration of the task processing loop */
+  def taskLoop(implicit ec: ExecutionContext): Future[FiniteDuration] = {
 
-    @scala.annotation.tailrec
-    def waitMore(tries: Int): AnyResult = {
-      if(timeSpent > taskProcessingTimeout) {
-        val msg = s"Timeout exceeded: ${timeSpent} spent"
-        terminateWorker(msg)
-        Failure(msg)
-      } else {
-        futureResult.value match {
-          case None => {
-            // every 5min we extend it for 6min
-            if (tries % (5*60) == 0) {
-              if (Try(message.changeVisibility(6.minutes)).isFailure)
-                logger.warn("Couldn't change the visibility globalTimeout")
-              // FIXME: something weird is happening here
-            }
-            Thread.sleep(step.toMillis)
-            // logger.info("Solving dataMapping: " + timeSpent.prettyPrint)
-            waitMore(tries + 1)
-          }
-          case Some(scala.util.Success(r)) => {
-            logger.info(s"Got a result: ${r.trace.toString}")
-            r
-          }
-          case Some(scala.util.Failure(t)) => Failure(s"future error: ${t.getMessage}")
-        }
+    Future.fromTry(receiveMessage)
+      .flatMap { message =>
+        TaskContext(
+          message,
+          Deadline.now
+        )(workerContex).processTask
       }
-    }
+      .flatMap { _ =>
+        taskLoop
+      }
+  }
+}
 
-    waitMore(tries = 0) match {
-      case Failure(tr) => Failure(tr)
-      case Success(tr, _) => Success(tr, timeSpent)
+
+/* Local context per-task */
+case class TaskContext(
+  val message: Message,
+  val startTime: Deadline
+)(val workerContex: WorkerContext) extends LazyLogging {
+  import workerContex._
+
+  val dataMapping = SimpleDataMapping.deserialize(message.body)
+
+  def timeSpent: FiniteDuration = -startTime.timeLeft
+
+  // This timer keeps task message in-flight while the data is being processed
+  val keeper: ScheduledFuture[_] = scheduler.repeat(
+    after = 0.seconds,
+    every = (config.sqsInitialTimeout.toMillis * 0.9).millis
+  ) {
+    logger.debug(s"Keeping message ${dataMapping.id} in flight (${timeSpent.toSeconds}s)")
+    message.changeVisibility(config.sqsInitialTimeout).recover {
+      case ex: ReceiptHandleIsInvalidException => {
+        logger.warn(s"Task ${dataMapping.id} is already done by somebody")
+        keeper.cancel(true)
+        ()
+      }
     }
   }
 
-  def terminateWorker(msg: String): Unit = {
-    stopped = true
+  /* This is the main method that conbines all the other methods */
+  def processTask(implicit ec: ExecutionContext): Future[FiniteDuration] = {
+    logger.info(s"Started task ${dataMapping.id}")
+    prepareInputData
+      .map(processFiles)
+      .flatMap(finishTask)
+      .map { _ =>
+        keeper.cancel(true)
+        logger.info(s"Task ${dataMapping.id} took ${timeSpent.toSeconds}s")
+        timeSpent
+      }
+  }
 
+  /* This method downloads one input data resource and returns the created file */
+  private def downloadInput(
+    name: String,
+    resource: AnyRemoteResource
+  ): File = resource match {
+    /* - if the resource is a message, we just write it to a file */
+    case MessageResource(msg) => {
+      logger.debug(s"Input [${name}]: writing message to a file")
+      val file = (inputDir / name).overwrite(msg)
+      logger.debug(s"Input [${name}]: written to ${file.path}")
+      file
+    }
+    /* - if the resource is an S3 object/folder, we download it */
+    case S3Resource(s3Address) => {
+      // NOTE: if it is an S3 folder, destination will be inputDir/name/<s3Address.key>/
+      logger.debug(s"Input [${name}]: downloading [${s3Address}]")
+      import ohnosequences.awstools.s3._
+      val file = transferManager.download(
+        s3Address,
+        inputDir / name
+      ).get
+      logger.debug(s"Input [${name}]: downloaded to [${file.path}]")
+      file
+    }
+  }
+
+  /* This downloads input files for the given datamapping in parallel. */
+  def prepareInputData(implicit ec: ExecutionContext): Future[Map[String, File]] = {
+    logger.debug(s"Cleaning up...")
+    workingDir.deleteRecursively()
+    inputDir.createDirectory
+    outputDir.createDirectory
+
+    logger.debug("Downloading input data...")
+    Future.traverse(dataMapping.inputs) { case (name, resource) =>
+      Future(name -> downloadInput(name, resource))
+    }.map { _.toMap }
+  }
+
+  def processFiles(
+    inputFiles: Map[String, File]
+  ): Map[String, File] = {
+    logger.debug("Processing data...")
+    instructionsBundle.runProcess(workingDir, inputFiles) match {
+      case Success(_, outputFiles) => outputFiles
+      case Failure(errors) => {
+
+        logger.error(s"Data processing failed, publishing it to the error queue")
+        errorQueue.sendOne(
+          // TODO: attach normall log
+          ProcessingResult(instance.id, errors.mkString("\n")).toString
+        )
+        // TODO: make a specific exception
+        throw new Throwable(errors.mkString("\n"))
+      }
+    }
+  }
+
+  /* This method uploads one output file and returns the destination S3 address or `None` if the files was empty and could be skept */
+  private def uploadOutput(
+    file: File,
+    destination: AnyS3Address
+  ): Option[AnyS3Address] = {
+    if (config.skipEmptyResults && file.isEmpty) {
+      logger.info(s"Output file [${file.getName}] is empty. Skipping it.")
+      None
+    } else {
+      logger.info(s"Publishing output object: [${file.getName}]")
+      transferManager.upload(
+        file,
+        destination,
+        s3Metadata,
+        true // silent
+      ).toOption
+    }
+  }
+
+  /* This method uploads all output files, sends a success-message and (!) deletes the task-message from the input queue */
+  def finishTask(
+    outputFiles: Map[String, File]
+  )(implicit ec: ExecutionContext): Future[Unit] = {
+    logger.info("Uploading output files...")
+    Future.traverse(outputFiles) { case (name, file) =>
+      Future(uploadOutput(file, dataMapping.outputs(name).resource))
+    }.map { _ =>
+      logger.debug("Sending success message to the output queue...")
+      outputQueue.sendOne(
+        // TODO: attach normall log
+        ProcessingResult(instance.id, dataMapping.id).toString
+      ).get
+    }.map { _ =>
+      logger.debug("Deleting task message from the input queue...")
+      message.delete().get
+    }
+  }
+
+  /* Publishes an error message to the SQS queue */
+  def publishError(msg: String): Try[MessageId] = {
     logger.error(msg)
-    logger.error("Terminating instance")
-
-    val msgWithID = s"Worker instance ${instance.id}: ${msg}"
-    errorQueue.sendOne(msgWithID)
-      .map { _ => () }
-      .recover { case e: Throwable =>
-        logger.error(s"Couldn't send failure SQS message: ${e}")
-      }
-
-    loggerBundle.uploadLog()
-
-    loggerBundle.failureNotification(s"Worker instance ${instance.id} terminated with a fatal error")
-      .map { _ => () }
-      .recover { case e: Throwable =>
-        logger.error(s"Couldn't send failure SNS notification: ${e}")
-      }
-
-    Thread.sleep(15.minutes.toMillis)
-
-    instance.terminate.getOrElse {
-      logger.error(s"Couldn't teminate the instance")
-    }
+    // TODO: should publish relevant part of the log
+    // TODO: construct a JSON?
+    errorQueue.sendOne(s"Instance: ${instance.id}; Task: ${dataMapping.id}; Reason: ${msg}")
   }
 
-  private def processDataMapping(
-    transferManager: TransferManager,
-    dataMapping: SimpleDataMapping,
-    workingDir: File
-  ): AnyResult = {
-
-    try {
-      logger.debug("Preparing dataMapping input")
-
-      val inputDir = (workingDir / "input").createDirectory
-
-      val inputFiles: Map[String, File] = dataMapping.inputs.map { case (name, resource) =>
-
-        logger.debug(s"Trying to create input object [${name}] from \n${resource}")
-
-        resource match {
-          case MessageResource(msg) => {
-            val destination: File = inputDir / name
-            destination.createFile.overwrite(msg)
-            (name -> destination)
-          }
-          case S3Resource(s3Address) => {
-            // FIXME: this shouldn't ignore the returned Try
-            val destination: File = transferManager.download(
-              s3Address,
-              inputDir / name
-            ).get
-            (name -> destination)
-          }
-        }
-      }
-
-      // logger.debug("Processing data in: " + workingDir.path)
-      val result = instructionsBundle.runProcess(workingDir, inputFiles)
-
-      val resultDescription = ProcessingResult(dataMapping.id, result.toString)
-
-      result match {
-        case Failure(tr) => {
-          logger.error(s"Script finished with non zero code: ${result}. publishing it to the error queue.")
-          errorQueue.sendOne(s"Worker instance ${instance.id}: ${resultDescription}")
-          result
-        }
-        case Success(tr, outputFileMap) => {
-          // FIXME: do it more careful
-          val outputMap: Map[File, AnyS3Address] =
-            outputFileMap.map { case (name, file) =>
-              file -> dataMapping.outputs(name).resource
-            }
-          // TODO: simplify this huge if-else statement
-          if (outputMap.keys.forall(_.exists)) {
-
-            val uploadTries = outputMap flatMap { case (file, s3Address) =>
-              if (config.skipEmptyResults && file.isEmpty) {
-                logger.info(s"Output file [${file.getName}] is empty. Skipping it.")
-                None
-              } else {
-                logger.info(s"Publishing output object: [${file.getName}]")
-                Some(
-                  transferManager.upload(
-                    file,
-                    s3Address,
-                    Map(
-                      "artifact-org"     -> config.metadata.organization,
-                      "artifact-name"    -> config.metadata.artifact,
-                      "artifact-version" -> config.metadata.version,
-                      "artifact-url"     -> config.metadata.artifactUrl
-                    )
-                  )
-                )
-              }
-            }
-
-            // TODO: check whether we can fold Try's here somehow
-            if (uploadTries.forall(_.isSuccess)) {
-              logger.info("Finished uploading output files. publishing message to the output queue.")
-              outputQueue.sendOne(resultDescription.toString)
-              result //-&- success(s"task [${dataMapping.id}] is successfully finished", ())
-            } else {
-              logger.error(s"Some uploads failed: ${uploadTries.filter(_.isFailure)}")
-              tr +: Failure(Seq("failed to upload output files"))
-            }
-
-          } else {
-
-            val missingFiles = outputMap.keys.filterNot(_.exists).map(_.path)
-            logger.error(s"Some output files don't exist: ${missingFiles}")
-            tr +: Failure(Seq(s"Couldn't upload results, because some output files don't exist: ${missingFiles}"))
-
-          }
-        }
-      }
-    } catch {
-      case t: Throwable => {
-        terminateWorker(s"Fatal failure during dataMapping processing: ${t}")
-        Failure(Seq(t.toString))
-      }
-    }
-  }
-
-  def waitForTask(): Message = inputQueue.poll(
-    timeout = Duration.Inf,
-    amountLimit = Some(1),
-    adjustRequest = { _.withWaitTimeSeconds(10) }
-  ).toOption.flatMap { _.headOption }.getOrElse {
-    logger.info("Didn't get any input tasks. Probably the queue is empty. Retrying...")
-    Thread.sleep(1.minute.toMillis)
-    waitForTask()
-  }
-
-  def runLoop(): Unit = {
-
-    logger.info(s"DataProcessor started at ${instance.id}")
-
-    if (workingDir.exists) {
-      logger.debug(s"Deleting working directory: ${workingDir.path}")
-      workingDir.deleteRecursively()
-    }
-
-    logger.info(s"Creating working directory: ${workingDir.path}")
-    workingDir.createDirectory
-
-    while(!stopped) {
-      try {
-        val transferManager = aws.s3.createTransferManager
-
-        logger.info("Waiting for new data")
-
-        val message = waitForTask()
-
-        // instance.foreach(_.createTag(StatusTag.processing))
-        val dataMapping = SimpleDataMapping.deserialize(message.body)
-
-        logger.info(s"Processing message [${dataMapping.id}]")
-
-        import scala.concurrent.ExecutionContext.Implicits._
-        val futureResult = Future {
-          processDataMapping(transferManager, dataMapping, workingDir)
-        }
-
-        // NOTE: this is blocking until the Future gets a result
-        val dataMappingResult = waitForResult(futureResult, message)
-
-        // FIXME: check this. what happens if result has failures?
-        if (dataMappingResult.isSuccessful) {
-          logger.info("Result was successful. deleting message from the input queue")
-          message.delete()
-        }
-
-        transferManager.shutdown()
-      } catch {
-        case t: Throwable => terminateWorker(s"Fatal failure during dataMapping processing: ${t}")
-      }
-    }
+  /* Enter the void... */
+  def suicide(reason: Throwable): Unit = {
+    // TODO: SNS notifications on critical failures
+    publishError(s"Instance is terminated due to a fatal exception: ${reason}")
+    instance.terminate
+    // throw the suicide note
+    throw reason
   }
 
 }
