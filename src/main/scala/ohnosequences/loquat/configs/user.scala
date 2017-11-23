@@ -25,7 +25,7 @@ case class LoquatUser(
 
     emailErr ++ {
       if(aws.ec2.keyPairExists(keypairName).isSuccess) Seq()
-      else Seq(s"key pair: ${keypairName} doesn't exists")
+      else Seq(s"Keypair [${keypairName}] doesn't exist")
     }
   }
 
