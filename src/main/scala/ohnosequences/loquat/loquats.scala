@@ -10,6 +10,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.util.Try
 import scala.concurrent.duration._
 import java.util.NoSuchElementException
+import java.util.concurrent.ScheduledFuture
 
 trait AnyLoquat { loquat =>
 
@@ -40,17 +41,17 @@ trait AnyLoquat { loquat =>
       AWSClients(config.region, user.localCredentials),
       TerminateManually
     )
-  final def launchLocally(user: LoquatUser): Unit =
+  final def launchLocally(user: LoquatUser): Try[ScheduledFuture[_]] =
     LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager)
 
-  final def monitorProgress(interval: FiniteDuration): Unit =
+  final def monitorProgress(interval: FiniteDuration): ScheduledFuture[_] =
     LoquatOps.monitorProgress(
       config,
       dataMappings.length,
       interval
     )
 
-  final def monitorProgress(): Unit =
+  final def monitorProgress(): ScheduledFuture[_] =
     monitorProgress(interval = 3.minutes)
 }
 
@@ -202,29 +203,23 @@ case object LoquatOps extends LazyLogging {
     user: LoquatUser,
     dataProcessing: AnyDataProcessingBundle,
     dataMappings: List[AnyDataMapping],
-    manager: AnyManagerBundle
-  ): Unit = {
+    manager: AnyManagerBundle,
+    interval: FiniteDuration = 3.minutes
+  ): Try[ScheduledFuture[_]] = {
 
     LoquatOps.check(config, user, dataProcessing, dataMappings) match {
-      case Left(msg) => logger.error(msg)
+      case Left(msg) => util.Failure(new RuntimeException(msg))
       case Right(aws) => {
         logger.info(s"Launching loquat locally: ${config.loquatId}")
-
-        val steps = prepareResourcesSteps(config, user, aws) ++ Seq(
-          Step("Launching manager locally") {
-            resultToTry(
-              manager.localInstructions(user).run(localTargetTmpDir())
-            )
-          },
-          Step("Launching manager locally") {
-            Try { monitorProgress(config, dataMappings.length, 3.minutes) }
-          }
-        )
-
-        steps.foldLeft[Try[_]] {
+        prepareResourcesSteps(config, user, aws).foldLeft[Try[_]] {
           util.Success(true)
         } { (result: Try[_], next: Step[_]) =>
           result.flatMap(_ => next.execute)
+        }
+        resultToTry(
+          manager.localInstructions(user).run(localTargetTmpDir())
+        ).map { _ =>
+          monitorProgress(config, dataMappings.length, interval)
         }
       }
     }
@@ -235,7 +230,7 @@ case object LoquatOps extends LazyLogging {
     config: AnyLoquatConfig,
     tasksCount: Int,
     interval: FiniteDuration
-  ): Unit = {
+  ): ScheduledFuture[_] = {
     TerminationDaemonBundle(config, Scheduler(1), tasksCount)
       .checkAndTerminate(
         after = 1.second,

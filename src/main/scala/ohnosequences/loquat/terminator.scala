@@ -5,6 +5,7 @@ import ohnosequences.statika._
 import ohnosequences.awstools._, sqs._, autoscaling._, regions._
 import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent.duration._
+import java.util.concurrent.ScheduledFuture
 
 case class TerminationDaemonBundle(
   val config: AnyLoquatConfig,
@@ -37,7 +38,7 @@ case class TerminationDaemonBundle(
   def checkAndTerminate(
     after: FiniteDuration,
     every: FiniteDuration
-  ) = {
+  ): ScheduledFuture[_] = {
     scheduler.repeat(after, every){
       checkConditions(recheck = false)
     }
