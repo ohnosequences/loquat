@@ -3,7 +3,7 @@ description  := "🍋"
 organization := "ohnosequences"
 bucketSuffix := "era7.com"
 
-crossScalaVersions := Seq("2.11.11", "2.12.3")
+crossScalaVersions := Seq("2.11.12", "2.12.4")
 scalaVersion  := crossScalaVersions.value.last
 
 libraryDependencies ++= Seq(
