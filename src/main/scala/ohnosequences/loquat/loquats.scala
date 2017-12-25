@@ -215,10 +215,11 @@ case object LoquatOps extends LazyLogging {
           util.Success(true)
         } { (result: Try[_], next: Step[_]) =>
           result.flatMap(_ => next.execute)
-        }
-        resultToTry(
-          manager.localInstructions(user).run(localTargetTmpDir())
-        ).map { _ =>
+        }.flatMap { _ =>
+          resultToTry(
+            manager.localInstructions(user).run(localTargetTmpDir())
+          )
+        }.map { _ =>
           monitorProgress(config, dataMappings.length, interval)
         }
       }
