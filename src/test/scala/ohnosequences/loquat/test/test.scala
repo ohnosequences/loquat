@@ -11,9 +11,11 @@ import java.util.concurrent._
 class LoquatSuite extends org.scalatest.FunSuite {
 
   test("launching loquat locally and waiting for its termination") {
-    config.testLoquat.launchLocally(config.testUser).map { monitor =>
-      val result = monitor.get(10, TimeUnit.MINUTES)
-      info(result.toString)
+    config.testLoquat.launchLocally(
+      user = config.testUser,
+      interval = 30.seconds
+    ).map { monitor =>
+      monitor.get(15, TimeUnit.MINUTES)
       assert(monitor.isDone)
     }.getOrElse {
       failure("Couldn't launch loquat")

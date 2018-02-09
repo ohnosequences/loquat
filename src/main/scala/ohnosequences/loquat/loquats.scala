@@ -41,8 +41,11 @@ trait AnyLoquat { loquat =>
       AWSClients(config.region, user.localCredentials),
       TerminateManually
     )
-  final def launchLocally(user: LoquatUser): Try[ScheduledFuture[_]] =
-    LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager)
+  final def launchLocally(
+    user: LoquatUser,
+    interval: FiniteDuration = 3.minutes
+  ): Try[ScheduledFuture[_]] =
+    LoquatOps.launchLocally(config, user, dataProcessing, dataMappings, manager, interval)
 
   final def monitorProgress(interval: FiniteDuration): ScheduledFuture[_] =
     LoquatOps.monitorProgress(
