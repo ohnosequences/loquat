@@ -37,7 +37,7 @@ case object config {
     override val sqsInitialTimeout: FiniteDuration = 20.seconds
   }
 
-  val N = 100
+  val N = 10
   val dataMappings: List[DataMapping[processingBundle.type]] = (1 to N).toList.map{ _ => test.dataMappings.dataMapping }
 
   case object testLoquat extends Loquat(testConfig, processingBundle)(dataMappings)
