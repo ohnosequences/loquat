@@ -8,7 +8,7 @@ scalaVersion  := crossScalaVersions.value.last
 
 libraryDependencies ++= Seq(
   // Internal:
-  "ohnosequences" %% "aws-statika"     % "2.0.1",
+  "ohnosequences" %% "aws-statika"     % "2.0.2",
   "ohnosequences" %% "datasets"        % "0.5.2",
   // Logging:
   "ch.qos.logback"              % "logback-classic" % "1.2.3",
