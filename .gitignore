@@ -20,3 +20,4 @@ gridBase/grid.config.generated
 .classpath*
 .atom*
 .imdone*
+.metals*
